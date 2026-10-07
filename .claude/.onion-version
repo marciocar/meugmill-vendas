@@ -1,0 +1,8 @@
+framework: gmill
+source_commit: b4d38766cb65
+source_commit_date: 2026-10-07
+role: adopted
+adopted_from: https://github.com/marciocar/gmill.git
+adopted_at: 2026-10-07
+mode: greenfield
+integration_branch: main

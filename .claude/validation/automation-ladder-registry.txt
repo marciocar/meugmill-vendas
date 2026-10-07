@@ -1,0 +1,38 @@
+# SSOT do estado da Automação Graduada — a escada por CLASSE DE AÇÃO (realidade MEDIDA 2026-07-24).
+# Guardado por ladder-integrity-check.sh (doutrina: graduated-automation-ladder.md).
+# formato:  <classe>|<degrau>|<promoted_by>
+#   degraus: HUMAN | STRUCTURAL | MONITORED | DYNAMIC | AUTO | MOAT
+#   degrau que EXIGE prova (STRUCTURAL/MONITORED/DYNAMIC/AUTO) → promoted_by ALCANÇÁVEL; HUMAN/MOAT = '-'
+#
+# REGRA DE OURO (máxima do maestro): autonomia/estrutura se declara com LASTRO, não por decreto.
+# Esta escada ATESTA o que a federação já provou (medido), não só o que falta.
+
+# ── STRUCTURAL — auto-POR-CONSTRUÇÃO (derivação determinística do SSOT, sempre segura; modo estrutural) ──
+inventory-regen|STRUCTURAL|docs/knowledge-base/concepts/onion-guardrails.md
+backlog-project-regen|STRUCTURAL|docs/knowledge-base/concepts/onion-guardrails.md
+plugin-assemble|STRUCTURAL|docs/knowledge-base/concepts/onion-guardrails.md
+graph-map-console-regen|STRUCTURAL|docs/knowledge-base/concepts/onion-guardrails.md
+lint-count-autofix|STRUCTURAL|docs/knowledge-base/concepts/onion-guardrails.md
+diary-index-regen|STRUCTURAL|docs/knowledge-base/concepts/onion-guardrails.md
+kg-radar-verdict|STRUCTURAL|docs/knowledge-base/concepts/knowledge-graph-sdaal.md
+
+# ── HUMAN — execução/ato-3 (canais de risco; propor→confirmar no repo dono). Todos HUMAN hoje. ──
+# co-deliver-target-resolution é a candidata MADURA a MONITORED (91 entregas + falha multi-checkout
+# documentada + monitor Passo 2.1) — mas SÓ sobe com um run monitorado real (a máxima: não fabricar).
+co-deliver-transport|HUMAN|-
+co-deliver-target-resolution|HUMAN|-
+a2a-accept-signal|HUMAN|-
+adopt-update-apply|HUMAN|-
+doctrine-correct-ingest|HUMAN|-
+co-evolve-triage|HUMAN|-
+
+# ── MONITORED (eixo CONFIANÇA) — promoção POR EVIDÊNCIA já GANHA, human-gated ──
+# UM ADOTANTE REGULADO conquistou o direito de CORRIGIR a doutrina do core (can_correct_to) em 2026-07-06
+# por ação provada: achou+corrigiu um bug real de lint, convergente com o nosso, com horas de diferença,
+# zero comunicação. É a máxima do maestro realizada, datada, medida. A prova (nominal) vive no members.yaml
+# (core-privado) + no diário privado — não na superfície vendorizada.
+regulated-adopter-correct-to-core|MONITORED|docs/evolution/federation/members.yaml
+
+# ── MOAT — irreversível → NUNCA auto (medir≠decidir; o extremo seguro, manual por desenho) ──
+site-vps-deploy|MOAT|-
+bridge-deploy|MOAT|-

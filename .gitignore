@@ -1,0 +1,5 @@
+# Segredos locais — nunca versionados (o .env.example é o modelo, este sim versionado). Onion.
+.env
+.env.*
+!.env.example
+!.env.example.onion

@@ -1,0 +1,5 @@
+# Baseline da REGRA 49 — PASSIVO TOLERADO de nós PROD/impact>=4 sem verified_at.
+# Gerado por: bash .claude/validation/kg-verification-coverage.sh --emit-baseline
+# Esta lista SO PODE ENCOLHER. Acrescentar entrada aqui e REGRESSAO (HARD).
+# Para remover uma entrada: MEÇA o no contra o vivo (/meta:kg-freshness) e carimbe.
+

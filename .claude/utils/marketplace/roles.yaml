@@ -1,0 +1,107 @@
+# Mapa role → bundle — O-QUE-SE-INSTALA por papel: verticais de domínio (base/optional) +
+# ferramentas de TRABALHO cross-cutting (work_tools).
+#
+# NÃO confundir com .claude/utils/trust/ (QUEM-FALA-COM-QUEM: relay/advise/correct). Aqui é o ESCOPO
+# DE CAPACIDADE: qual conjunto de plugins/tools cada papel recebe. Federação 2026 (marketplace de org):
+#   (a) acesso-por-grupo (Team/Enterprise) — role → group → auto-install;
+#   (b) fallback /meta:adopt — quais verticais/tools vendorizar por papel quando não há marketplace de org.
+#
+# TRÊS grupos de capacidade (ortogonais):
+#   - VERTICAIS de domínio (base/optional): produto/engenharia/testes/docs/design/compliance.
+#   - WORK_TOOLS (cross-cutting): ferramentas de trabalho de commands/meta que NÃO são meta-fábrica
+#     (kg/diary/orchestrate/metaspec-validate/...). std == hub == source aqui (pesquisa 2026-07-19,
+#     docs/evolution/research/onion-tier-matrix-2026-07). Cada tool arrasta seu motor/agente.
+#   - META-FÁBRICA: create-*/evolve/graph/inventory/federation-* = Camada 1, core-only (o hub USA o framework,
+#     não o autora). ADOPT = Camada 2 (source + hub — a empresa adota os PRÓPRIOS projetos; ver adopt.md PASSO 0).
+#     DOWNSTREAM (co-deliver/announce) = Camada 3, gated (federação cross-empresa; autoridade do core por ora).
+#
+# SSOT: verticais = verticals/*.manifest.sh; work_tools = verticals/onion.manifest.sh (o núcleo absorveu onion-work-tools em 2026-09-04); ambos em marketplace.json.
+# Drift-guard: lint check_role_bundle_sync (todo vertical/tool nomeado resolve a artefato real).
+# Resolver: resolve-role-bundle.sh <role> [--with-optional] [--tools].
+version: 1
+
+# Conjuntos de work_tools nomeados (referenciados por papel abaixo). NÃO são verticais de domínio,
+# NÃO são meta-fábrica. O manifesto onion.manifest.sh (núcleo) materializa comandos + motores + agente — onion-work-tools foi absorvido em 2026-09-04.
+work_tool_sets:
+  # FULL — source/hub/standalone: a ferramenta de trabalho COMPLETA (o reframe: std=solo-completo).
+  full:
+    - kg                     # motor: validation/kg-radar.sh + kg-console.sh
+    - diary                  # motor: validation/diary-index.sh
+    - orchestrate
+    - analyze-complex-problem
+    - metaspec-validate      # agente: agents/meta/metaspec-gate-keeper.md
+    - recover
+    - all-tools
+    - kb-freshness
+    - context-freshness
+    - constellation          # motor: validation/constellation-map.sh
+    - setup-integration
+    - setup-code-review
+    - co-evolve              # co-evolução upstream: ler o inbox do core
+    - co-relay               # co-evolução upstream: sinalizar o core
+    # ── A MAQUINARIA DO MÉTODO (KG + SSOTs geradas) — acrescentada em 2026-09-15 ──────────────
+    # Este conjunto foi escrito quando estes comandos ainda não existiam, e ficou defasado em
+    # silêncio: nada media a lista contra o que o alvo de fato precisa. O corte por papel do
+    # transporte (vendor-manifest.sh) passou a CONSUMIR este arquivo, e aí a defasagem virou
+    # entrega errada — o standalone nasceria sem o motor do próprio método.
+    #
+    # O critério não é gosto, é medição: **comando que as guardas do ALVO mandam rodar tem de
+    # viajar**. Contado nas mensagens de .claude/validation/*.sh — `/meta:inventory` aparece 32
+    # vezes ("rode /meta:inventory"), `/meta:kg-freshness` 27, `/meta:drive` 5, `/meta:radar` 4,
+    # `/meta:backlog` 3, `/meta:kg-inbox` 3. Entregar a guarda sem o comando que ela manda rodar é
+    # dar ao adotante uma instrução que ele não pode cumprir.
+    #
+    # E é o norte NS1 (KG/conhecimento): o standalone é solo-COMPLETO, não solo-mutilado.
+    - inventory              # motor: validation/inventory.sh — SSOT do inventário (REGRA 8/16)
+    - graph                  # motor: validation/graph.sh — projeção do grafo (REGRA 21)
+    - kg-freshness           # re-medir o grafo contra o vivo (re-testar, nunca re-carimbar)
+    - kg-inbox               # entrada de conhecimento no grafo
+    - backlog                # projeção dos nós open (REGRA 62)
+    - realign                # realinhar o plano-grafo com o vivo
+    - radar                  # radar de mundo com baseline datada (REGRA 65)
+    - drive                  # conduzir um plano-grafo até o fim
+    - census                 # censo do backlog medido, não lembrado
+  # DOWNSTREAM — carteiro core→adotante. Só quem TEM sub-adotados (source; hub quando a seam
+  # org-marketplace abrir). std/consumer têm exposes_downstream vazio por definição → não recebem.
+  downstream:
+    - co-deliver
+    - co-announce
+  # MINIMAL (consumer T2) — A DEFINIR quando nascer um consumer real (subconjunto de full).
+
+roles:
+  source:        # TIER 0 — o core (onion-evolve). Instala TUDO: autor + autoridade emissora.
+    base: [onion-engineering, onion-product, onion-design, onion-compliance]
+    optional: []
+    work_tools: full
+    downstream: true
+    note: "Alem dos verticais e dos work_tools, a meta-factory (create-*/adopt/federation-*/evolve/graph/inventory) e core-only e NAO e vertical/tool — nunca sai do core."
+
+  hub:           # TIER 1 — adocao de EMPRESA; a empresa como autoridade sobre os PROPRIOS projetos.
+    base: [onion-engineering, onion-product]
+    optional: [onion-design, onion-compliance]
+    work_tools: full
+    # 3 CAMADAS de capacidade (2026-07-23, sinal de campo de um adotante — o "multi" chegou):
+    #   Camada 1 (autoria do framework: create-*/evolve/graph/inventory) = source-only. Hub USA, nao autora.
+    #   Camada 2 (adocao+controle LOCAL dos proprios projetos: /meta:adopt e --update) = source + HUB. ABERTA
+    #     (gate em adopt.md PASSO 0 = grep role: source|hub; NAO e um campo de bundle aqui): o hub carimba
+    #     role: hub via /meta:adopt --promote-hub e o PASSO 0 passa. FED-3-1 intacto (adopted puro barra).
+    #   Camada 3 (federacao CROSS-empresa: co-deliver/announce, members.yaml de topologia, org-marketplace) = gated.
+    downstream: gated    # Camada 3 — co-deliver/announce cross-empresa so quando a seam abrir; hoje a autoria e do core
+
+  standalone:    # TIER 3 — dev solo com ferramenta COMPLETA, SEM federacao. Pode evoluir p/ hub ou consumer.
+    base: [onion-engineering, onion-product]
+    optional: [onion-design, onion-compliance]
+    work_tools: full
+    downstream: false   # exposes_downstream sempre vazio — sem sub-adotados
+
+  consumer:      # TIER 2 — minimo (adota um hub, nao o core).
+    base: [onion-engineering, onion-product]
+    optional: []
+    work_tools: tbd     # A DEFINIR quando nascer um consumer real (subconjunto de full)
+    downstream: false
+
+  distilled:     # NAO vendoriza nem instala — destilacao curada (onion-mini, prompt-as-bytecode).
+    base: []
+    optional: []
+    work_tools: none
+    downstream: false

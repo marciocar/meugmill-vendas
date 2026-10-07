@@ -1,0 +1,4 @@
+# Baseline de links vendorizados p/ caminho core-privado — PASSIVO TOLERADO.
+# Gerado por: bash .claude/validation/kb-vendored-link-check.sh --emit-baseline > .claude/validation/kb-vendored-link-baseline.txt
+# formato: <rel>|<resolved_core_private_rel>. SÓ PODE ENCOLHER (migre link→gloss e remova a linha).
+# scope: .claude/agents .claude/commands .claude/skills .claude/utils .claude/validation .claude/hooks .claude/rules .claude/workflows docs/meta-specs docs/knowledge-base docs/sdaal plugins

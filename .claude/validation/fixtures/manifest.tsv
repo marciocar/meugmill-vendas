@@ -1,0 +1,129 @@
+# Manifesto de fixtures do auto-teste de guardas (lint-selftest.sh)
+# Colunas TAB-separadas: kind	fixture	target	verdict	keyword	inject
+#   inject  : (opcional) NOME do arquivo injetado; vazio = selftest-fixture-probe.md. Guarda cujo
+#             universo nao e `.md` (ex.: REGRA 89, que varre */radar-*/*.kg.yaml) SO e alcancavel por
+#             aqui. ⚠️ CAMPO VAZIO NO MEIO EXIGE `-`: IFS=$'\t' COLAPSA TABs consecutivos, entao
+#             `…<TAB>good<TAB><TAB>probe.kg.yaml` faz o nome cair em `keyword`. Escreva `-` no
+#             keyword — mesmo idioma do `target` das linhas `members`.
+#   kind    : lint | fix | contract | members | merge | kg
+#             members: roda members-validate.sh <fixture> e assere o exit contra
+#                    o veredito (pass=exit 0 | fail=exit 1); target/keyword = '-'.
+#             merge: exercita .claude/utils/adopt/merge-onion-hooks.sh com a
+#                    fixture como settings.json-ALVO; target/verdict/keyword = '-'
+#                    (asserção é semântica: presença + preservação + idempotência).
+#   fixture : caminho relativo sob .claude/validation/fixtures/
+#   target  : subdir do repo onde injetar (só kind=lint; use '-' p/ contract).
+#             Evite campos vazios no MEIO da linha: IFS=tab colapsa tabs
+#             consecutivos. Campos vazios só no FIM (ex.: keyword) são seguros.
+#   verdict : lint -> bad|good|exempt ; contract/members/kg -> pass|fail (kg = exit de kg-radar.sh --integrity)
+#   keyword : substring esperada na violação (só verdict=bad; vazio caso contrário)
+# Linhas iniciadas por '#' e linhas em branco são ignoradas.
+kind	fixture	target	verdict	keyword
+lint	r12-tool-names/bad-provider-mcp.md	.claude/agents/development	bad	mcp__clickup__
+lint	r12-tool-names/bad-managed-mcp.md	.claude/agents/development	bad	mcp__claude_ai_Asana__
+lint	r12-tool-names/bad-cursor-toolname.md	.claude/agents/development	bad	estilo-Cursor
+lint	r12-tool-names/bad-single-underscore-mcp.md	.claude/agents/development	bad	formato inválido
+lint	r12-tool-names/good-native.md	.claude/agents/development	good
+lint	r15-context-stamp/bad-no-stamp.md	docs/business-context	bad	carimbo de frescor
+lint	r15-context-stamp/good-stamped.md	docs/business-context	good
+lint	r16-count-drift/bad-cmd-count.md	docs	bad	divergente da SSOT
+lint	r16-count-drift/good-cmd-count.md	docs	good
+lint	r16-count-drift/exempt-snapshot.md	docs	exempt
+contract	contracts/bad-no-fixtures.md	-	fail
+contract	contracts/good-contract.md	-	pass
+members	members/members-good.yaml	-	pass	
+members	members/members-bad-no-role.yaml	-	fail	
+members	members/members-bad-dup-id.yaml	-	fail	
+members	members/members-bad-missing-pin.yaml	-	fail	
+members	members/members-bad-fake-source.yaml	-	fail	
+members	members/members-bad-stamp-role.yaml	-	fail	
+merge	adopt-settings-merge/target-empty.json	-	-
+merge	adopt-settings-merge/target-with-own.json	-	-
+merge	adopt-settings-merge/target-with-own-attribution.json	-	-
+lint	r17-frontmatter-colon/bad-unquoted-colon.md	.claude/agents/development	bad	não-aspado
+lint	r17-frontmatter-colon/good-quoted.md	.claude/agents/development	good	
+lint	r16-count-drift/bad-cmd-categorias.md	docs	bad	divergente da SSOT
+lint	r16-count-drift/bad-agentes-comandos.md	docs	bad	divergente da SSOT
+lint	r16-count-drift/good-table-breakdown.md	docs	good
+fix	r16-count-drift/bad-cmd-count.md	docs	corrected
+fix	r16-count-drift/exempt-snapshot.md	docs	untouched
+lint	r18-claude-docs/bad-doc-under-claude-docs.md	.claude/docs	bad	proibido
+lint	r16-count-drift/bad-agent-categorias.md	docs	bad	categorias de agentes
+lint	r16-count-drift/good-agent-categorias.md	docs	good
+fix	r16-count-drift/bad-agent-categorias.md	docs	corrected
+lint	r16-count-drift/bad-parentetic.md	docs	bad	divergente da SSOT
+lint	r16-count-drift/good-parentetic.md	docs	good
+lint	r16-count-drift/bad-approx.md	docs	bad	divergente da SSOT
+lint	r16-count-drift/good-approx-frota.md	docs	good
+lint	r16-count-drift/bad-composite.md	docs	bad	divergente da SSOT
+lint	r16-count-drift/good-composite.md	docs	good
+fix	r16-count-drift/bad-composite.md	docs	corrected
+lint	r16-count-drift/bad-bare-especializados.md	docs	bad	divergente da SSOT
+lint	r16-count-drift/bad-bare-ia.md	docs	bad	divergente da SSOT
+lint	r16-count-drift/good-bare-paren.md	docs	good
+lint	r16-count-drift/good-bare-historical.md	docs	good
+lint	r16-count-drift/good-bare-fleet.md	docs	good
+lint	r16-count-drift/good-bare-criados.md	docs	good
+fix	r16-count-drift/bad-bare-especializados.md	docs	corrected
+lint	r22-evolution-links/bad-broken-link.md	docs/evolution	bad	link relativo quebrado
+lint	r22-evolution-links/good-intake-not-judged.md	docs/evolution/inbox	good
+lint	r22-evolution-links/bad-processed-still-judged.md	docs/evolution/inbox/_processed	bad	link relativo quebrado
+lint	r22-evolution-links/good-fence-ignored.md	docs/evolution/inbox	good
+lint	r22-evolution-links/good-valid-links.md	docs/evolution/inbox	good
+lint	r22-kb-links/bad-broken-link.md	docs/knowledge-base/concepts	bad	link relativo quebrado
+lint	r22-kb-links/good-valid-links.md	docs/knowledge-base/concepts	good
+lint	r23-frontmatter/good-command-no-model.md	.claude/commands/meta	good
+lint	r23-frontmatter/bad-command-with-model.md	.claude/commands/meta	bad	comando declara model:
+lint	r23-frontmatter/bad-agent-no-category.md	.claude/agents/development	bad	sem category:
+lint	r23-frontmatter/good-agent-full.md	.claude/agents/development	good
+kg	kg-domain/good-domain.kg.yaml	-	pass
+kg	kg-domain/warn-domain-gaps.kg.yaml	-	pass
+kg	kg-domain/bad-integrity.kg.yaml	-	fail
+lint	branch-distinction/bad-no-clause.md	.claude/agents/development	bad	cláusula de distinção
+lint	branch-distinction/good-with-clause.md	.claude/agents/development	good	
+lint	r53-rules-pathscoped/bad-no-paths.md	.claude/rules	bad	sem 'paths:' no frontmatter
+lint	r53-rules-pathscoped/bad-empty-paths.md	.claude/rules	bad	declarado mas VAZIO
+lint	r53-rules-pathscoped/bad-dead-glob.md	.claude/rules	bad	NUNCA carrega
+lint	r53-rules-pathscoped/good-live-glob.md	.claude/rules	good	
+lint	r16-count-drift/bad-skills-bare.md	docs	bad	skills divergente da SSOT
+lint	r16-count-drift/good-skills-bare.md	docs	good	
+lint	r16-count-drift/good-skills-no-anchor-fp.md	docs	good	
+lint	r16-count-drift/bad-skills-orquestracao.md	docs	bad	skills divergente da SSOT
+lint	r16-count-drift/bad-table-metrics.md	docs	bad	forma tabela
+lint	r16-count-drift/good-table-metrics.md	docs	good	
+lint	r16-count-drift/good-table-unrecognized-label-fp.md	docs	good	
+lint	r16-count-drift/bad-kb-documentos.md	docs	bad	KBs divergente da SSOT
+lint	r16-count-drift/good-kb-documentos.md	docs	good	
+lint	r16-count-drift/good-kb-arquivos-fp.md	docs	good	
+lint	r1-agent-frontmatter/bad-missing-tools.md	.claude/agents/development	bad	frontmatter de agente incompleto
+lint	r1-agent-frontmatter/good-complete.md	.claude/agents/development	good	
+lint	r2-command-description/bad-no-description.md	.claude/commands/meta	bad	sem description:
+lint	r2-command-description/good-with-description.md	.claude/commands/meta	good	
+lint	r48-backtick-refs/bad-dead-pointer.md	.claude/agents/development	bad	ponteiro morto
+lint	r48-backtick-refs/good-live-pointer.md	.claude/agents/development	good	
+lint	r3-model-allowlist/bad-gpt5-model.md	.claude/agents/development	bad	fora da allowlist
+lint	r3-model-allowlist/good-sonnet-model.md	.claude/agents/development	good	
+lint	r7-no-worker-orchestrator/bad-name-worker-orchestrator.md	.claude/agents/development	bad	worker-orchestrator
+lint	r7-no-worker-orchestrator/good-task-orchestrator-neighbor.md	.claude/agents/development	good	
+lint	r11-abstraction-methods/bad-invented-method.md	.claude/commands/meta	bad	inexistente na interface
+lint	r11-abstraction-methods/good-canonical-method.md	.claude/commands/meta	good	
+lint	r13-template-dialect/bad-cursor-token.md	.claude/commands/common/templates	bad	dialeto
+lint	r13-template-dialect/good-native-tools.md	.claude/commands/common/templates	good	
+lint	r14-metaspec-dialect/bad-cursor-list-item.md	docs/meta-specs	bad	dialeto Cursor
+lint	r14-metaspec-dialect/good-cursor-prose-mention.md	docs/meta-specs	good	
+lint	r16-count-drift/bad-invocaveis-invertida.md	docs	bad	divergente da SSOT
+lint	r16-count-drift/good-invocaveis-invertida.md	docs	good
+lint	r16-count-drift/bad-conjuntiva.md	docs	bad	divergente da SSOT
+lint	r16-count-drift/good-conjuntiva.md	docs	good
+lint	r16-count-drift/bad-table-total.md	docs	bad	não bate com nenhuma contagem
+lint	r16-count-drift/good-table-total.md	docs	good
+lint	r89-aufhebung/bad-sem-aufhebung.kg.yaml	docs/evolution/research/radar-selftest-fixture	bad	REGRA 89	probe.kg.yaml
+lint	r53-rules-pathscoped/bad-empty-body.md	.claude/rules	bad	CORPO VAZIO
+lint	r53-rules-pathscoped/good-scalar-paths.md	.claude/rules	good	
+lint	r53-rules-pathscoped/good-flow-paths.md	.claude/rules	good	
+lint	r53-rules-pathscoped/bad-scalar-dead.md	.claude/rules	bad	NUNCA carrega
+lint	r53-rules-pathscoped/bad-star-only-deep.md	.claude/rules	bad	NUNCA carrega
+lint	r53-rules-pathscoped/good-brace-live.md	.claude/rules	good	
+lint	r53-rules-pathscoped/bad-brace-dead.md	.claude/rules	bad	NUNCA carrega
+lint	r53-rules-pathscoped/good-brace-nested.md	.claude/rules	good	
+lint	r53-rules-pathscoped/good-brace-slash.md	.claude/rules	good	
