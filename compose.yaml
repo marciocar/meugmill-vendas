@@ -1,0 +1,79 @@
+# Stack local do MeuGmill Vendas / Carteira de Clientes: api + web + idp (IdP de mentira).
+# Este arquivo documenta as variáveis: todas têm default via ${VAR:-default}.
+# Para sobrescrever, exporte a variável no shell antes do `docker compose up`.
+# O idp é SÓ para desenvolvimento/CI; em produção a API aponta para o IdP real.
+
+name: carteira
+
+services:
+  idp:
+    # Servidor OAuth2/OIDC de mentira. Fixe a versão: nada de :latest.
+    image: ghcr.io/navikt/mock-oauth2-server:3.0.1
+    # Sem healthcheck de propósito: a imagem é distroless (sem shell/curl/wget, não verificado aqui),
+    # então não há como sondar por dentro. Quem espera o IdP é o scripts/smoke.sh (discovery 200).
+    ports:
+      # Porta do IdP no host. O issuer exposto ao navegador é http://localhost:8080/default.
+      - "${IDP_PORT:-8080}:8080"
+    environment:
+      # Arquivo de configuração: tokens do issuer "default" com aud/roles/branch_ids da carteira.
+      JSON_CONFIG_PATH: /config/idp-config.json
+    volumes:
+      - ./docker/idp-config.json:/config/idp-config.json:ro
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    image: carteira-api:local
+    # ATENÇÃO: manter UMA réplica só. SQLite tem um único escritor; não use `deploy.replicas`
+    # nem `--scale api=N` com o mesmo volume.
+    depends_on:
+      - idp
+    ports:
+      # Porta da API no host (dentro do container é sempre PORT=3000).
+      - "${API_PORT:-3000}:3000"
+    volumes:
+      # Banco SQLite persistente.
+      - carteira-data:/data
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOST: 0.0.0.0
+      # Nível de log do Fastify/pino: fatal|error|warn|info|debug|trace.
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_PATH: /data/carteira.sqlite
+      # Issuer esperado no claim "iss". O mock monta o iss a partir do Host da requisição, e os
+      # tokens são pedidos pelo host em localhost:8080, então o iss é este valor.
+      OIDC_ISSUER: ${OIDC_ISSUER:-http://localhost:8080/default}
+      # Audiência esperada no claim "aud" (o idp já emite aud=carteira-api).
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:-carteira-api}
+      # JWKS buscado pela rede interna do Compose (dentro do container, localhost não é o idp).
+      # Vazio em produção = usar discovery do issuer.
+      OIDC_JWKS_URI: ${OIDC_JWKS_URI:-http://idp:8080/default/jwks}
+      # Algoritmos de assinatura aceitos, separados por vírgula.
+      OIDC_ALGORITHMS: ${OIDC_ALGORITHMS:-RS256,ES256}
+      # Nome do claim com os papéis do usuário.
+      OIDC_CLAIM_ROLES: ${OIDC_CLAIM_ROLES:-roles}
+      # Nome do claim com as filiais do usuário.
+      OIDC_CLAIM_BRANCHES: ${OIDC_CLAIM_BRANCHES:-branch_ids}
+      # Tolerância de relógio (segundos) na validação de exp/nbf.
+      OIDC_CLOCK_TOLERANCE_SECONDS: ${OIDC_CLOCK_TOLERANCE_SECONDS:-30}
+      # Só para o IdP de teste em http; produção exige https.
+      OIDC_ALLOW_INSECURE_HTTP: "true"
+      # Origens autorizadas a chamar a API pelo navegador (lista separada por vírgula).
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8081}
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    image: carteira-web:local
+    ports:
+      # Porta do web component + demo no host (nginx escuta 8080 dentro do container).
+      - "${WEB_PORT:-8081}:8080"
+    restart: unless-stopped
+
+volumes:
+  # Dados do SQLite. `docker compose down -v` apaga o banco.
+  carteira-data:

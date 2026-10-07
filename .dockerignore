@@ -1,0 +1,18 @@
+# Fora do contexto de build: dependências, artefatos, VCS, docs e segredos.
+**/node_modules
+**/dist
+**/coverage
+.git
+.github
+.claude
+.githooks
+docs
+data
+**/*.sqlite
+**/*.sqlite-*
+**/*.sqlite3
+.env
+.env.*
+**/.env
+**/.env.*
+*.log

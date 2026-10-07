@@ -1,0 +1,21 @@
+{
+  "interactiveLogin": false,
+  "tokenCallbacks": [
+    {
+      "issuerId": "default",
+      "tokenExpiry": 3600,
+      "requestMappings": [
+        {
+          "requestParam": "grant_type",
+          "match": "*",
+          "claims": {
+            "sub": "vendedor-01",
+            "aud": ["carteira-api"],
+            "roles": ["vendedor"],
+            "branch_ids": ["filial-01"]
+          }
+        }
+      ]
+    }
+  ]
+}
