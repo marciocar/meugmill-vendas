@@ -18,6 +18,7 @@ export type AuthConfig = Pick<
   | 'OIDC_ISSUER'
   | 'OIDC_AUDIENCE'
   | 'OIDC_JWKS_URI'
+  | 'OIDC_ALLOW_INSECURE_HTTP'
   | 'OIDC_ALGORITHMS'
   | 'OIDC_CLAIM_ROLES'
   | 'OIDC_CLAIM_BRANCHES'
@@ -28,9 +29,12 @@ export interface AuthPluginOptions {
   config: AuthConfig;
   /** Substitui a busca da JWKS (uso em testes). */
   keyGetter?: JWTVerifyGetKey;
+  /** Intervalo sem nova tentativa de discovery após uma falha (default 10s; injetável em testes). */
+  discoveryCooldownMs?: number;
 }
 
 const FETCH_TIMEOUT_MS = 5000;
+const DEFAULT_DISCOVERY_COOLDOWN_MS = 10_000;
 
 // Erros que significam "token ruim" (401). Qualquer outro erro (rede, JWKS inválida,
 // timeout, falha inesperada) vira 503: a requisição nunca passa.
@@ -48,10 +52,17 @@ function isTokenError(err: unknown): boolean {
   );
 }
 
-// Descobre o jwks_uri (se não configurado) de forma lazy e guarda o key getter; falhas não são cacheadas.
-function remoteKeyGetter(config: AuthConfig): JWTVerifyGetKey {
+// Descobre o jwks_uri (se não configurado) de forma lazy e guarda o key getter. Falhas não são
+// cacheadas como sucesso, mas respeitam um cooldown: dentro dele a falha anterior é repetida na hora,
+// sem nova ida ao IdP.
+function remoteKeyGetter(
+  config: AuthConfig,
+  cooldownMs: number,
+  log: { error: (obj: object, msg: string) => void },
+): JWTVerifyGetKey {
   let getter: JWTVerifyGetKey | undefined;
   let pending: Promise<JWTVerifyGetKey> | undefined;
+  let lastFailure: { at: number; error: Error } | undefined;
 
   async function resolve(): Promise<JWTVerifyGetKey> {
     let uri = config.OIDC_JWKS_URI;
@@ -62,16 +73,31 @@ function remoteKeyGetter(config: AuthConfig): JWTVerifyGetKey {
       const doc = (await res.json()) as { jwks_uri?: unknown };
       if (typeof doc.jwks_uri !== 'string') throw new Error('Discovery OIDC sem jwks_uri');
       uri = doc.jwks_uri;
+      // O jwks_uri vem de fora (discovery): aplica a mesma regra de https da configuração.
+      if (!config.OIDC_ALLOW_INSECURE_HTTP && new URL(uri).protocol !== 'https:') {
+        log.error({ reason: 'discovery_jwks_uri_not_https' }, 'jwks_uri do discovery rejeitado: não é https');
+        throw new Error('jwks_uri do discovery não é https');
+      }
     }
     return createRemoteJWKSet(new URL(uri), { timeoutDuration: FETCH_TIMEOUT_MS });
   }
 
   return async (protectedHeader, token) => {
     if (!getter) {
-      pending ??= resolve().finally(() => {
-        pending = undefined;
-      });
+      if (lastFailure && Date.now() - lastFailure.at < cooldownMs) throw lastFailure.error;
+      pending ??= resolve()
+        .catch((err: unknown) => {
+          lastFailure = {
+            at: Date.now(),
+            error: err instanceof Error ? err : new Error('Falha no discovery'),
+          };
+          throw err;
+        })
+        .finally(() => {
+          pending = undefined;
+        });
       getter = await pending;
+      lastFailure = undefined;
     }
     return getter(protectedHeader, token);
   };
@@ -100,7 +126,9 @@ function unauthorized(reply: FastifyReply): FastifyReply {
 export const authPlugin = fp<AuthPluginOptions>(
   async (app, opts) => {
     const { config } = opts;
-    const getKey = opts.keyGetter ?? remoteKeyGetter(config);
+    const getKey =
+      opts.keyGetter ??
+      remoteKeyGetter(config, opts.discoveryCooldownMs ?? DEFAULT_DISCOVERY_COOLDOWN_MS, app.log);
 
     app.decorateRequest('user');
     app.decorate('authenticate', async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {

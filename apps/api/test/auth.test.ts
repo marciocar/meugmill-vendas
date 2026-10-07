@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { SignJWT, exportJWK, generateKeyPair, type JWK } from 'jose';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { buildApp } from '../src/app.js';
+import { buildApp, type BuildAppOptions } from '../src/app.js';
 import { loadConfig } from '../src/config.js';
 
 const ISSUER = 'https://idp.test';
@@ -51,7 +51,10 @@ afterEach(async () => {
   await Promise.all(apps.splice(0).map((a) => a.close()));
 });
 
-async function make(env: Record<string, string> = {}): Promise<FastifyInstance> {
+async function make(
+  env: Record<string, string> = {},
+  appOptions: BuildAppOptions = {},
+): Promise<FastifyInstance> {
   const app = buildApp(
     loadConfig({
       LOG_LEVEL: 'silent',
@@ -60,8 +63,10 @@ async function make(env: Record<string, string> = {}): Promise<FastifyInstance> 
       OIDC_ISSUER: ISSUER,
       OIDC_AUDIENCE: AUDIENCE,
       OIDC_JWKS_URI: jwksUri,
+      OIDC_ALLOW_INSECURE_HTTP: 'true',
       ...env,
     }),
+    appOptions,
   );
   apps.push(app);
   await app.ready();
@@ -72,18 +77,23 @@ interface SignOptions {
   key?: CryptoKey;
   issuer?: string;
   audience?: string;
-  expiresIn?: string | number;
+  expiresIn?: string | number | null;
+  kid?: string;
+  /** null = não define `sub`; string = valor (inclusive vazio). */
+  sub?: string | null;
+  notBefore?: number;
   claims?: Record<string, unknown>;
 }
 
 function sign(opts: SignOptions = {}): Promise<string> {
   const jwt = new SignJWT({ roles: ['vendedor'], branch_ids: ['f1', 'f2'], ...opts.claims })
-    .setProtectedHeader({ alg: 'RS256', kid: KID })
-    .setSubject('user-1')
+    .setProtectedHeader({ alg: 'RS256', kid: opts.kid ?? KID })
     .setIssuer(opts.issuer ?? ISSUER)
     .setAudience(opts.audience ?? AUDIENCE)
-    .setIssuedAt()
-    .setExpirationTime(opts.expiresIn ?? '5m');
+    .setIssuedAt();
+  if (opts.sub !== null) jwt.setSubject(opts.sub ?? 'user-1');
+  if (opts.expiresIn !== null) jwt.setExpirationTime(opts.expiresIn ?? '5m');
+  if (opts.notBefore !== undefined) jwt.setNotBefore(opts.notBefore);
   return jwt.sign(opts.key ?? keys.privateKey);
 }
 
@@ -188,7 +198,7 @@ describe('GET /v1/me', () => {
     });
     const port = await listen(discovery);
     try {
-      const app = await make({ OIDC_ISSUER: `http://127.0.0.1:${port}` });
+      const app = await make({ OIDC_ISSUER: `http://127.0.0.1:${port}`, OIDC_JWKS_URI: '' });
       const token = await sign({ issuer: `http://127.0.0.1:${port}` });
       expect((await getMe(app, token)).statusCode).toBe(200);
     } finally {
@@ -204,6 +214,109 @@ describe('GET /v1/me', () => {
     const res = await getMe(app, await sign());
     expect(res.statusCode).toBe(503);
     expect(res.json()).toEqual({ error: 'auth_unavailable' });
+  });
+});
+
+describe('claims temporais e obrigatórias', () => {
+  const now = (): number => Math.floor(Date.now() / 1000);
+
+  it('nbf no futuro retorna 401', async () => {
+    const app = await make({ OIDC_CLOCK_TOLERANCE_SECONDS: '0' });
+    expectUnauthorized(await getMe(app, await sign({ notBefore: now() + 600 })));
+  });
+
+  it('respeita a tolerância de relógio: exp vencido há 10s passa, há 60s não (30s)', async () => {
+    const app = await make({ OIDC_CLOCK_TOLERANCE_SECONDS: '30' });
+    expect((await getMe(app, await sign({ expiresIn: now() - 10 }))).statusCode).toBe(200);
+    expectUnauthorized(await getMe(app, await sign({ expiresIn: now() - 60 })));
+  });
+
+  it('token sem sub retorna 401', async () => {
+    expectUnauthorized(await getMe(await make(), await sign({ sub: null })));
+  });
+
+  it('token com sub vazio retorna 401', async () => {
+    expectUnauthorized(await getMe(await make(), await sign({ sub: '' })));
+  });
+
+  it('token sem exp retorna 401', async () => {
+    expectUnauthorized(await getMe(await make(), await sign({ expiresIn: null })));
+  });
+
+  it('kid inexistente na JWKS (rotação) retorna 401, não 503', async () => {
+    expectUnauthorized(await getMe(await make(), await sign({ kid: 'rotacionada' })));
+  });
+});
+
+describe('https obrigatório e discovery', () => {
+  it('jwks_uri http vindo do discovery retorna 503 quando http não é permitido', async () => {
+    const discovery = createServer((_req, res) => {
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ jwks_uri: jwksUri }));
+    });
+    const port = await listen(discovery);
+    try {
+      // O issuer http seria rejeitado no boot sem a flag; o config é montado com ela ligada e
+      // depois desligada, para exercitar só a checagem do jwks_uri obtido no discovery.
+      const config = loadConfig({
+        LOG_LEVEL: 'silent',
+        NODE_ENV: 'test',
+        DATABASE_PATH: ':memory:',
+        OIDC_ISSUER: `http://127.0.0.1:${port}`,
+        OIDC_AUDIENCE: AUDIENCE,
+        OIDC_ALLOW_INSECURE_HTTP: 'true',
+      });
+      const app = buildApp({ ...config, OIDC_ALLOW_INSECURE_HTTP: false });
+      apps.push(app);
+      await app.ready();
+      const res = await getMe(app, await sign({ issuer: `http://127.0.0.1:${port}` }));
+      expect(res.statusCode).toBe(503);
+      expect(res.json()).toEqual({ error: 'auth_unavailable' });
+    } finally {
+      await close(discovery);
+    }
+  });
+
+  it('falha no boot com issuer http sem a flag', () => {
+    expect(() =>
+      loadConfig({ OIDC_ISSUER: 'http://idp.test', OIDC_AUDIENCE: AUDIENCE, DATABASE_PATH: ':memory:' }),
+    ).toThrow(/OIDC_ISSUER/);
+  });
+
+  it('cooldown: falha 503 imediato, e após o cooldown recupera', async () => {
+    let calls = 0;
+    let healthy = false;
+    const discovery = createServer((_req, res) => {
+      calls += 1;
+      if (!healthy) {
+        res.statusCode = 500;
+        res.end('erro');
+        return;
+      }
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ jwks_uri: jwksUri }));
+    });
+    const port = await listen(discovery);
+    try {
+      const issuer = `http://127.0.0.1:${port}`;
+      const cooldown = 300;
+      const app = await make({ OIDC_ISSUER: issuer, OIDC_JWKS_URI: '' }, { discoveryCooldownMs: cooldown });
+      const token = await sign({ issuer });
+
+      expect((await getMe(app, token)).statusCode).toBe(503);
+      expect(calls).toBe(1);
+
+      // Dentro do cooldown: 503 imediato, sem nova ida ao IdP (mesmo que ele já tenha se recuperado).
+      healthy = true;
+      expect((await getMe(app, token)).statusCode).toBe(503);
+      expect(calls).toBe(1);
+
+      await new Promise((r) => setTimeout(r, cooldown + 100));
+      expect((await getMe(app, token)).statusCode).toBe(200);
+      expect(calls).toBe(2);
+    } finally {
+      await close(discovery);
+    }
   });
 });
 

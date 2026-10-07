@@ -13,6 +13,7 @@ describe('loadConfig', () => {
       NODE_ENV: 'development',
       OIDC_ISSUER: 'https://idp.test',
       OIDC_AUDIENCE: 'meugmill',
+      OIDC_ALLOW_INSECURE_HTTP: false,
       OIDC_ALGORITHMS: ['RS256', 'ES256'],
       OIDC_CLAIM_ROLES: 'roles',
       OIDC_CLAIM_BRANCHES: 'branch_ids',
@@ -74,5 +75,43 @@ describe('loadConfig', () => {
       OIDC_CLAIM_BRANCHES: 'filiais',
       OIDC_CLOCK_TOLERANCE_SECONDS: 5,
     });
+  });
+
+  it('exige https em issuer e jwks_uri por padrão', () => {
+    expect(() => loadConfig({ OIDC_ISSUER: 'http://idp.test', OIDC_AUDIENCE: 'x' })).toThrow(
+      /OIDC_ISSUER: http não é permitido/,
+    );
+    expect(() => loadConfig({ ...OIDC, OIDC_JWKS_URI: 'http://idp.test/jwks' })).toThrow(
+      /OIDC_JWKS_URI: http não é permitido/,
+    );
+    expect(() => loadConfig({ ...OIDC, OIDC_JWKS_URI: 'https://idp.test/jwks' })).not.toThrow();
+  });
+
+  it('OIDC_ALLOW_INSECURE_HTTP=true aceita http', () => {
+    const cfg = loadConfig({
+      OIDC_ISSUER: 'http://idp.local',
+      OIDC_AUDIENCE: 'x',
+      OIDC_JWKS_URI: 'http://idp.local/jwks',
+      OIDC_ALLOW_INSECURE_HTTP: 'true',
+    });
+    expect(cfg.OIDC_ALLOW_INSECURE_HTTP).toBe(true);
+  });
+
+  it.each([
+    'https://app.test/',
+    'https://app.test/caminho',
+    'https://app.test?x=1',
+    'https://app.test#frag',
+    'https://app.test/?x=1',
+  ])('rejeita CORS_ORIGINS que não é exatamente uma origem (%s)', (origin) => {
+    expect(() => loadConfig({ ...OIDC, CORS_ORIGINS: origin })).toThrow(
+      /CORS_ORIGINS.*exatamente uma origem/,
+    );
+  });
+
+  it('aceita origem com porta em CORS_ORIGINS', () => {
+    expect(loadConfig({ ...OIDC, CORS_ORIGINS: 'http://localhost:5173' }).CORS_ORIGINS).toEqual([
+      'http://localhost:5173',
+    ]);
   });
 });

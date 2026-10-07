@@ -19,6 +19,8 @@ export interface BuildAppOptions {
   keyGetter?: JWTVerifyGetKey;
   /** Destino do log (uso em testes, para capturar as linhas). */
   logStream?: LogStream;
+  /** Cooldown do discovery OIDC após falha, em ms (uso em testes; default 10s). */
+  discoveryCooldownMs?: number;
 }
 
 export function buildApp(config: AppConfig, options: BuildAppOptions = {}): FastifyInstance {
@@ -42,6 +44,9 @@ export function buildApp(config: AppConfig, options: BuildAppOptions = {}): Fast
   void app.register(authPlugin, {
     config,
     ...(options.keyGetter ? { keyGetter: options.keyGetter } : {}),
+    ...(options.discoveryCooldownMs !== undefined
+      ? { discoveryCooldownMs: options.discoveryCooldownMs }
+      : {}),
   });
   void app.register(healthRoutes);
   void app.register(meRoutes, { prefix: '/v1' });

@@ -16,6 +16,7 @@ source: teste do formulário de dúvidas pelo maestro (respostas sugeridas aceit
 |---|---|---|
 | IdP | Provedor compatível com OIDC; issuer e URL de descoberta de homologação a receber | `[INFERIDO]` |
 | Claims | `sub` = usuário; `branch_ids` = filiais; `roles` = perfis | `[INFERIDO]` |
+| Tipo de token | O IdP emite access token distinguível do ID token (`typ: at+jwt`, RFC 9068, ou `aud` própria da API diferente do `client_id` do front). Se não emitir, um ID token do mesmo issuer passaria como access token — achado da revisão do E1 | `[INFERIDO]` |
 | Perfis | Vendedor: clientes vinculados a ele no seu subgrupo. Responsável/gerente: clientes das carteiras que gerencia. Administrador: todas as carteiras da filial. Permissão específica: visão ampliada por filial | `[INFERIDO]` palpite |
 
 ## Uso pelo sistema principal

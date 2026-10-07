@@ -28,6 +28,8 @@ const ConfigSchema = Type.Object({
   OIDC_AUDIENCE: Type.String({ minLength: 1 }),
   // Se ausente, o jwks_uri é descoberto em `${OIDC_ISSUER}/.well-known/openid-configuration`.
   OIDC_JWKS_URI: Type.Optional(Type.String({ minLength: 1 })),
+  // Fora de dev, issuer e jwks_uri precisam ser https. Só ligue em dev/Compose (IdP local em http).
+  OIDC_ALLOW_INSECURE_HTTP: Type.Boolean({ default: false }),
   OIDC_ALGORITHMS: Type.String({ default: 'RS256,ES256' }),
   // [INFERIDO] Os nomes de claims abaixo são hipótese provisória do cliente; confirmar com o IdP da GMill.
   // Ver docs/business-context/02-product/features/carteira-de-clientes-hipoteses.md (tema "Claims").
@@ -74,11 +76,16 @@ function splitList(value: string): string[] {
 }
 
 function isHttpUrl(value: string): boolean {
+  return httpProtocol(value) !== null;
+}
+
+// Retorna o protocolo (http:/https:) ou null se a URL for inválida ou de outro esquema.
+function httpProtocol(value: string): 'http:' | 'https:' | null {
   try {
     const { protocol } = new URL(value);
-    return protocol === 'https:' || protocol === 'http:';
+    return protocol === 'https:' || protocol === 'http:' ? protocol : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -105,6 +112,14 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
   if (candidate.OIDC_JWKS_URI !== undefined && !isHttpUrl(candidate.OIDC_JWKS_URI)) {
     issues.push('OIDC_JWKS_URI: deve ser uma URL http(s)');
   }
+  if (!candidate.OIDC_ALLOW_INSECURE_HTTP) {
+    const hint = 'use https ou, apenas em desenvolvimento, OIDC_ALLOW_INSECURE_HTTP=true';
+    if (httpProtocol(candidate.OIDC_ISSUER) === 'http:')
+      issues.push(`OIDC_ISSUER: http não é permitido; ${hint}`);
+    if (candidate.OIDC_JWKS_URI !== undefined && httpProtocol(candidate.OIDC_JWKS_URI) === 'http:') {
+      issues.push(`OIDC_JWKS_URI: http não é permitido; ${hint}`);
+    }
+  }
 
   const algorithms = splitList(candidate.OIDC_ALGORITHMS);
   if (algorithms.length === 0) issues.push('OIDC_ALGORITHMS: informe ao menos um algoritmo');
@@ -118,6 +133,10 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
   for (const origin of corsOrigins) {
     if (origin === '*' || !isHttpUrl(origin)) {
       issues.push(`CORS_ORIGINS: origem inválida "${origin}" (use origens explícitas, sem curinga)`);
+    } else if (new URL(origin).origin !== origin) {
+      issues.push(
+        `CORS_ORIGINS: "${origin}" deve ser exatamente uma origem (esquema://host[:porta], sem barra final, caminho, query ou fragmento)`,
+      );
     }
   }
 

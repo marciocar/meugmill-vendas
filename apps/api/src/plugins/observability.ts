@@ -58,6 +58,13 @@ export const observabilityPlugin = fp(
       void reply.header(REQUEST_ID_HEADER, request.id);
     });
 
+    // 404 próprio: o log padrão do Fastify ("Route ... not found") traz a URL com query string.
+    // Aqui só método e caminho (sem query) vão para o log, e a resposta não ecoa a URL.
+    app.setNotFoundHandler((request, reply) => {
+      request.log.info({ method: request.method, path: request.url.split('?')[0] }, 'Rota não encontrada');
+      return reply.code(404).send({ error: 'not_found' });
+    });
+
     app.setErrorHandler((error: FastifyError, request, reply) => {
       const status = error.statusCode && error.statusCode >= 400 ? error.statusCode : 500;
       if (status >= 500) {
