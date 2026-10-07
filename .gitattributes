@@ -1,0 +1,2 @@
+docs/evolution/**/CHANGELOG.md merge=union
+docs/evolution/**/_processed/** merge=union

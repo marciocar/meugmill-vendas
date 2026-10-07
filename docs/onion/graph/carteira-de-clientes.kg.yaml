@@ -1,0 +1,462 @@
+graph: carteira-de-clientes
+title: "MeuGmill Vendas — carteira de clientes (domínio)"
+layer: mixed
+created: 2026-10-07
+updated: 2026-10-07
+owner: meugmill-vendas
+purpose: |
+  Primeiro domínio mapeado do MeuGmill Vendas: como a carteira de clientes é montada, como decide quais
+  clientes entram, como distribui entre vendedores e como limita o que cada vendedor vê.
+  FONTE ÚNICA: docs/business-context/02-product/features/carteira-de-clientes.md (texto do maestro, que
+  declara ter sido conferido na interface e na API). Nada aqui foi conferido contra o código, que não está
+  neste repo: por isso a confiança fica abaixo de 1 e os `trace:` apontam para o documento, não para código.
+  Regra de escrita: não inventar regra além do documento. O que o documento não diz virou `question`.
+como_usar: |
+  Leia com: bash .claude/validation/kg-radar.sh docs/onion/graph/carteira-de-clientes.kg.yaml
+  Quando o código chegar, re-verifique cada `rule`/`invariant`/`policy` contra ele e troque o `trace:`
+  do documento pelo `arquivo:linha` do código.
+
+meta:
+  id: carteira-de-clientes-meugmill-vendas
+  schema_version: "1"
+  baseline: 2026-10-07
+  date: 2026-10-07
+  review_after: 2027-01-31
+
+nodes:
+  # ---- camada domain ----
+  - id: EN_PORTFOLIO
+    node_type: entity
+    layer: domain
+    plane: PROD
+    status: confirmed
+    impact: 5
+    confidence: 0.8
+    verified_at: 2026-10-07
+    verified_against: doc-carteira-de-clientes-sem-codigo
+    trace: docs/business-context/02-product/features/carteira-de-clientes.md:16
+    label: "Carteira de clientes: pertence a UMA filial, tem um responsável e um tipo, reúne um ou mais vendedores e define um conjunto de clientes por critérios comerciais ou geográficos."
+
+  - id: EN_BRANCH
+    node_type: entity
+    layer: domain
+    plane: PROD
+    status: confirmed
+    impact: 4
+    confidence: 0.8
+    verified_at: 2026-10-07
+    verified_against: doc-carteira-de-clientes-sem-codigo
+    trace: docs/business-context/02-product/features/carteira-de-clientes.md:16
+    label: "Filial: dona da carteira. A disputa de prioridade entre carteiras só acontece dentro da mesma filial."
+
+  - id: EN_CUSTOMER
+    node_type: entity
+    layer: domain
+    plane: PROD
+    status: confirmed
+    impact: 4
+    confidence: 0.8
+    verified_at: 2026-10-07
+    verified_against: doc-carteira-de-clientes-sem-codigo
+    trace: docs/business-context/02-product/features/carteira-de-clientes.md:35
+    label: "Cliente: casado com a carteira pelos dados cadastrais (estado, cidade, bairro, rede, grupo econômico)."
+
+  - id: EN_SELLER
+    node_type: entity
+    layer: domain
+    plane: PROD
+    status: confirmed
+    impact: 4
+    confidence: 0.8
+    verified_at: 2026-10-07
+    verified_against: doc-carteira-de-clientes-sem-codigo
+    trace: docs/business-context/02-product/features/carteira-de-clientes.md:27
+    label: "Vendedor: escolhido na carteira junto com os subgrupos de produto que atende."
+
+  - id: EN_SUBGROUP
+    node_type: entity
+    layer: domain
+    plane: PROD
+    status: confirmed
+    impact: 4
+    confidence: 0.8
+    verified_at: 2026-10-07
+    verified_against: doc-carteira-de-clientes-sem-codigo
+    trace: docs/business-context/02-product/features/carteira-de-clientes.md:51
+    label: "Subgrupo de produto (ex.: Medicamentos, Consumo): a unidade em que se atribui o vendedor ao cliente."
+
+  - id: EN_ASSIGNMENT
+    node_type: entity
+    layer: domain
+    plane: PROD
+    status: confirmed
+    impact: 5
+    confidence: 0.8
+    verified_at: 2026-10-07
+    verified_against: doc-carteira-de-clientes-sem-codigo
+    trace: docs/business-context/02-product/features/carteira-de-clientes.md:53
+    label: "Vínculo carteira × cliente × vendedor × subgrupo: o que o MeuGmill grava ao finalizar a carteira."
+
+  - id: ST_ASSIGNMENT_PREVIEW
+    node_type: state
+    layer: domain
+    plane: PROD
+    status: confirmed
+    impact: 3
+    confidence: 0.7
+    verified_at: 2026-10-07
+    verified_against: doc-carteira-de-clientes-sem-codigo
+    trace: docs/business-context/02-product/features/carteira-de-clientes.md:31
+    label: "Na prévia: cliente sugerido pelos filtros (ou incluído à mão), ainda em revisão e atribuição; nada gravado."
+
+  - id: ST_ASSIGNMENT_ACTIVE
+    node_type: state
+    layer: domain
+    plane: PROD
+    status: confirmed
+    impact: 4
+    confidence: 0.8
+    verified_at: 2026-10-07
+    verified_against: doc-carteira-de-clientes-sem-codigo
+    trace: docs/business-context/02-product/features/carteira-de-clientes.md:53
+    label: "Vínculo ativo: gravado ao finalizar; é o que dá ao vendedor visibilidade do cliente."
+
+  - id: ST_ASSIGNMENT_INACTIVE
+    node_type: state
+    layer: domain
+    plane: PROD
+    status: confirmed
+    impact: 3
+    confidence: 0.8
+    verified_at: 2026-10-07
+    verified_against: doc-carteira-de-clientes-sem-codigo
+    trace: docs/business-context/02-product/features/carteira-de-clientes.md:53
+    label: "Vínculo inativo: removido da lista revisada numa edição. TERMINAL: o documento diz que vínculos removidos 'deixam de ficar ativos' (não são apagados) e que vínculos novos 'são criados', não reativados."
+
+  - id: EV_PORTFOLIO_FINALIZED
+    node_type: event
+    layer: domain
+    plane: PROD
+    status: confirmed
+    impact: 4
+    confidence: 0.8
+    verified_at: 2026-10-07
+    verified_against: doc-carteira-de-clientes-sem-codigo
+    trace: docs/business-context/02-product/features/carteira-de-clientes.md:53
+    label: "Carteira finalizada (criação ou edição): grava os vínculos da lista revisada."
+
+  - id: EV_PORTFOLIO_EDITED
+    node_type: event
+    layer: domain
+    plane: PROD
+    status: confirmed
+    impact: 3
+    confidence: 0.8
+    verified_at: 2026-10-07
+    verified_against: doc-carteira-de-clientes-sem-codigo
+    trace: docs/business-context/02-product/features/carteira-de-clientes.md:53
+    label: "Carteira editada: o sistema compara as atribuições atuais com a lista revisada."
+
+  - id: RU_FILTERS_ALL_FILLED
+    node_type: rule
+    layer: domain
+    plane: PROD
+    status: confirmed
+    impact: 4
+    confidence: 0.8
+    verified_at: 2026-10-07
+    verified_against: doc-carteira-de-clientes-sem-codigo
+    trace: docs/business-context/02-product/features/carteira-de-clientes.md:35
+    label: "Com mais de um tipo de filtro, o cliente precisa atender a TODOS os critérios preenchidos (E, não OU). Filtros: região (estado, cidade, bairro), rede, grupo econômico."
+
+  - id: RU_SPECIFICITY_PRIORITY
+    node_type: rule
+    layer: domain
+    plane: PROD
+    status: confirmed
+    impact: 5
+    confidence: 0.8
+    verified_at: 2026-10-07
+    verified_against: doc-carteira-de-clientes-sem-codigo
+    trace: docs/business-context/02-product/features/carteira-de-clientes.md:37
+    label: "Se duas carteiras da MESMA filial alcançam o mesmo cliente, vence a correspondência mais específica: grupo econômico > rede > bairro > cidade > estado."
+
+  - id: RU_TIE_BLOCKS_PREVIEW
+    node_type: rule
+    layer: domain
+    plane: PROD
+    status: confirmed
+    impact: 4
+    confidence: 0.8
+    verified_at: 2026-10-07
+    verified_against: doc-carteira-de-clientes-sem-codigo
+    trace: docs/business-context/02-product/features/carteira-de-clientes.md:45
+    label: "Empate de prioridade entre duas carteiras: o cliente fica BLOQUEADO nas duas prévias até a equipe revisar o conflito. O sistema não escolhe sozinho."
+
+  - id: RU_MANUAL_INCLUSION
+    node_type: rule
+    layer: domain
+    plane: PROD
+    status: confirmed
+    impact: 3
+    confidence: 0.8
+    verified_at: 2026-10-07
+    verified_against: doc-carteira-de-clientes-sem-codigo
+    trace: docs/business-context/02-product/features/carteira-de-clientes.md:31
+    label: "Os filtros só SUGEREM: a prévia é revisável e clientes podem ser incluídos manualmente."
+
+  - id: RU_AUTO_DISTRIBUTION
+    node_type: rule
+    layer: domain
+    plane: PROD
+    status: confirmed
+    impact: 3
+    confidence: 0.7
+    verified_at: 2026-10-07
+    verified_against: doc-carteira-de-clientes-sem-codigo
+    trace: docs/business-context/02-product/features/carteira-de-clientes.md:49
+    label: "Distribuição: o responsável atribui cliente a cliente ou usa a automática, que divide os clientes entre os vendedores disponíveis EM CADA SUBGRUPO. O critério de divisão não está no documento (ver Q_AUTO_DISTRIBUTION_CRITERIA)."
+
+  - id: IN_ONE_SELLER_PER_SUBGROUP
+    node_type: invariant
+    layer: domain
+    plane: PROD
+    status: confirmed
+    impact: 5
+    confidence: 0.8
+    verified_at: 2026-10-07
+    verified_against: doc-carteira-de-clientes-sem-codigo
+    trace: docs/business-context/02-product/features/carteira-de-clientes.md:51
+    label: "No mesmo subgrupo, um cliente tem no máximo UM vendedor responsável. Em subgrupos diferentes, vendedores diferentes podem atender o mesmo cliente."
+
+  - id: RU_EDIT_RECONCILES
+    node_type: rule
+    layer: domain
+    plane: PROD
+    status: confirmed
+    impact: 4
+    confidence: 0.8
+    verified_at: 2026-10-07
+    verified_against: doc-carteira-de-clientes-sem-codigo
+    trace: docs/business-context/02-product/features/carteira-de-clientes.md:53
+    label: "Na edição, o sistema compara o atual com a lista revisada: vínculos que saíram da lista ficam inativos e os novos são criados."
+
+  - id: PO_VISIBILITY_BY_PORTFOLIO
+    node_type: policy
+    layer: domain
+    plane: PROD
+    status: confirmed
+    impact: 5
+    confidence: 0.7
+    verified_at: 2026-10-07
+    verified_against: doc-carteira-de-clientes-sem-codigo
+    trace: docs/business-context/02-product/features/carteira-de-clientes.md:57
+    label: "Visibilidade: 'em geral' o vendedor vê só os clientes associados a ele; administradores e usuários com permissão específica veem uma carteira mais ampla. A mesma regra vale para dados relacionados, como pedidos e títulos financeiros. O documento ressalva que o acesso varia por perfil (ver Q_VISIBILITY_PROFILES)."
+
+  - id: PO_RULES_DECIDE_NOT_AI
+    node_type: policy
+    layer: domain
+    plane: PROD
+    status: confirmed
+    impact: 3
+    confidence: 0.8
+    verified_at: 2026-10-07
+    verified_against: doc-carteira-de-clientes-sem-codigo
+    trace: docs/business-context/02-product/features/carteira-de-clientes.md:81
+    label: "Seleção e distribuição de clientes são feitas pelas regras do sistema. IA pode explicar as regras, mas não substitui o cadastro nem decide atribuições."
+
+  # ---- camada audit ----
+  - id: C_SOURCE_NOT_VERIFIED_IN_CODE
+    node_type: claim
+    layer: audit
+    plane: PROD
+    status: open
+    impact: 4
+    confidence: 1.0
+    verified_at: 2026-10-07
+    verified_against: repo-meugmill-vendas-sem-codigo-na-adocao
+    label: "Todo o domínio acima vem de UM documento do maestro, que diz ter sido conferido na interface e na API. Este repo não tem o código, então nenhuma regra foi conferida aqui. Fecha quando cada regra tiver trace para código."
+
+  - id: Q_CODE_LOCATION
+    node_type: question
+    layer: audit
+    plane: PROD
+    status: open
+    impact: 4
+    confidence: 1.0
+    verified_at: 2026-10-07
+    verified_against: busca-local-sem-repo-meugmill-em-home
+    label: "Onde está o código do MeuGmill Vendas (interface e API citadas pelo documento)? Uma busca local não achou repo com esse nome. Sem ele, C_SOURCE_NOT_VERIFIED_IN_CODE não fecha."
+
+  - id: Q_PORTFOLIO_TYPES
+    node_type: question
+    layer: audit
+    plane: PROD
+    status: open
+    impact: 3
+    confidence: 1.0
+    verified_at: 2026-10-07
+    verified_against: doc-cita-tipo-da-carteira-sem-listar
+    label: "O cadastro pede o 'tipo da carteira', mas o documento não diz quais tipos existem nem o que cada um muda."
+
+  - id: Q_AUTO_DISTRIBUTION_CRITERIA
+    node_type: question
+    layer: audit
+    plane: PROD
+    status: open
+    impact: 3
+    confidence: 1.0
+    verified_at: 2026-10-07
+    verified_against: doc-diz-divide-sem-criterio
+    label: "Qual é o critério da distribuição automática (rodízio, equilíbrio por quantidade, por faturamento)? O documento só diz que 'divide'."
+
+  - id: Q_VISIBILITY_PROFILES
+    node_type: question
+    layer: audit
+    plane: PROD
+    status: open
+    impact: 4
+    confidence: 1.0
+    verified_at: 2026-10-07
+    verified_against: doc-diz-em-geral-e-varia-por-perfil
+    label: "Quais perfis existem e o que cada um vê? O documento diz 'em geral' e que os detalhes de acesso variam conforme perfil e permissões. Responsável e gerente veem a carteira inteira?"
+
+  - id: Q_MODULE_SCOPE
+    node_type: question
+    layer: audit
+    plane: PROD
+    status: open
+    impact: 4
+    confidence: 1.0
+    verified_at: 2026-10-07
+    verified_against: so-carteira-documentada-na-adocao
+    label: "Que outras funcionalidades o MeuGmill Vendas tem além da carteira? Pedidos e títulos financeiros aparecem como dados sob a mesma regra de acesso, mas não estão documentados."
+
+  - id: A_SOURCE_DOC
+    node_type: artifact
+    layer: audit
+    plane: PROD
+    status: confirmed
+    impact: 4
+    confidence: 1.0
+    verified_at: 2026-10-07
+    verified_against: arquivo-presente-no-repo
+    trace: docs/business-context/02-product/features/carteira-de-clientes.md
+    label: "Documento-fonte da carteira de clientes (texto do maestro). Âncora de todas as regras deste grafo até existir trace para código."
+
+edges:
+  - from: EN_BRANCH
+    to: EN_PORTFOLIO
+    edge_type: CONSTRAINS
+    label: "a filial é dona da carteira e delimita a disputa de prioridade"
+  - from: EN_PORTFOLIO
+    to: EN_CUSTOMER
+    edge_type: READS
+    label: "os filtros leem os dados cadastrais do cliente"
+  - from: EN_ASSIGNMENT
+    to: ST_ASSIGNMENT_PREVIEW
+    edge_type: HAS_STATE
+  - from: EN_ASSIGNMENT
+    to: ST_ASSIGNMENT_ACTIVE
+    edge_type: HAS_STATE
+  - from: EN_ASSIGNMENT
+    to: ST_ASSIGNMENT_INACTIVE
+    edge_type: HAS_STATE
+  - from: ST_ASSIGNMENT_PREVIEW
+    to: ST_ASSIGNMENT_ACTIVE
+    edge_type: TRANSITIONS
+    on: EV_PORTFOLIO_FINALIZED
+  - from: ST_ASSIGNMENT_ACTIVE
+    to: ST_ASSIGNMENT_INACTIVE
+    edge_type: TRANSITIONS
+    on: EV_PORTFOLIO_EDITED
+  - from: EN_PORTFOLIO
+    to: EN_ASSIGNMENT
+    edge_type: WRITES
+    label: "ao finalizar, grava os vínculos"
+  - from: EN_PORTFOLIO
+    to: EV_PORTFOLIO_FINALIZED
+    edge_type: EMITS
+  - from: EN_PORTFOLIO
+    to: EV_PORTFOLIO_EDITED
+    edge_type: EMITS
+  - from: RU_FILTERS_ALL_FILLED
+    to: ST_ASSIGNMENT_PREVIEW
+    edge_type: CONSTRAINS
+  - from: RU_SPECIFICITY_PRIORITY
+    to: ST_ASSIGNMENT_PREVIEW
+    edge_type: CONSTRAINS
+  - from: RU_TIE_BLOCKS_PREVIEW
+    to: ST_ASSIGNMENT_PREVIEW
+    edge_type: CONSTRAINS
+  - from: RU_MANUAL_INCLUSION
+    to: ST_ASSIGNMENT_PREVIEW
+    edge_type: CONSTRAINS
+  - from: RU_AUTO_DISTRIBUTION
+    to: ST_ASSIGNMENT_PREVIEW
+    edge_type: CONSTRAINS
+  - from: IN_ONE_SELLER_PER_SUBGROUP
+    to: ST_ASSIGNMENT_ACTIVE
+    edge_type: CONSTRAINS
+  - from: RU_EDIT_RECONCILES
+    to: ST_ASSIGNMENT_INACTIVE
+    edge_type: CONSTRAINS
+  - from: PO_VISIBILITY_BY_PORTFOLIO
+    to: ST_ASSIGNMENT_ACTIVE
+    edge_type: READS
+    label: "o que o vendedor vê deriva dos vínculos ativos"
+  - from: PO_RULES_DECIDE_NOT_AI
+    to: EN_ASSIGNMENT
+    edge_type: CONSTRAINS
+  - from: IN_ONE_SELLER_PER_SUBGROUP
+    to: EN_SELLER
+    edge_type: CONSTRAINS
+  - from: EN_ASSIGNMENT
+    to: EN_SUBGROUP
+    edge_type: READS
+  - from: C_SOURCE_NOT_VERIFIED_IN_CODE
+    to: A_SOURCE_DOC
+    edge_type: TRACES_TO
+  - from: Q_CODE_LOCATION
+    to: C_SOURCE_NOT_VERIFIED_IN_CODE
+    edge_type: SUPPORTS
+    label: "sem o código, a afirmação não tem como fechar"
+  - from: Q_PORTFOLIO_TYPES
+    to: EN_PORTFOLIO
+    edge_type: TRACES_TO
+  - from: Q_AUTO_DISTRIBUTION_CRITERIA
+    to: RU_AUTO_DISTRIBUTION
+    edge_type: TRACES_TO
+  - from: Q_VISIBILITY_PROFILES
+    to: PO_VISIBILITY_BY_PORTFOLIO
+    edge_type: TRACES_TO
+  - from: Q_MODULE_SCOPE
+    to: EN_PORTFOLIO
+    edge_type: TRACES_TO
+  - from: RU_FILTERS_ALL_FILLED
+    to: A_SOURCE_DOC
+    edge_type: TRACES_TO
+  - from: RU_SPECIFICITY_PRIORITY
+    to: A_SOURCE_DOC
+    edge_type: TRACES_TO
+  - from: RU_TIE_BLOCKS_PREVIEW
+    to: A_SOURCE_DOC
+    edge_type: TRACES_TO
+  - from: RU_MANUAL_INCLUSION
+    to: A_SOURCE_DOC
+    edge_type: TRACES_TO
+  - from: RU_AUTO_DISTRIBUTION
+    to: A_SOURCE_DOC
+    edge_type: TRACES_TO
+  - from: IN_ONE_SELLER_PER_SUBGROUP
+    to: A_SOURCE_DOC
+    edge_type: TRACES_TO
+  - from: RU_EDIT_RECONCILES
+    to: A_SOURCE_DOC
+    edge_type: TRACES_TO
+  - from: PO_VISIBILITY_BY_PORTFOLIO
+    to: A_SOURCE_DOC
+    edge_type: TRACES_TO
+  - from: PO_RULES_DECIDE_NOT_AI
+    to: A_SOURCE_DOC
+    edge_type: TRACES_TO

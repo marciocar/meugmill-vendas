@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git status *)",
+      "Bash(git branch)",
+      "Bash(git branch *)",
+      "Bash(git log *)",
+      "Bash(git diff *)",
+      "Bash(ls .claude/*)",
+      "Bash(grep * .env)",
+      "Bash(wc -l *)",
+      "Bash(find .claude *)",
+      "Read",
+      "Grep",
+      "Glob"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/task-manager-provider-hook.sh\"",
+            "timeout": 5,
+            "statusMessage": "Detectando Task Manager provider (Onion)"
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/worklog-capture-session.sh\"",
+            "timeout": 5,
+            "statusMessage": "Capturando session_id no worklog (Onion)"
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/co-evolution-inbox-check.sh\"",
+            "timeout": 5,
+            "statusMessage": "Checando inbox de co-evolução (Onion)"
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-beacon-hook.sh\" up",
+            "timeout": 5,
+            "statusMessage": "Acendendo farol de sessão (Onion)"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-beacon-hook.sh\" refresh",
+            "timeout": 5,
+            "statusMessage": "Refrescando farol de sessão (Onion)"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/aside-router-hook.sh\"",
+            "timeout": 5,
+            "statusMessage": "Roteando aparte do maestro (Onion)"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-version-drift.sh\"",
+            "timeout": 5,
+            "statusMessage": "Conferindo versão do processo vs disco (Onion)"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-degraded-notice.sh\""
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-beacon-hook.sh\" down",
+            "timeout": 5,
+            "statusMessage": "Apagando farol de sessão (Onion)"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/worklog-precompact-breadcrumb.sh\"",
+            "timeout": 5,
+            "statusMessage": "Breadcrumb de compaction no worklog (Onion)"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/bash-empty-result-guard.sh\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/pretooluse-protect-main.sh\""
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/pretooluse-merge-gate.sh\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/kg-read-leg.sh\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/pretooluse-env-guard.sh\""
+          }
+        ]
+      }
+    ],
+    "PreModelSwitch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/premodelswitch-guard.sh\"",
+            "timeout": 5,
+            "statusMessage": "Guarda de modelo da sessão (Onion): veta downgrade fora do lineup"
+          }
+        ]
+      }
+    ],
+    "PostModelSwitch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/premodelswitch-guard.sh\"",
+            "timeout": 5,
+            "statusMessage": "Registrando troca de modelo (Onion)"
+          }
+        ]
+      }
+    ],
+    "InstructionsLoaded": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/instructions-loaded-log.sh\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/rule-title-in-prose.sh\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/background-state-needs-evidence.sh\""
+          }
+        ]
+      }
+    ]
+  },
+  "fallbackModel": [
+    "claude-opus-5",
+    "claude-sonnet-5"
+  ],
+  "attribution": {
+    "commit": "Orquestrado com 🧅 Onion Evolve",
+    "pr": "Orquestrado com 🧅 Onion Evolve"
+  }
+}

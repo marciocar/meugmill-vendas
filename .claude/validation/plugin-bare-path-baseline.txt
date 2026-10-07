@@ -1,0 +1,3 @@
+# Baseline de caminhos .claude/ NUS dentro de plugins/ — PASSIVO TOLERADO (REGRA 74).
+# Gerado por: bash .claude/validation/plugin-bare-path-check.sh --emit-baseline > .claude/validation/plugin-bare-path-baseline.txt
+# formato: <rel>|<ref>. SÓ PODE ENCOLHER (embarque o artefato no plugin dono, ou não distribua o comando).

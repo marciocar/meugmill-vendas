@@ -1,0 +1,2 @@
+# Baseline da REGRA 64 — exposições de compose LEGADAS toleradas (PASSIVO; só encolhe).
+# Chave: <arquivo>::sha1(linha-sem-espaços)[:12]. Cure a linha e a chave sai junto.

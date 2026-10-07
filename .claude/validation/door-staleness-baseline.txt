@@ -1,0 +1,209 @@
+# Catraca de DEFASAGEM DE PORTA — quantos commits da superfície que viaja cada porta
+# tolera estar atrás. SÓ ENCOLHE: a métrica de saúde é o número DIMINUINDO.
+# Regenere com: bash .claude/validation/door-staleness-check.sh --emit-baseline
+#
+# onion-standalone 372 — o PASSIVO MEDIDO, e a razão desta guarda existir. A porta está parada
+#   desde 2026-07-19 porque o ciclo de re-materialização era PROSA. Não é negligência: é o modo de
+#   falha previsível de um gatilho que depende de alguém lembrar.
+# onion-core 0 — porta NOVA nasce sem passivo. Se subir sem re-materialização, a guarda reprova.
+#
+# ⚠️ POR QUE OS NÚMEROS CAÍRAM (378/2 → 372/0) SEM NINGUÉM RE-MATERIALIZAR NADA: os tetos antigos
+#   mediam `pin..HEAD` da BRANCH, então carregavam commits em voo que a porta não teria como
+#   espelhar — a guarda cobrava por trabalho que ainda não existia em main. Corrigida a ponta para
+#   o `merge-base`, o passivo REAL apareceu, e é menor. A catraca não afrouxou: ficou honesta.
+#
+# 2026-09-17, pós-merge do #840: a `main` ANDOU de verdade (4 commits na superfície que viaja), e
+# os números subiram 372→373 e 0→1. Isto NÃO é a esteira curada acima: ali o teto crescia por
+# trabalho em VOO, que a porta não teria como espelhar; aqui o trabalho está MERGEADO, a porta de
+# fato ficou para trás, e a catraca está fazendo exatamente o que existe para fazer. O `onion-core`
+# volta a 0 na re-materialização logo a seguir; o 373 do `onion-standalone` é o passivo real.
+#
+# 2026-09-17, pós-re-materialização: `onion-core` volta a ZERO — a porta foi refeita do `main`
+# mergeado (pin 79456b1e21de) e espelha o core exatamente. É a catraca funcionando no sentido
+# que interessa: o número DIMINUINDO. O `onion-standalone` sobe para 374 porque a leva do #842
+# entrou em main e aquela porta segue parada desde 2026-07-19 — passivo real, não ruído.
+#
+# 2026-09-17 (4ª materialização): `onion-core` segue em ZERO — re-materializado do pin f5ec0dcf2dfb,
+# que é a 1ª versão da porta a passar no PRÓPRIO lint (0 HARD), depois de a dívida da REGRA 45
+# chegar a zero. `onion-standalone` sobe a 381: a main andou 7 commits e aquela porta segue parada
+# desde 2026-07-19 — passivo real, e o único número desta catraca que ainda cresce.
+#
+# 2026-09-18: a catraca parou de contar o PRÓPRIO livro-caixa, e os números caíram sem ninguém
+# materializar nada — 383→381 e 2→1. O que sumiu eram commits que só ajustavam ESTE arquivo: o
+# teto morava na superfície que ele julga, então reconciliar a porta defasava a porta e um teto 0
+# exigia um PR depois de todo PR. O `onion-core 1` que sobra é HONESTO: é o
+# `regen-core-projections.sh`, mudança real de framework que a porta ainda não recebeu.
+#
+# 2026-09-18 (pós-#845): 383 e 3 — a main andou com o merge do #845 e com a cura dos nomes de
+# cliente. Os dois sobem porque são mudança REAL de framework; o livro-caixa já não conta contra
+# si mesmo (ver acima). `onion-core` volta a ZERO na próxima materialização, que é obrigatória:
+# é ela que tira os nomes de cliente do HEAD público.
+#
+# 2026-09-18 (pós-#846): 384 e 4. A `main` andou com o merge do #846 — a cura que tirou os nomes
+# de cliente das FIXTURES que viajam. Os dois sobem porque é mudança REAL de framework, medida
+# contra o `merge-base`, então trabalho em voo NÃO inflou estes números.
+#
+# 2026-09-18 (5ª materialização, no mesmo dia): `onion-core` volta a ZERO — e o caminho que a
+# tornou possível é o registro que interessa. A dificuldade era real: `materialize-door.sh` monta
+# com `git archive HEAD`, e o HEAD da branch em curso tem trabalho NÃO-MERGEADO, então materializar
+# de lá publicaria o que ainda não passou pelo gate. A saída NÃO foi esperar o merge: foi uma
+# WORKTREE DESTACADA em `origin/main`, de onde o `git archive HEAD` é exatamente a main mergeada.
+# Sequência deixa de ser motivo para adiar item de segurança.
+# ⚠️ E O PIN É METADE DA CURA. Materializar sem avançar `onion_version` no `members.yaml` deixa a
+#   catraca medindo contra a materialização ANTERIOR: medido aqui, a porta já estava publicada e o
+#   número seguia em 4/4. O pin é a única coisa que esta guarda lê; porta nova com pin velho é
+#   trabalho feito que o gate não enxerga.
+# VERIFICADO NO REMOTO, não no disco: o arquivo baixado de `repos/marciocar/onion-core` traz 0 dos
+# quatro termos declarados em `client-terms.txt`, com controle positivo (9 ocorrências de `PoC` no
+# mesmo arquivo, provando que ele veio inteiro). Isto remove do HEAD — NÃO da história.
+#
+# 2026-09-18 (6ª materialização, pós-#847): `onion-core` volta a ZERO pela segunda vez no mesmo dia,
+# e desta vez sem worktree — a árvore estava em `main` limpa, então `git archive HEAD` já era a main
+# mergeada. O ciclo materializar→avançar-o-pin funcionou como desenhado.
+#
+# ⚠️ E O `onion-standalone` MERECE SER DITO EM VOZ ALTA: 384 → 388. Ele só SOBE, e sobe desde
+#   2026-07-19. Uma catraca cujo único movimento é para cima não é catraca — é CONTADOR, e um
+#   contador não cria pressão nenhuma: ele registra a dívida e se acomoda a ela. A guarda está
+#   correta (o número é honesto); o que falta é a DECISÃO sobre aquela porta, que é do maestro e não
+#   desta guarda. Enquanto ela não vem, este número é a medida exata de quanto o `onion-standalone`
+#   deixou de espelhar — hoje 388 commits da superfície que viaja.
+#
+# 2026-09-18 (7a materializacao): `onion-core` volta a ZERO pela terceira vez no dia — o ciclo
+# materializar → avancar o pin ja e mecanismo, e desta vez dispensou ate a worktree (a arvore estava
+# em `main` limpa). `onion-standalone` sobe a 389.
+# ⚠️ E A DECISAO (A) — RE-MATERIALIZAR o standalone — REVELOU UM BLOQUEIO QUE NENHUMA MEDICAO DE
+#   CUSTO TINHA VISTO: a porta VIVA carimba `role: adopted` (corte manual de 2026-07-19), mas uma
+#   materializacao NOVA carimba `role: standalone` — e CINCO predicados que decidem "este repo e
+#   derivado?" so conheciam `adopted|hub`. Re-materializar trocaria a identidade da porta por uma que
+#   as guardas leem como FONTE. Curado nos cinco sitios, com caso de bancada que DERIVA os papeis
+#   validos do `write-stamp.sh` e reprova se algum predicado nao os conhecer todos (mutante provado).
+#
+# 2026-09-19 (8a materializacao): `onion-core` volta a ZERO pela quarta vez em dois dias; o ciclo
+# materializar → avancar o pin roda sem pensar. `onion-standalone` sobe a 391.
+# ⚠️ A DECISAO (A) DO MAESTRO — re-materializar o standalone — esta DESBLOQUEADA desde o #849, e o
+#   que a destravava nao era custo: era o papel `standalone` ser invisivel para seis predicados que
+#   julgam "este repo e derivado?". Materializar antes disso trocaria a identidade da porta viva
+#   (que carimba `role: adopted`, do corte manual de 2026-07-19) por uma que as guardas leiam como
+#   FONTE. Hoje a porta materializa em 0 HARD medidos SEM isencao — provado trocando o carimbo e
+#   vendo o veredito NAO mudar de forma que compre verde.
+#
+# 2026-09-19/20 (9a materializacao): `onion-core` volta a ZERO pela quinta vez em tres dias — o ciclo
+# materializar → avancar o pin ja nao exige pensar. `onion-standalone` sobe a 393.
+# ⚠️ REGISTRO DE UMA ESPERA, porque ela e a metade que nao e minha: entre a materializacao e o push
+#   houve ~1h de gate VERMELHO no core, e eu NAO avancei o pin nesse intervalo. Avancar teria feito a
+#   catraca dizer 0/0 sobre uma porta que ninguem podia abrir — a armadilha INVERSA da de 2026-09-18,
+#   quando o pin velho escondia porta nova. As duas mentem; a diferenca e a direcao. O pin so anda
+#   depois do push VERIFICADO no remoto (`gh api .../commits/main`), nunca depois do commit local.
+#
+# 2026-09-20 (10a materializacao): `onion-core` volta a ZERO de novo; `onion-standalone` sobe a 395.
+# O ciclo materializar → push verificado no remoto → avancar o pin rodou sem atrito desta vez, com a
+# ordem que a entrada anterior fixou: o pin so anda DEPOIS do `gh api .../commits/main` confirmar.
+#
+# 2026-09-20 (pos-#854): `onion-standalone` sobe a 397 (passivo real da porta parada). O
+# `onion-core` FICA EM ZERO de proposito, e o gate fica VERMELHO ate o push — a porta esta
+# materializada e commitada (pin e3f25693ea66) mas nao publicada.
+# ⚠️ POR QUE NAO SUBI O TETO DO `onion-core` PARA 2, que destravaria o gate: seria catraca subindo
+# por estado TRANSITORIO. O 2 some no push; tolera-lo no baseline e gravar como divida o que e so
+# uma espera. Catraca so encolhe, e a unica coisa que legitimamente a faz subir e trabalho MERGEADO
+# que a porta ainda nao recebeu — nao trabalho ja materializado esperando `git push`.
+# O vermelho aqui nao e defeito: e a guarda dizendo a verdade sobre o mundo.
+#
+# 2026-09-20 (pos-#855): `onion-standalone` sobe a 398 — mesmo criterio de sempre: e trabalho
+# MERGEADO que a porta parada nao recebeu (o #855 entrou em main), nao espera de push. O
+# `onion-core` segue em ZERO: a 12a materializacao esta commitada no clone (pin cb582c0e088b, o
+# HEAD de main MERGEADA — materializei de uma worktree destacada, porque `git archive HEAD` da
+# branch publicaria trabalho em voo numa porta PUBLICA, armadilha que ja me pegou 3 vezes).
+# O gate fica VERMELHO ate o push do maestro, e isso e a guarda dizendo a verdade sobre o mundo.
+#
+# 2026-09-20 (pos-#856): `onion-standalone` sobe a 399 — trabalho MERGEADO que a porta parada
+# nao recebeu. O `onion-core` segue em ZERO com a 13a materializacao commitada no clone
+# (pin 4299290b73d4, de worktree destacada em origin/main), aguardando o push.
+#
+# 2026-09-22: `onion-standalone` sobe 400→402 — a `main` andou 2 commits na superfície que viaja
+#   (o bloqueio de achados do revisor e a leva bi-temporal do motor de grafo), e aquela porta segue
+#   parada desde 2026-07-19. Passivo REAL, do mesmo tipo das subidas de 09-17: não é afrouxamento
+#   de catraca, é a catraca medindo trabalho MERGEADO que a porta não recebeu. `onion-core` segue
+#   em ZERO. Este número só cai por re-materialização daquela porta — decisão do maestro, porque
+#   publicar exige o push dele.
+#
+# 2026-09-22 (2ª do dia): `onion-standalone` 402→404 — o #865 entrou em main (2 commits na
+#   superfície que viaja). Mesmo passivo real da nota acima; a porta segue parada desde 2026-07-19.
+#
+# 2026-09-23: `onion-standalone` 404→408 — o #866 entrou em main (4 commits na superficie que
+#   viaja). Mesmo passivo real: aquela porta segue parada desde 2026-07-19. `onion-core` volta a
+#   ZERO com a 17a materializacao, publicada (remoto 5d83730797ab).
+#
+# 2026-09-21 (pos-#857): `onion-standalone` sobe a 400 — trabalho MERGEADO que a porta parada nao
+# recebeu (os #856 e #857 entraram em main). O `onion-core` volta a ZERO com a 14a materializacao
+# ja PUBLICADA (pin 7260feacbfe0, push verificado no remoto em 36592d9ba145).
+#
+# 2026-09-23 (PR #869): `onion-standalone` 408→412 — o #868 entrou em main (4 commits na superficie
+#   que viaja). Passivo REAL da porta parada desde 2026-07-19, do mesmo tipo de todas as subidas
+#   anteriores: nao e afrouxamento, e a catraca medindo trabalho MERGEADO que aquela porta nao
+#   recebeu. `onion-core` NAO sobe: o teto dele fica em ZERO, e o gate fica VERMELHO ate a 18a
+#   materializacao ser publicada — tolerar 4 seria gravar como divida uma ESPERA de push.
+# ⚠️ E ESTE PR EXPOS O DEADLOCK, que virou no de decisao: a cura que a REGRA 85 cobra (re-materializar)
+#   so existe DEPOIS do merge, porque materializar do HEAD da branch publicaria trabalho nao-mergeado
+#   numa porta PUBLICA. Resultado: o `lint-onion-artifacts` fica vermelho por 2 HARD que nenhuma acao
+#   dentro do PR limpa, e ele NAO e dispensavel no `ops/pr-merge-verified.sh` — por desenho. A saida
+#   usada aqui e a do ritual (publicar a porta do `origin/main`, avancar o pin, e so entao mergear),
+#   ao custo de DUAS materializacoes quando a leva muda o proprio lint. Onde cobrar isso passa a ser
+#   decisao do maestro: `D_ONDE_COBRAR_A_DEFASAGEM_DA_PORTA` em triagem-inbox-2026-09.kg.yaml.
+#
+# 2026-09-24 (PR do pin da 19a): `onion-standalone` 412→415 — o #869 entrou em main (3 commits na
+#   superficie que viaja). Passivo REAL da porta parada desde 2026-07-19; nao e afrouxamento, e a
+#   catraca medindo trabalho MERGEADO que aquela porta nao recebeu. `onion-core` volta a ZERO com a
+#   19a materializacao PUBLICADA (remoto f03726abc45d, verificado por `gh api`, nao pela nota do
+#   script nem pelo disco).
+# ⚠️ ESTA LEVA CUSTOU DUAS MATERIALIZACOES, e o registro importa mais que o numero: a 18a publicou o
+#   lint que morria calado, so para destravar o merge do #869 (a REGRA 85 nao se satisfaz sem a porta
+#   espelhando main, e `lint-onion-artifacts` nao e dispensavel no `pr-merge-verified.sh`); a 19a e a
+#   que levou a cura. O deadlock virou nó de decisao: `D_ONDE_COBRAR_A_DEFASAGEM_DA_PORTA` em
+#   docs/evolution/research/triagem-inbox-2026-09/. Recomendacao registrada: mover a cobranca para
+#   DEPOIS do merge, que e o unico momento em que a cura existe.
+#
+# 2026-09-24 (20a materializacao — a PRIMEIRA do regime novo): `onion-standalone` 415→418 (passivo real
+#   da porta parada desde 2026-07-19) e `onion-core` volta a ZERO, publicada e VERIFICADA no remoto
+#   (c70421eee91f, por `gh api`).
+# ⚠️ E ESTE E O REGISTRO QUE INTERESSA: a decisao de mover a cobranca para pos-merge (selada pelo
+#   maestro em 2026-09-24, no `D_ONDE_COBRAR_A_DEFASAGEM_DA_PORTA`) FUNCIONOU no primeiro uso real. O
+#   workflow `onion-door-staleness` disparou 4 SEGUNDOS apos o merge do #872, nomeou as duas portas com
+#   os numeros e entregou os 4 passos da cura — e o #872 mergeou SEM a porta o bloquear. Pela primeira
+#   vez em 20 materializacoes, este arquivo nao registra "o gate fica VERMELHO ate o push".
+#
+# 2026-09-26 (22a materializacao): `onion-core` volta a ZERO — publicada em 232bba50ccc8 e VERIFICADA
+#   no remoto (5063e81b2d8d, por `gh api`), cobrindo as duas levas mergeadas no dia (#875 e #876).
+#   `onion-standalone` 418->421: passivo REAL da porta parada desde 2026-07-19, nao trabalho novo —
+#   a subida e a catraca fazendo o que deve, registrando que aquela porta segue sem re-materializacao.
+# ⚠️ E O QUE ESTA LEVA ENSINOU SOBRE ESTE ARQUIVO: o `--emit-baseline` devolve SO as duas linhas de
+#   dado. Redirecionar a saida dele por cima deste arquivo apagaria ~170 linhas de historico — e essa
+#   saida destrutiva e PLAUSIVEL, porque o gerador sai 0 e o arquivo fica nao-vazio. Por isso a
+#   atualizacao aqui e CIRURGICA nas duas linhas de dado. Quem automatizar isto um dia tem de
+#   preservar o historico, que e o unico lugar onde o PORQUE de cada numero mora.
+#
+# 2026-09-26 (23a materializacao): `onion-core` publicada em 526c00800359 (remoto b18e40d09f49) e o
+#   registro carimbado pelo MECANISMO NOVO — `ops/door-seal-pin.sh`, 1o uso real. Ele provou as quatro
+#   coisas antes de escrever: pin legivel, commit deste core, ancestral de origin/main, e push
+#   conferido no remoto. Fim da era do numero a mao neste campo.
+# ⚠️ E O DEFEITO QUE O DOGFOOD ACHOU, na 1a execucao: a v1 lia o pin da ARVORE DE TRABALHO, entao
+#   rodada depois de materializar e ANTES de commitar ela carimbava como PUBLICADO um pin que so
+#   existia no disco (HEAD do clone ainda era o antigo, igual ao remoto — as duas confereencias
+#   passavam). Curado: arvore suja RECUSA, e o pin vem de `git show HEAD:`. Dois casos de bancada,
+#   com mutante que morre. O caso que existia para isso testava um remoto DIFERENTE — cenario que o
+#   fluxo real nao produz, logo nao era cobertura.
+#   E `onion-standalone` 421->422: passivo REAL daquela porta, parada desde 2026-07-19 — a catraca
+#   registrando o que o merge da leva acrescentou, nao trabalho novo. Ela segue sem dono para
+#   re-materializar, e o numero e a memoria disso.
+#
+# 2026-09-26 (24a materializacao): `onion-core` publicada em cff28d36626a a partir do pin b7f24eb27a79,
+#   e o registro carimbado PELO MECANISMO — 2o uso real do `ops/door-seal-pin.sh`, agora curado. Ele
+#   provou os DOIS lados no mesmo ciclo: RECUSOU antes do commit (arvore suja = materializacao no disco
+#   nao e publicacao) e carimbou depois do push conferido no remoto. Na vespera, a v1 teria carimbado na
+#   primeira dessas duas situacoes.
+#   `onion-standalone` 422->423 — TERCEIRA subida dela HOJE, sempre pelo mesmo motivo: cada leva
+#   mergeada afasta uma porta que ninguem re-materializa. Isso NAO e trabalho novo, e a catraca
+#   registrando que aquela porta esta parada desde 2026-07-19, e o numero vai crescer para sempre
+#   enquanto ninguem decidir entre RE-MATERIALIZA-LA ou declara-la congelada. A decisao e do maestro;
+#   o que a catraca pode fazer, ela ja faz — nao deixar o passivo virar silencio.
+onion-standalone 423
+onion-core 0

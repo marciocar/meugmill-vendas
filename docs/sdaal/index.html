@@ -1,0 +1,4110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDAAL - Specification-Driven AI Abstraction Layer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary: #1e3c72;
+            --primary-light: #2a5298;
+            --primary-dark: #0f1f3d;
+            --accent: #ff6b35;
+            --bg: #FFFFFF;
+            --bg-secondary: #F8F9FA;
+            --bg-tertiary: #F1F3F4;
+            --text-primary: #202124;
+            --text-secondary: #5F6368;
+            --text-tertiary: #80868B;
+            --border: #DADCE0;
+            --border-light: #E8EAED;
+            --shadow-sm: 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
+            --shadow-md: 0 1px 2px 0 rgba(60,64,67,.3), 0 2px 6px 2px rgba(60,64,67,.15);
+            --shadow-lg: 0 2px 4px 0 rgba(60,64,67,.3), 0 4px 8px 3px rgba(60,64,67,.15);
+            --sidebar-width: 0px;
+            --header-height: 64px;
+            --content-max-width: 1200px;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-secondary);
+            font-size: 15px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        /* Header Minimalista */
+        .header-minimal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: white;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            z-index: 1000;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        
+        .header-content {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .logo-minimal {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1e3c72;
+            letter-spacing: -0.5px;
+        }
+        
+        .btn-print {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 18px;
+        }
+        
+        .btn-print:hover {
+            background: var(--bg-tertiary);
+            border-color: #ff6b35;
+        }
+        
+        /* Menu Button */
+        .menu-toggle {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 20px;
+            margin-right: 12px;
+        }
+        
+        .menu-toggle:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--accent);
+        }
+        
+        .menu-toggle.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+        
+        /* Sidebar Navigation */
+        .sidebar {
+            position: fixed !important;
+            top: 60px !important;
+            left: 0 !important;
+            width: 320px !important;
+            height: calc(100vh - 60px) !important;
+            background: white !important;
+            border-right: 1px solid var(--border-light) !important;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1) !important;
+            transform: translateX(-100%) !important;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            z-index: 999 !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+        }
+        
+        .sidebar.open {
+            transform: translateX(0) !important;
+            left: 0 !important;
+        }
+        
+        /* Forçar sidebar aberto - debug */
+        nav.sidebar.open {
+            transform: translateX(0) !important;
+            left: 0 !important;
+        }
+        
+        /* Garantir que nenhum outro CSS sobrescreva */
+        #sidebar.open,
+        nav#sidebar.open,
+        .sidebar#sidebar.open {
+            transform: translateX(0) !important;
+            left: 0 !important;
+        }
+        
+        .sidebar-content {
+            padding: 24px;
+        }
+        
+        /* Scrollbar styling for sidebar */
+        .sidebar::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .sidebar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        .sidebar::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+        
+        .sidebar::-webkit-scrollbar-thumb:hover {
+            background: var(--text-tertiary);
+        }
+        
+        /* Search Box */
+        .search-box {
+            margin-bottom: 24px;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.2s;
+            background: var(--bg-secondary);
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            background: white;
+            box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
+        }
+        
+        .search-input::placeholder {
+            color: var(--text-tertiary);
+        }
+        
+        /* Navigation Tree */
+        .nav-tree {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .nav-item {
+            margin-bottom: 4px;
+        }
+        
+        .nav-link {
+            display: block;
+            padding: 8px 12px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.2s;
+            line-height: 1.5;
+        }
+        
+        .nav-link:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+        
+        .nav-link.active {
+            background: rgba(30, 60, 114, 0.1);
+            color: var(--primary);
+            font-weight: 500;
+        }
+        
+        .nav-link.h1 {
+            font-weight: 600;
+            font-size: 15px;
+            color: var(--text-primary);
+            margin-top: 16px;
+            margin-bottom: 8px;
+            padding-left: 12px;
+        }
+        
+        .nav-link.h1:first-child {
+            margin-top: 0;
+        }
+        
+        .nav-link.h2 {
+            padding-left: 24px;
+            font-size: 14px;
+        }
+        
+        .nav-link.h3 {
+            padding-left: 36px;
+            font-size: 13px;
+            color: var(--text-tertiary);
+        }
+        
+        .nav-link.h4 {
+            padding-left: 48px;
+            font-size: 12px;
+            color: var(--text-tertiary);
+        }
+        
+        /* Search Results */
+        .search-results {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-light);
+        }
+        
+        .search-results-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
+        }
+        
+        .search-result-item {
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .search-result-item:hover {
+            background: var(--bg-tertiary);
+        }
+        
+        .search-result-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        
+        .search-result-excerpt {
+            font-size: 12px;
+            color: var(--text-tertiary);
+            line-height: 1.4;
+        }
+        
+        .search-highlight {
+            background: rgba(255, 107, 53, 0.2);
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: 500;
+        }
+        
+        /* Overlay */
+        .sidebar-overlay {
+            position: fixed;
+            top: 60px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+            z-index: 998;
+        }
+        
+        .sidebar-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                max-width: 320px;
+            }
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+        
+        .logo {
+            font-size: 20px;
+            font-weight: 500;
+            color: var(--primary);
+            letter-spacing: -0.5px;
+            text-decoration: none;
+        }
+        
+        .logo-mobile {
+            display: none;
+            font-size: 18px;
+            font-weight: 500;
+            color: var(--primary);
+        }
+        
+        .header-tagline {
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .btn-modern {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 18px;
+        }
+        
+        .btn-modern:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--border);
+        }
+        
+        .btn-modern:active {
+            background: var(--border-light);
+        }
+        
+        .search-container {
+            position: relative;
+            padding: 0 24px 16px;
+        }
+        
+        .search-box {
+            width: 100%;
+            padding: 10px 12px 10px 36px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.2s;
+            background: var(--bg);
+            color: var(--text-primary);
+            font-family: inherit;
+        }
+        
+        .search-box:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(139, 38, 53, 0.1);
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 32px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-tertiary);
+            font-size: 16px;
+            pointer-events: none;
+        }
+        
+        .toc {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .toc li {
+            margin: 0;
+        }
+        
+        .toc a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            display: block;
+            padding: 8px 24px;
+            font-size: 14px;
+            font-weight: 400;
+            transition: all 0.15s;
+            border-left: 3px solid transparent;
+        }
+        
+        .toc a:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+        
+        .toc a.active {
+            background: rgba(139, 38, 53, 0.08);
+            color: var(--primary);
+            font-weight: 500;
+            border-left-color: var(--primary);
+        }
+        
+        .toc .toc-level-2 {
+            font-weight: 500;
+            font-size: 13px;
+            color: var(--text-primary);
+            padding: 12px 24px 8px;
+            margin-top: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .toc .toc-level-2:first-child {
+            margin-top: 0;
+        }
+        
+        .toc .toc-level-3 {
+            padding-left: 32px;
+            font-size: 14px;
+        }
+        
+        .toc .toc-level-4 {
+            padding-left: 40px;
+            font-size: 13px;
+            color: var(--text-tertiary);
+        }
+        
+        /* Main Content - Full Width */
+        .main-content {
+            margin-left: 0;
+            margin-top: 60px;
+            min-height: calc(100vh - 60px);
+        }
+        
+        .content-wrapper {
+            max-width: var(--content-max-width);
+            margin: 0 auto;
+            padding: 48px 64px;
+            background: var(--bg);
+        }
+        
+        .hero-simple {
+            margin-top: 0;
+        }
+        
+        /* Typography Google-style */
+        h1 {
+            font-size: 40px;
+            font-weight: 400;
+            color: var(--text-primary);
+            margin-bottom: 24px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border-light);
+            line-height: 1.2;
+            letter-spacing: -0.5px;
+        }
+        
+        h2 {
+            font-size: 32px;
+            font-weight: 400;
+            color: var(--text-primary);
+            margin-top: 56px;
+            margin-bottom: 16px;
+            padding-top: 24px;
+            scroll-margin-top: 24px;
+            line-height: 1.3;
+            letter-spacing: -0.3px;
+        }
+        
+        h3 {
+            font-size: 24px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-top: 40px;
+            margin-bottom: 12px;
+            scroll-margin-top: 24px;
+            line-height: 1.4;
+        }
+        
+        h4 {
+            font-size: 20px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-top: 32px;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+        
+        p {
+            margin-bottom: 16px;
+            font-size: 15px;
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+        
+        ul, ol {
+            margin: 16px 0 16px 24px;
+        }
+        
+        li {
+            margin: 8px 0;
+            font-size: 15px;
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+        
+        li::marker {
+            color: var(--text-secondary);
+        }
+        
+        code {
+            background: var(--bg-tertiary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Roboto Mono', 'Courier New', monospace;
+            font-size: 13px;
+            color: #1e3c72;
+            border: 1px solid var(--border-light);
+        }
+        
+        a {
+            color: #1e3c72;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        
+        a:hover {
+            color: #ff6b35;
+            text-decoration: underline;
+        }
+        
+        pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 24px 0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border: 1px solid #333;
+            font-family: 'Roboto Mono', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        pre code {
+            background: none;
+            padding: 0;
+            color: inherit;
+            font-size: inherit;
+            border: none;
+            font-family: inherit;
+        }
+        
+        code.language-typescript {
+            color: #4ec9b0;
+        }
+        
+        code.language-bash {
+            color: #ce9178;
+        }
+        
+        code.language-markdown {
+            color: #9cdcfe;
+        }
+        
+        code.language-plaintext {
+            color: #d4d4d4;
+        }
+        
+        hr {
+            border: none;
+            border-top: 1px solid var(--border-light);
+            margin: 32px 0;
+        }
+        
+        hr.section-divider {
+            border-top: 1px solid var(--border);
+            margin: 48px 0;
+        }
+        
+        strong {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        
+        em {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+        
+        input[type="checkbox"] {
+            margin-right: 8px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: var(--primary);
+        }
+        
+        /* Scroll to top button */
+        .scroll-top {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #1e3c72;
+            color: white;
+            border: 2px solid #ff6b35;
+            width: 48px;
+            height: 48px;
+            border-radius: 24px;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 4px 12px rgba(30, 60, 114, 0.3);
+            transition: all 0.2s;
+            z-index: 999;
+        }
+        
+        .scroll-top:hover {
+            background: #ff6b35;
+            border-color: #1e3c72;
+            box-shadow: 0 6px 16px rgba(255, 107, 53, 0.4);
+        }
+        
+        .scroll-top.show {
+            display: flex;
+        }
+        
+        /* Mobile responsive */
+        @media (max-width: 1024px) {
+            .content-wrapper {
+                padding: 24px 32px;
+            }
+            .header-minimal {
+                padding: 0 16px;
+            }
+            h1 {
+                font-size: 32px;
+            }
+            h2 {
+                font-size: 28px;
+                margin-top: 40px;
+            }
+            h3 {
+                font-size: 22px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .content-wrapper {
+                padding: 24px 16px;
+            }
+            .header-minimal {
+                padding: 0 12px;
+            }
+            h1 {
+                font-size: 28px;
+            }
+            h2 {
+                font-size: 24px;
+                margin-top: 32px;
+            }
+            h3 {
+                font-size: 20px;
+            }
+        }
+        
+        html {
+            scroll-behavior: smooth;
+        }
+        
+        /* Hero Section Simplificado - Azul e Laranja */
+        .hero-simple {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 120px 0 80px;
+            text-align: center;
+        }
+        
+        .hero-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 32px;
+        }
+        
+        .hero-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 24px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: white;
+        }
+        
+        .hero-title-simple {
+            font-size: 56px;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 24px;
+            letter-spacing: -1px;
+            color: white;
+        }
+        
+        .title-accent {
+            color: #ff6b35;
+        }
+        
+        .hero-description {
+            font-size: 20px;
+            line-height: 1.6;
+            margin-bottom: 32px;
+            opacity: 0.95;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            color: white;
+        }
+        
+        .hero-formula-simple {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 16px 24px;
+            border-radius: 8px;
+            display: inline-block;
+        }
+        
+        .hero-formula-simple code {
+            font-size: 16px;
+            color: white;
+            background: transparent;
+            border: none;
+            font-family: 'Roboto Mono', monospace;
+        }
+        
+        /* Mermaid Diagrams */
+        .mermaid {
+            margin: 40px 0;
+            padding: 24px;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            border: 1px solid var(--border-light);
+            text-align: center;
+        }
+        
+        /* Melhorias visuais gerais */
+        .content-wrapper h1:first-of-type {
+            margin-top: 0;
+            padding-top: 0;
+        }
+        
+        /* Cards premium */
+        .premium-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 32px;
+            border-radius: 16px;
+            margin: 32px 0;
+            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+        }
+        
+        .premium-card h2,
+        .premium-card h3 {
+            color: white;
+        }
+        
+        /* Intro Simplificada */
+        .intro-simple {
+            padding: 80px 0;
+            background: var(--bg);
+        }
+        
+        .section-title {
+            font-size: 36px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 48px;
+            color: var(--text-primary);
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 32px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        .feature-card {
+            background: white;
+            padding: 32px;
+            border-radius: 12px;
+            border: 2px solid #e3f2fd;
+            text-align: center;
+            transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(255, 107, 53, 0.2);
+            border-color: #ff6b35;
+        }
+        
+        .feature-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        
+        .feature-card h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #1e3c72;
+        }
+        
+        .feature-card p {
+            font-size: 15px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin: 0;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero-title-simple {
+                font-size: 36px;
+            }
+            
+            .hero-description {
+                font-size: 18px;
+            }
+            
+            .hero-simple {
+                padding: 80px 0 60px;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 24px;
+            }
+        }
+    </style>
+    <script>
+        // Global functions for sidebar - MUST be defined before HTML uses them
+        function toggleSidebar() {
+            console.log('🔵 toggleSidebar() chamada');
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            const menuToggle = document.getElementById('menuToggle');
+            const menuIcon = document.getElementById('menuIcon');
+            
+            console.log('Elementos encontrados:', {
+                sidebar: !!sidebar,
+                overlay: !!overlay,
+                menuToggle: !!menuToggle,
+                menuIcon: !!menuIcon
+            });
+            
+            if (!sidebar) {
+                console.error('❌ Sidebar não encontrado!');
+                return;
+            }
+            if (!overlay) {
+                console.error('❌ Overlay não encontrado!');
+                return;
+            }
+            if (!menuToggle) {
+                console.error('❌ MenuToggle não encontrado!');
+                return;
+            }
+            if (!menuIcon) {
+                console.error('❌ MenuIcon não encontrado!');
+                return;
+            }
+            
+            const isOpen = sidebar.classList.contains('open');
+            console.log('Estado atual - aberto:', isOpen);
+            
+            // Toggle classes primeiro
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('active');
+            menuToggle.classList.toggle('active');
+            
+            const isOpenAfter = sidebar.classList.contains('open');
+            menuIcon.textContent = isOpenAfter ? '✕' : '☰';
+            
+            console.log('Estado novo - aberto:', isOpenAfter);
+            
+            // Aplicar estilo inline IMEDIATAMENTE com setProperty e !important
+            if (isOpenAfter) {
+                sidebar.style.setProperty('transform', 'translateX(0)', 'important');
+                console.log('✅ Estilo aplicado: translateX(0)');
+            } else {
+                sidebar.style.setProperty('transform', 'translateX(-100%)', 'important');
+                console.log('✅ Estilo aplicado: translateX(-100%)');
+            }
+            
+            // Verificar após um frame
+            requestAnimationFrame(() => {
+                const computed = window.getComputedStyle(sidebar);
+                const transform = computed.transform;
+                console.log('Transform computado:', transform);
+                
+                // Se não aplicou corretamente, forçar novamente
+                if (isOpenAfter) {
+                    if (transform.includes('-320') || transform.includes('-100%')) {
+                        console.warn('⚠️ Forçando translateX(0) novamente...');
+                        sidebar.style.setProperty('transform', 'translateX(0)', 'important');
+                    }
+                } else {
+                    if (!transform.includes('-320') && !transform.includes('-100%')) {
+                        console.warn('⚠️ Forçando translateX(-100%) novamente...');
+                        sidebar.style.setProperty('transform', 'translateX(-100%)', 'important');
+                    }
+                }
+            });
+        }
+        
+        function closeSidebar() {
+            console.log('🔴 closeSidebar() chamada');
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            const menuToggle = document.getElementById('menuToggle');
+            const menuIcon = document.getElementById('menuIcon');
+            
+            if (!sidebar || !overlay || !menuToggle || !menuIcon) {
+                console.error('❌ Elementos não encontrados em closeSidebar');
+                return;
+            }
+            
+            sidebar.classList.remove('open');
+            sidebar.style.setProperty('transform', 'translateX(-100%)', 'important');
+            overlay.classList.remove('active');
+            menuToggle.classList.remove('active');
+            menuIcon.textContent = '☰';
+            
+            console.log('✅ Sidebar fechado');
+            
+            // Verificar se fechou corretamente após um frame
+            requestAnimationFrame(() => {
+                const computed = window.getComputedStyle(sidebar);
+                const transform = computed.transform;
+                console.log('Transform após fechar:', transform);
+                if (!transform.includes('-320') && !transform.includes('-100%')) {
+                    console.warn('⚠️ Forçando fechamento...');
+                    sidebar.style.setProperty('transform', 'translateX(-100%)', 'important');
+                }
+            });
+        }
+    </script>
+</head>
+<body>
+    <!-- Header Minimalista -->
+    <!-- Header Minimalista -->
+    <header class="header-minimal">
+        <div class="header-content">
+            <div style="display: flex; align-items: center;">
+                <button class="menu-toggle" id="menuToggle" aria-label="Abrir menu" title="Menu de navegação" onclick="toggleSidebar()">
+                    <span id="menuIcon">☰</span>
+                </button>
+                <div class="logo-minimal">SDAAL</div>
+            </div>
+            <div class="header-actions">
+                <button class="btn-print" onclick="window.print()" title="Imprimir">🖨️</button>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Sidebar Navigation -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-content" onclick="event.stopPropagation()">
+            <div class="search-box">
+                <input 
+                    type="text" 
+                    class="search-input" 
+                    id="searchInput" 
+                    placeholder="🔍 Buscar no documento..."
+                    autocomplete="off"
+                />
+            </div>
+            <div id="navTree" class="nav-tree"></div>
+            <div id="searchResults" class="search-results" style="display: none;"></div>
+        </div>
+    </nav>
+    
+    <!-- Main Content -->
+    <main class="main-content" style="margin-top: 60px;">
+        <!-- Hero Section Simplificado -->
+        <section class="hero-simple">
+            <div class="hero-container">
+                <div class="hero-badge">Padrão de Desenvolvimento</div>
+                <h1 class="hero-title-simple">
+                    Specification-Driven<br>
+                    <span class="title-accent">AI Abstraction Layer</span>
+                </h1>
+                <p class="hero-description">
+                    Documentação Markdown substitui código executável, permitindo que LLMs 
+                    interpretem e simulem abstrações complexas através de especificações estruturadas.
+                </p>
+                <div class="hero-formula-simple">
+                    <code>SDAAL = Markdown Estruturado + Interfaces TypeScript + Documentação Executável</code>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Introdução Simplificada -->
+        <section class="intro-simple" id="visao-geral">
+            <div class="content-wrapper">
+            <h2 class="section-title">Como Funciona</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">📝</div>
+                    <h3>Documentação como Código</h3>
+                    <p>Markdown estruturado substitui código executável</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🧠</div>
+                    <h3>Interpretação Estruturada</h3>
+                    <p>LLMs interpretam especificações e simulam comportamentos</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔄</div>
+                    <h3>Flexibilidade Total</h3>
+                    <p>Troque provedores sem modificar código</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    
+    <div class="content-wrapper">
+<hr class="section-divider">
+<h1 id="specification-driven-ai-abstraction-layer">Specification-Driven AI Abstraction Layer</h1>
+
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Campo</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Valor</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Versão</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">1.0.0</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Data de Criação</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">2025-11-25</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Última Atualização</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">2025-11-25</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Categoria</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Concepts</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Aplicação</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Sistema Onion - Padrões de Desenvolvimento de IA</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Tags</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>ai-patterns</code>, <code>abstraction-layer</code>, <code>spec-as-code</code>, <code>claude-code-development</code></td>
+</tr>
+</tbody>
+</table>
+
+<ul>
+<li>Task Manager Abstraction (<code>.claude/utils/task-manager/</code>)</li>
+<li><a href="https://refactoring.guru/design-patterns/adapter">Adapter Pattern - GoF</a></li>
+<li><a href="https://refactoring.guru/design-patterns/factory-method">Factory Pattern - GoF</a></li>
+<li>Práticas do Sistema Onion</li>
+<li>Princípios de Prompt Engineering</li>
+</ul>
+
+
+<p>O <strong>Specification-Driven AI Abstraction Layer</strong> (SDAAL) é um padrão de desenvolvimento de IA onde <strong>documentação Markdown substitui código executável</strong>, permitindo que LLMs &quot;executem&quot; abstrações complexas baseadas em especificações estruturadas.</p>
+
+
+<p><strong>Princípio Central</strong>: LLMs não executam código diretamente, mas podem simular comportamentos complexos quando as especificações são precisas, tipadas e bem estruturadas.</p>
+
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Aspecto</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Spec-as-Code</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">SDAAL</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Foco</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Requisitos de negócio</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Abstrações técnicas</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Saída</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Código gerado</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Comportamento simulado</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Execução</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Compilação/Runtime</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Interpretação Estruturada</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Validação</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Testes automatizados</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Consistência de respostas</td>
+</tr>
+</tbody>
+</table>
+
+
+<p>LLMs como Claude são excelentes em:</p>
+
+<ol>
+<li><strong>Interpretar tipos TypeScript</strong>: Entendem contratos de interface</li>
+<li><strong>Seguir padrões documentados</strong>: Aplicam lógica descrita em Markdown</li>
+<li><strong>Mapear conceitos</strong>: Traduzem entre sistemas (ClickUp → Asana)</li>
+<li><strong>Manter consistência</strong>: Respeitam comportamentos definidos</li>
+</ol>
+
+<h3>Modelo Mental da IA</h3>
+<div class="mermaid">
+flowchart TD
+    A[interface.md] -->|"Entendo o contrato"| B[adapter.md]
+    B -->|"Sei como mapear para este provedor"| C[factory.md]
+    C -->|"Sei qual adapter usar"| D[detector.md]
+    D -->|"Sei identificar o contexto"| E["IA executa abstração consistentemente"]
+    
+    style A fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style B fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style C fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style D fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    style E fill:#ffebee,stroke:#c62828,stroke-width:3px
+</div>
+
+<h3>Analogia: Código vs Documentação</h3>
+<div class="mermaid">
+graph LR
+    subgraph TC["Código Tradicional"]
+        A["function add(a, b) {<br/>  return a + b;<br/>}"]
+        A --> B["Executado:<br/>VM/Runtime"]
+    end
+    
+    subgraph SD["SDAAL"]
+        C["# Função add<br/>Recebe dois números a e b.<br/>Retorna a soma de ambos."]
+        C --> D["Executado:<br/>Interpretação Estruturada"]
+    end
+    
+    style TC fill:#ffebee,stroke:#c62828,stroke-width:2px
+    style SD fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+</div>
+
+<h3>Arquitetura do Padrão</h3>
+<div class="mermaid">
+flowchart TD
+    subgraph SL["Specification Layer"]
+        I[interface.md]
+        T[types.md]
+        F[factory.md]
+        D[detector.md]
+    end
+    
+    subgraph AL["Adapter Layer"]
+        C[clickup.md]
+        A[asana.md]
+        L[linear.md]
+        N[none.md<br/>fallback]
+    end
+    
+    subgraph EL["Execution Layer"]
+        MCP[MCP Tools]
+        API[API Calls]
+        LOCAL[local_store]
+    end
+    
+    SL --> AL
+    AL --> EL
+    
+    style SL fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style AL fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style EL fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+</div>
+
+<h3>Fluxo de Execução</h3>
+<div class="mermaid">
+flowchart TD
+    START["1. Comando Onion<br/>invoca operação"] --> F1["2. IA lê factory.md<br/>detectProvider()"]
+    F1 --> F2["3. IA identifica provedor<br/>configurado via env"]
+    F2 --> F3["4. IA lê adapter específico<br/>clickup.md, asana.md"]
+    F3 --> F4["5. IA executa método<br/>conforme especificação"]
+    F4 --> F5["6. IA chama MCP tool real<br/>com parâmetros mapeados"]
+    F5 --> F6["7. IA normaliza resposta<br/>conforme types.md"]
+    F6 --> END["8. Retorna resultado<br/>padronizado"]
+    
+    style START fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style END fill:#c8e6c9,stroke:#388e3c,stroke-width:3px
+    style F1 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style F2 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style F3 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style F4 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style F5 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style F6 fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+</div>
+
+<h3>Estrutura de Arquivos da Abstração</h3>
+<p>A estrutura padrão de uma abstração SDAAL segue este formato:</p>
+
+<pre><code class="language-plaintext">├── README.md           # Visão geral e uso rápido
+├── interface.md        # Interface/Contrato principal
+├── types.md            # Tipos de entrada e saída
+├── factory.md          # Criação de instâncias</code></pre>
+
+<h4>Estrutura Completa com Adaptadores</h4>
+<p>Estrutura completa incluindo diretório de adapters:</p>
+
+<pre><code class="language-plaintext">.claude/utils/&lt;abstraction&gt;/
+├── README.md           # Visão geral e uso rápido
+├── interface.md        # Interface/Contrato principal
+├── types.md            # Tipos de entrada e saída
+├── factory.md          # Criação de instâncias
+├── detector.md         # Detecção de contexto/provedor
+└── adapters/
+    ├── provider-a.md   # Implementação Provider A
+    ├── provider-b.md   # Implementação Provider B
+    └── none.md         # Fallback (Null Object Pattern)</code></pre>
+
+
+<h4>Definição da Interface</h4>
+<p>A interface define o contrato que todos os adapters devem implementar:</p>
+
+<p>Estrutura básica:</p>
+
+<pre><code class="language-typescript">interface I&lt;Nome&gt; {
+  // Propriedades
+  readonly property: Type;
+  
+  // Métodos
+  method(input: Input): Promise&lt;Output&gt;;
+}</code></pre>
+
+<h4>Métodos da Interface</h4>
+<p>Principais métodos disponíveis na interface:</p>
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Categoria</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Métodos</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Descrição</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">CRUD</td>
+<td style="border: 1px solid var(--border); padding: 12px;">create, get, update, delete</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Operações básicas</td>
+</tr>
+</tbody>
+</table>
+
+<h4>Exemplo de Uso</h4>
+<p>Como usar a factory para obter uma instância:</p>
+
+<pre><code class="language-typescript">const instance = getFactory();
+await instance.method({ ... });</code></pre>
+
+<h4>Implementação do Adapter</h4>
+<p>Cada adapter implementa a interface genérica para um provedor específico. Exemplo de estrutura:</p>
+
+<pre><code class="language-bash">PROVIDER_API_TOKEN=xxx
+PROVIDER_WORKSPACE_ID=xxx</code></pre>
+
+<h5>Implementação TypeScript</h5>
+<p>Estrutura básica do adapter:</p>
+
+<pre><code class="language-typescript">class &lt;Provider&gt;Adapter implements I&lt;Nome&gt; {
+  // Cada método com mapeamento específico
+  async method(input): Promise&lt;Output&gt; {
+    const result = await mcp_provider_call({
+      // Mapear campos de input → provider
+    });
+    return this.normalize(result);
+  }
+  
+  // Helpers de normalização
+  private normalize(raw): Output { ... }
+}</code></pre>
+
+
+<p>Cada provedor tem um adapter documentado que traduz:</p>
+<ul>
+<li><strong>Input</strong>: Interface genérica → API específica</li>
+<li><strong>Output</strong>: Resposta específica → Formato normalizado</li>
+</ul>
+
+
+<h4>Factory Pattern - Seleção de Adapter</h4>
+<p>A factory detecta o provedor configurado e retorna o adapter apropriado:</p>
+
+<pre><code class="language-typescript">function getTaskManager(): ITaskManager {
+  const provider = detectProvider();
+  
+  switch (provider) {
+    case 'clickup': return new ClickUpAdapter();
+    case 'asana': return new AsanaAdapter();
+    default: return new NoProviderAdapter();
+  }
+}</code></pre>
+
+
+<p>Cada adapter implementa a mesma interface com estratégias diferentes:</p>
+
+<h4>Hierarquia de Implementação</h4>
+<p>Abaixo está a estrutura de como os adapters são organizados:</p>
+
+<pre><code class="language-plaintext">ITaskManager.createTask()
+  │
+  ├── ClickUpAdapter: mcp_ClickUp_clickup_create_task
+  ├── AsanaAdapter: mcp_asana_asana_create_task
+  └── NoProviderAdapter: retorna objeto local</code></pre>
+
+<p>O <code>NoProviderAdapter</code> permite funcionamento sem provedor:</p>
+
+<h4>Implementação do NoProviderAdapter</h4>
+<p>Este adapter permite que o sistema funcione mesmo sem um provedor configurado:</p>
+
+<pre><code class="language-typescript">class NoProviderAdapter implements ITaskManager {
+  readonly isConfigured = false;
+  
+  async createTask(input): Promise&lt;TaskOutput&gt; {
+    console.warn('⚠️ Modo offline - task local');
+    return {
+      id: `local-${Date.now()}`,
+      provider: 'none',
+      ...input
+    };
+  }
+}</code></pre>
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Elemento</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Propósito</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Exemplo</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Emojis em headers</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Navegação visual</td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>## 🎯 Propósito</code></td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Separadores ASCII</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Divisões claras</td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>═══════════════</code></td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Tabelas de mapeamento</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Tradução entre sistemas</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Status/Priority</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Code blocks TypeScript</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Tipagem precisa</td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>interface ITask</code></td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Exemplos práticos</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Demonstração de uso</td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>🧪 Exemplos de Uso</code></td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Referências cruzadas</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Contexto adicional</td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>[Ver types.md]</code></td>
+</tr>
+</tbody>
+</table>
+
+<h3>Template de Estrutura de Abstração</h3>
+<p>Estrutura padrão que cada arquivo de uma abstração SDAAL deve seguir:</p>
+
+<pre><code class="language-markdown">## Estrutura de Conteúdo
+
+[1-2 parágrafos explicando o objetivo]
+
+### Interface Principal
+
+[Interface/Classe/Função principal em TypeScript]
+
+### Mapeamentos e Constantes
+
+[Mapeamentos, enums, constantes]
+
+### Operações
+
+[Detalhamento de cada operação]
+
+### Exemplos de Uso
+
+[Código prático demonstrando uso]
+
+### Referências
+
+[Links para outros arquivos relacionados]</code></pre>
+
+<h4>Checklist de Arquivos</h4>
+<p>Arquivos que devem existir em uma abstração completa:</p>
+
+<ul>
+<li>[ ] <strong>README.md</strong>: Visão geral, estrutura de arquivos, uso rápido</li>
+<li>[ ] <strong>interface.md</strong>: Contrato completo com todos os métodos</li>
+<li>[ ] <strong>types.md</strong>: Todos os tipos de entrada e saída</li>
+<li>[ ] <strong>factory.md</strong>: Lógica de criação de instâncias</li>
+<li>[ ] <strong>detector.md</strong>: Lógica de detecção de contexto</li>
+<li>[ ] <strong>adapters/</strong>: Um arquivo por provedor suportado</li>
+<li>[ ] <strong>adapters/none.md</strong>: Fallback para modo offline</li>
+</ul>
+
+<h4>Checklist de Qualidade</h4>
+<p>Elementos que devem estar presentes em cada abstração:</p>
+
+<ul>
+<li>[ ] TypeScript em todos os code blocks de interface/tipos</li>
+<li>[ ] Tabelas de mapeamento para traduções entre sistemas</li>
+<li>[ ] Exemplos práticos de uso em cada arquivo</li>
+<li>[ ] Referências cruzadas entre arquivos</li>
+<li>[ ] Emojis consistentes para navegação</li>
+<li>[ ] Versionamento e data de criação</li>
+</ul>
+
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Aspecto</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Código Tradicional</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">SDAAL</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Formato</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>.ts</code>, <code>.js</code>, <code>.py</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>.md</code> (Markdown)</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Execução</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Runtime (Node, Python)</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Interpretação Estruturada</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Debugging</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Breakpoints, logs</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Verificar resposta da IA</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Testes</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Unit tests, integration</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Consistência de output</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Versionamento</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Git (código)</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Git (documentação)</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Portabilidade</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Requer ambiente</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Funciona em qualquer LLM</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Manutenção</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Refatoração</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Atualização de docs</td>
+</tr>
+</tbody>
+</table>
+
+<p>✅ <strong>Use quando:</strong></p>
+<ul>
+<li>Sistema opera principalmente via LLM</li>
+<li>Precisa de flexibilidade para trocar provedores</li>
+<li>Deseja documentação e implementação unificadas</li>
+<li>Trabalha com assistentes de código (Claude Code, Copilot)</li>
+</ul>
+
+<p>❌ <strong>Não use quando:</strong></p>
+<ul>
+<li>Precisa de performance crítica</li>
+<li>Requer execução determinística</li>
+<li>Sistema não envolve IA</li>
+<li>Complexidade algorítmica alta</li>
+</ul>
+
+<h3>Estrutura de Arquivos - Task Manager</h3>
+<p>Exemplo real da estrutura de arquivos da abstração Task Manager:</p>
+
+<pre><code class="language-plaintext">├── README.md           # Introdução + uso rápido
+├── interface.md        # ITaskManager completo
+├── types.md            # CreateTaskInput, TaskOutput, etc
+├── factory.md          # getTaskManager(), NoProviderAdapter
+├── detector.md         # detectProvider(), detectProviderFromTaskId()
+└── adapters/
+    ├── clickup.md      # ClickUpAdapter (completo)
+    ├── asana.md        # AsanaAdapter (completo)
+    └── linear.md       # LinearAdapter (API-first; MCP opcional)</code></pre>
+
+<h4>Fluxo Real de Uso</h4>
+
+<pre><code class="language-markdown">## Comando Onion Executa
+
+1. Usuário: `/engineer/start TASK-123`
+
+2. IA lê factory.md:
+   - "Preciso chamar getTaskManager()"
+   - "Vou detectar o provedor configurado"
+
+3. IA lê detector.md:
+   - "TASK_MANAGER_PROVIDER=clickup no .env"
+   - "Provedor é ClickUp"
+
+4. IA lê adapters/clickup.md:
+   - "Para getTask, uso mcp_ClickUp_clickup_get_task"
+   - "ID deve ter 9 caracteres alfanuméricos"
+
+5. IA executa MCP call:
+   - mcp_ClickUp_clickup_get_task({ task_id: "TASK-123" })
+
+6. IA normaliza resposta conforme types.md:
+   - Mapeia status "in progress" → "in_progress"
+   - Formata datas para ISO 8601
+
+7. Retorna TaskOutput padronizado</code></pre>
+
+
+<p><strong>❌ Problema:</strong></p>
+<p>Faz coisas com o Provider X.</code></pre>
+
+<p><strong>✅ Solução:</strong></p>
+
+<ul>
+<li>PROVIDER_X_TOKEN: Token de API (obrigatório)</li>
+</ul>
+
+<p>Cria task no Provider X.</p>
+
+<h4>Exemplo de Código</h4>
+<pre><code class="language-typescript">await mcp_provider_x_create({
+  title: input.name,
+  body: input.description
+});</code></pre>
+
+
+<p><strong>❌ Problema:</strong></p>
+<p>createTask(data: any): Promise<any>;</p>
+<p>}</code></pre>
+
+<p><strong>✅ Solução:</strong></p>
+<p>createTask(input: CreateTaskInput): Promise<TaskOutput>;</p>
+<p>}</p>
+
+<h3>Sistema Onion - Hierarquia</h3>
+<div class="mermaid">
+flowchart TD
+    subgraph SO["Sistema Onion"]
+        SAC["Spec-as-Code<br/>Requisitos de negócio"]
+        AADP["AI Agent Design Patterns<br/>Comportamento de agentes"]
+        SDAAL["SDAAL<br/>Abstrações de infraestrutura"]
+        TMA["Task Manager Abstraction<br/>Implementação de referência"]
+    end
+    
+    SAC --> AADP
+    AADP --> SDAAL
+    SDAAL --> TMA
+    
+    style SAC fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style AADP fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style SDAAL fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+    style TMA fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+</div>
+
+
+<ul>
+<li><a href="../../../.claude/commands/meta/create-abstraction.md">Comando /meta/create-abstraction</a> - Gerador automático de SDAAL</li>
+<li><a href="../../../.claude/commands/common/templates/abstraction-template.md">Template de Abstração</a> - Template base</li>
+</ul>
+
+<ul>
+<li><a href="https://refactoring.guru/design-patterns/adapter">Adapter Pattern - Refactoring Guru</a></li>
+<li><a href="https://refactoring.guru/design-patterns/factory-method">Factory Method - Refactoring Guru</a></li>
+<li><a href="https://refactoring.guru/design-patterns/null-object">Null Object Pattern</a></li>
+<li><a href="https://refactoring.guru/design-patterns/strategy">Strategy Pattern</a></li>
+<li><a href="https://docs.anthropic.com/claude/docs/prompt-engineering">Prompt Engineering Guide - Anthropic</a></li>
+</ul>
+
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Termo</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Definição</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>SDAAL</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Specification-Driven AI Abstraction Layer</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Adapter</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Componente que traduz entre interface genérica e API específica</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Factory</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Componente que decide qual adapter instanciar</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Detector</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Componente que identifica contexto/provedor</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Null Object</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Adapter de fallback que não faz nada (gracefully)</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Normalização</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Processo de converter resposta específica em formato padrão</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Próxima Atualização Planejada</strong>: Janeiro 2026</p>
+<p><strong>Responsável</strong>: Sistema Onion</p>
+
+
+<hr class="section-divider">
+<h1 id="spec-as-code-strategy">Spec as Code Strategy</h1>
+
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Campo</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Valor</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Versão</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">1.0.0</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Data de Criação</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">2025-11-24</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Última Atualização</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">2025-11-24</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Categoria</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Concepts</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Aplicação</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Sistema Onion - Metodologia de Especificação</td>
+</tr>
+</tbody>
+</table>
+
+<ul>
+<li>Práticas do Sistema Onion</li>
+<li><a href="https://cucumber.io/docs/bdd/">Behavior Driven Development (BDD)</a></li>
+<li><a href="https://martinfowler.com/bliki/ExecutableSpec.html">Executable Specifications</a></li>
+<li><a href="https://www.writethedocs.org/guide/docs-as-code/">Documentation as Code</a></li>
+<li>Princípios de Engenharia de Prompts</li>
+</ul>
+
+
+<p><strong>Spec as Code</strong> é uma metodologia onde especificações técnicas e de negócio são tratadas como código versionável, servindo como &quot;fonte da verdade&quot; para sistemas de IA gerarem implementações consistentes e alinhadas com requisitos.</p>
+
+
+<p><strong>Princípio Central</strong>: Especificações bem escritas permitem que a IA gere código correto na primeira tentativa.</p>
+
+<h3>Hierarquia de Especificações</h3>
+<p>Estrutura em camadas do Spec as Code, do mais abstrato ao mais concreto:</p>
+
+<div class="mermaid">
+flowchart TD
+    META["META-SPECS<br/>(Constituição do Sistema)"]
+    DOMAIN["DOMAIN SPECS<br/>(Regras de Negócio)"]
+    FEATURE["FEATURE SPECS<br/>(Especificações de Features)"]
+    IMPL["IMPLEMENTATION<br/>(Código Gerado)"]
+    
+    META --> DOMAIN
+    DOMAIN --> FEATURE
+    FEATURE --> IMPL
+    
+    style META fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+    style DOMAIN fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style FEATURE fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style IMPL fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+</div>
+
+<h4>Detalhamento dos Níveis</h4>
+<p>Características e exemplos de cada nível da hierarquia:</p>
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Nível</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Nome</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Propósito</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Exemplo</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>L0</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Meta-Specs</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Constituição, princípios imutáveis</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Arquitetura base, padrões de código</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>L1</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Domain Specs</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Regras de negócio, domínio</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Entidades, casos de uso</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>L2</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Feature Specs</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Especificações de funcionalidades</td>
+<td style="border: 1px solid var(--border); padding: 12px;">User stories com critérios</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>L3</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Task Specs</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Tarefas específicas</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Subtasks, implementações</td>
+</tr>
+</tbody>
+</table>
+
+<ul>
+<li>Toda spec é um arquivo Markdown versionado em Git</li>
+<li>Mudanças em specs geram histórico rastreável</li>
+<li>Código gerado referencia spec de origem</li>
+<li>Validações verificam conformidade</li>
+</ul>
+
+
+<ul>
+<li><strong>Tipo</strong>: [feature|domain|task]</li>
+<li><strong>Status</strong>: [draft|review|approved|implemented]</li>
+<li><strong>Versão</strong>: [semver]</li>
+<li><strong>Autor</strong>: [responsável]</li>
+<li><strong>Data</strong>: [YYYY-MM-DD]</li>
+</ul>
+
+<h4>Descrição</h4>
+<p>[Descrição clara do que esta spec define]</p>
+
+<h4>Contexto</h4>
+<p>[Informações de background necessárias]</p>
+
+
+<ul>
+<li>[ ] Requisito 1</li>
+<li>[ ] Requisito 2</li>
+</ul>
+
+<ul>
+<li>[ ] Performance</li>
+<li>[ ] Segurança</li>
+</ul>
+
+<h4>Dependências entre Specs</h4>
+<ul>
+<li><strong>Spec A</strong> → esta spec depende de</li>
+<li><strong>Spec B</strong> → depende desta spec</li>
+</ul>
+
+<ul>
+<li>[ ] Critério 1</li>
+<li>[ ] Critério 2</li>
+</ul>
+
+<p>[Casos de uso concretos]</p>
+
+<p>[Como verificar se a implementação está correta]</code></pre>
+
+
+<ul>
+<li><strong>Tipo</strong>: feature</li>
+<li><strong>Status</strong>: approved</li>
+<li><strong>Versão</strong>: 1.0.0</li>
+<li><strong>Autor</strong>: @product-agent</li>
+<li><strong>Data</strong>: 2025-11-24</li>
+</ul>
+
+<p>Implementar autenticação via OAuth 2.0 com suporte a Google e GitHub.</p>
+
+<p>O sistema atual usa autenticação básica. Usuários solicitaram</p>
+<p>login social para simplificar o acesso.</p>
+
+
+<ul>
+<li>[ ] Login com Google</li>
+<li>[ ] Login com GitHub</li>
+<li>[ ] Link/Unlink de contas sociais</li>
+<li>[ ] Refresh token automático</li>
+</ul>
+
+<ul>
+<li>[ ] Tempo de resposta &lt; 2s</li>
+<li>[ ] Tokens armazenados de forma segura</li>
+<li>[ ] Rate limiting de 100 req/min</li>
+</ul>
+
+<ul>
+<li>[ ] Usuário consegue fazer login com Google</li>
+<li>[ ] Usuário consegue fazer login com GitHub</li>
+<li>[ ] Sessão persiste por 7 dias</li>
+<li>[ ] Erro amigável se provider indisponível</li>
+</ul>
+
+
+<ol>
+<li>Usuário clica &quot;Login com Google&quot;</li>
+<li>Redirecionado para consent screen</li>
+<li>Após aprovação, retorna ao app</li>
+<li>Sessão criada automaticamente</code></pre>
+</ol>
+
+
+<h4>Fluxo de Estados da Spec</h4>
+<p>Ciclo de vida de uma especificação desde a criação até a implementação:</p>
+
+<div class="mermaid">
+flowchart LR
+    DRAFT["DRAFT<br/>Autor escreve"]
+    REVIEW["REVIEW<br/>Review por pares"]
+    APPROVED["APPROVED<br/>Validação automática"]
+    IMPL["IMPLEMENTED<br/>Geração de código"]
+    
+    DRAFT -->|"Submete"| REVIEW
+    REVIEW -->|"Aprova"| APPROVED
+    APPROVED -->|"Implementa"| IMPL
+    
+    style DRAFT fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style REVIEW fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style APPROVED fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style IMPL fill:#c8e6c9,stroke:#388e3c,stroke-width:3px
+</div>
+
+
+<ul>
+<li>Autor cria spec inicial</li>
+<li>Estrutura básica preenchida</li>
+<li>Requisitos preliminares</li>
+</ul>
+
+<ul>
+<li>Pares revisam especificação</li>
+<li>Identificam gaps e ambiguidades</li>
+<li>Refinam requisitos</li>
+</ul>
+
+<ul>
+<li>Gate-keeper valida conformidade</li>
+<li>Spec está pronta para implementação</li>
+<li>Critérios de aceitação claros</li>
+</ul>
+
+<ul>
+<li>IA gera código baseado na spec</li>
+<li>Testes validam critérios de aceitação</li>
+<li>Código referencia spec de origem</li>
+</ul>
+
+
+<h4>Fluxo de Transformação</h4>
+<p>Como uma spec Markdown se transforma em código através da IA:</p>
+
+<div class="mermaid">
+flowchart LR
+    SPEC["SPEC FILE<br/>(Markdown)"]
+    AI["AI CONTEXT<br/>(Prompt)"]
+    CODE["CODE OUTPUT<br/>(Gerado)"]
+    
+    SPEC -->|"Interpretação"| AI
+    AI -->|"Geração"| CODE
+    
+    style SPEC fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style AI fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style CODE fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+</div>
+
+<h4>Spec → Prompt Efetivo</h4>
+<p>Exemplo de como uma spec é transformada em prompt para a IA:</p>
+
+<pre><code class="language-markdown">## Contexto
+Você está implementando a feature definida em:
+@docs/specs/auth-oauth.md
+
+## Instruções
+1. Leia a spec completamente
+2. Implemente TODOS os requisitos funcionais
+3. Respeite os requisitos não-funcionais
+4. Gere testes para os critérios de aceitação
+
+## Restrições
+- Siga os padrões de @docs/meta-specs/code-standards.md
+- Use libs aprovadas em @docs/meta-specs/dependencies.md</code></pre>
+
+<h4>Exemplo de Checklist de Implementação</h4>
+<p>Como uma spec pode incluir referências ao código gerado:</p>
+
+<ul>
+<li>[x] <strong>Login com Google</strong> - Implementado em <code>auth.service.ts</code> (linhas 45-67)</li>
+<li>[x] <strong>Login com GitHub</strong> - Implementado em <code>auth.service.ts</code> (linhas 68-89)</li>
+<li>[ ] <strong>Refresh token</strong> - Pendente</li>
+</ul>
+
+<h5>Status dos Testes</h5>
+<ul>
+<li>[x] <code>auth.service.spec.ts</code> - 12 testes passando</li>
+</ul>
+
+<h5>Critérios de Aceitação</h5>
+<ul>
+<li>3/4 critérios de aceitação cobertos</li>
+<li>Falta: &quot;Erro amigável se provider indisponível&quot;</li>
+</ul>
+
+
+<pre><code class="language-plaintext">├── meta-specs/           # Nível L0 - Constituição
+│   ├── index.md          # Índice de meta-specs
+│   ├── architecture.md   # Arquitetura base
+│   ├── code-standards.md # Padrões de código
+│   └── dependencies.md   # Dependências aprovadas
+│
+├── domain-specs/         # Nível L1 - Domínio
+│   ├── entities/         # Entidades do domínio
+│   ├── use-cases/        # Casos de uso
+│   └── rules/            # Regras de negócio
+│
+├── feature-specs/        # Nível L2 - Features
+│   ├── auth/             # Specs de autenticação
+│   ├── payments/         # Specs de pagamentos
+│   └── reports/          # Specs de relatórios
+│
+└── task-specs/           # Nível L3 - Tarefas
+└── sessions/         # Contexto por sessão</code></pre>
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Tipo</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Padrão</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Exemplo</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Meta-spec</td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>kebab-case.md</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>code-standards.md</code></td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Domain spec</td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>entity-name.md</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>user-entity.md</code></td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Feature spec</td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>feature-name.md</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>oauth-login.md</code></td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Task spec</td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>task-id.md</code> ou <code>context.md</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>context.md</code></td>
+</tr>
+</tbody>
+</table>
+
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Benefício</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Descrição</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Consistência</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">IA sempre gera código alinhado com specs</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Rastreabilidade</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Toda linha de código tem origem em spec</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Validação</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Critérios de aceitação são verificáveis</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Iteração</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Refinar spec = refinar código</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Documentação</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Specs servem como documentação viva</td>
+</tr>
+</tbody>
+</table>
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Benefício</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Descrição</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Alinhamento</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Todos entendem o que será construído</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Review eficiente</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Revisar spec antes de código</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Onboarding</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Novos membros leem specs</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Handoff</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Specs transferem conhecimento</td>
+</tr>
+</tbody>
+</table>
+
+
+<pre><code class="language-plaintext">├── docs/
+│   └── meta-specs/         # Regras imutáveis do sistema
+│       ├── index.md        # Índice
+│       ├── architecture.md # Padrões arquiteturais
+│       └── agents.md       # Padrões de agentes
+├── STATE.md      # Índice Tier-0 de resume (ponteiro NEXT)
+├── context.md    # Spec da feature + Phase-Subtask Mapping
+├── plan.md       # Fases [DONE]/[ACTIVE]/[TODO]
+├── architecture.md # Design decisions
+└── notes.md      # Log append-only</code></pre>
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Comando</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Interação com Specs</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>/product/task</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Cria task spec</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>/product/spec</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Cria feature spec</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>/engineer/start</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Lê spec e prepara contexto</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>/engineer/work</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Implementa baseado em spec</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>@metaspec-gate-keeper</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Valida conformidade</td>
+</tr>
+</tbody>
+</table>
+
+<h4>Fluxo de Comandos e Agentes</h4>
+<p>Sequência de comandos e agentes no processo Spec as Code:</p>
+
+<ol>
+<li><code>/product/create</code> → Cria context.md com spec inicial</li>
+<li><code>/product/refine</code> → Refina spec com detalhes</li>
+<li><code>@metaspec-gate-keeper</code> → Valida conformidade com meta-specs</li>
+<li><code>/engineer/start</code> → Prepara ambiente baseado na spec</li>
+<li><code>/engineer/work</code> → Implementa seguindo spec</li>
+<li><code>/engineer/pr</code> → Valida critérios de aceitação</li>
+</ol>
+
+
+<p><strong>❌ Problema:</strong></p>
+<p>Fazer o login funcionar</p>
+
+<p><strong>✅ Solução:</strong></p>
+<ul>
+<li>Login com Google</li>
+<li>Login com GitHub</li>
+</ul>
+<ul>
+<li>Usuário autenticado em < 3 cliques</code></pre>
+</ul>
+
+
+<p><strong>❌ Problema:</strong> Spec diz uma coisa, código faz outra</p>
+
+<p><strong>✅ Solução:</strong></p>
+<ul>
+<li>Atualizar spec ANTES de mudar código</li>
+<li>Validação automática de conformidade</li>
+</ul>
+
+
+<p><strong>❌ Problema:</strong> Spec descreve implementação, não requisitos</p>
+
+<p><strong>✅ Solução:</strong> Focar no &quot;O QUÊ&quot;, não no &quot;COMO&quot;</p>
+
+
+<ul>
+<li><a href="specification-driven-ai-abstraction-layer.md">Specification-Driven AI Abstraction Layer</a> - Aplicação de Spec-as-Code para abstrações técnicas</li>
+<li><a href="task-manager-abstraction.md">Task Manager Abstraction</a> - Exemplo prático do padrão</li>
+<li><a href="ai-agent-design-patterns.md">AI Agent Design Patterns</a> - Padrões complementares de agentes</li>
+</ul>
+
+<ul>
+<li><a href="https://cucumber.io/docs/bdd/">Behavior Driven Development</a></li>
+<li><a href="https://specificationbyexample.com">Specification by Example</a></li>
+<li><a href="https://leanpub.com/livingdocumentation">Living Documentation</a></li>
+<li><a href="https://www.writethedocs.org/guide/docs-as-code/">Docs as Code</a></li>
+</ul>
+
+<p><strong>Próxima Atualização Planejada</strong>: Janeiro 2026</p>
+<p><strong>Responsável</strong>: Sistema Onion</p>
+
+
+<hr class="section-divider">
+<h1 id="ai-agent-design-patterns">AI Agent Design Patterns</h1>
+
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Campo</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Valor</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Versão</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">1.0.0</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Data de Criação</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">2025-11-24</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Última Atualização</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">2025-11-24</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Categoria</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Concepts</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Aplicação</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Sistema Onion - Design de Agentes</td>
+</tr>
+</tbody>
+</table>
+
+<ul>
+<li><a href="https://python.langchain.com/docs/modules/agents/">LangChain Agent Documentation</a></li>
+<li><a href="https://www.crewai.com/">CrewAI Framework</a></li>
+<li><a href="https://microsoft.github.io/autogen/">AutoGen Multi-Agent Framework</a></li>
+<li><a href="https://docs.anthropic.com/">Anthropic Claude Agent Patterns</a></li>
+<li>Práticas do Sistema Onion</li>
+</ul>
+
+
+<p>Este documento define patterns de design para agentes de IA, focando em arquitetura, especialização, delegação e orquestração para sistemas multi-agente eficientes.</p>
+
+
+<p><strong>Componentes Essenciais:</strong></p>
+<ul>
+<li><strong>Identidade</strong>: Nome, descrição, propósito único</li>
+<li><strong>Especialização</strong>: Área de expertise bem definida</li>
+<li><strong>Ferramentas</strong>: Capacidades disponíveis (read, write, search, etc.)</li>
+<li><strong>Protocolo</strong>: Como o agente opera e se comunica</li>
+</ul>
+
+<h3>Single Agent Pattern</h3>
+<p>Agente único que executa tarefas de forma independente:</p>
+
+<div class="mermaid">
+flowchart TD
+    SA["Single Agent<br/>Identidade + Ferramentas<br/>+ Todo o conhecimento"]
+    SA --> OUTPUT["Output"]
+    
+    style SA fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style OUTPUT fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+</div>
+
+<p><strong>Quando usar:</strong></p>
+<ul>
+<li>Tarefas simples e bem definidas</li>
+<li>Domínio único e específico</li>
+<li>Contexto limitado</li>
+</ul>
+
+<p><strong>Exemplo:</strong> Agente de revisão de código para uma linguagem.</p>
+
+<h3>Orchestrator Pattern</h3>
+<p>Agente coordenador que delega tarefas para workers especializados:</p>
+
+<div class="mermaid">
+flowchart TD
+    ORCH["Orchestrator<br/>(Coordena)"]
+    ORCH --> WA["Worker A<br/>(Pesquisa)"]
+    ORCH --> WB["Worker B<br/>(Código)"]
+    ORCH --> WC["Worker C<br/>(Teste)"]
+    
+    style ORCH fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+    style WA fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style WB fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style WC fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+</div>
+
+<p><strong>Quando usar:</strong></p>
+<ul>
+<li>Tarefas complexas com múltiplas especialidades</li>
+<li>Necessidade de coordenação</li>
+<li>Resultados precisam ser consolidados</li>
+</ul>
+
+<p><strong>Exemplo:</strong> Orquestrador de documentação delegando para especialistas.</p>
+
+<h3>Sequential Flow Pattern</h3>
+<p>Fluxo sequencial onde cada agente processa e passa para o próximo:</p>
+
+<div class="mermaid">
+flowchart LR
+    A1["Agent A<br/>(Análise)"] --> A2["Agent B<br/>(Design)"]
+    A2 --> A3["Agent C<br/>(Impl.)"]
+    A3 --> OUTPUT["Output<br/>(Final)"]
+    
+    style A1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style A2 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style A3 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style OUTPUT fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+</div>
+
+<p><strong>Quando usar:</strong></p>
+<ul>
+<li>Processo com etapas bem definidas</li>
+<li>Output de um agente é input do próximo</li>
+<li>Ordem de execução importante</li>
+</ul>
+
+<p><strong>Exemplo:</strong> Análise → Design → Implementação → Review.</p>
+
+<h3>Feedback Loop Pattern</h3>
+<p>Agentes que trabalham em conjunto com feedback bidirecional:</p>
+
+<div class="mermaid">
+flowchart TD
+    TASK["TASK"]
+    TASK --> A1["Agent A<br/>(Executor)"]
+    TASK --> A2["Agent B<br/>(Reviewer)"]
+    A1 <-->|Feedback| A2
+    A1 --> OUTPUT["Output<br/>(Refinado)"]
+    A2 --> OUTPUT
+    
+    style TASK fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style A1 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style A2 fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style OUTPUT fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+</div>
+
+<p><strong>Quando usar:</strong></p>
+<ul>
+<li>Qualidade crítica</li>
+<li>Necessidade de segunda opinião</li>
+<li>Redução de erros e alucinações</li>
+</ul>
+
+<p><strong>Exemplo:</strong> Code-reviewer revisando output de developer.</p>
+
+
+<p><strong>Princípio:</strong> Cada agente deve ter uma única responsabilidade bem definida.</p>
+
+<p><strong>❌ Anti-pattern:</strong></p>
+<p>description: Faz tudo - código, testes, docs, deploy, reviews...</code></pre>
+
+<p><strong>✅ Pattern correto:</strong></p>
+<p>description: Revisa código para qualidade, segurança e padrões.</p>
+<p>expertise: [&quot;code-review&quot;, &quot;security&quot;, &quot;best-practices&quot;]</code></pre>
+
+
+<p><strong>Princípio:</strong> Agente com conhecimento profundo em domínio específico.</p>
+
+<pre><code class="language-yaml">description: Especialista em desenvolvimento React e ecossistema.
+expertise:
+  - React hooks e patterns
+  - Estado com Zustand/Redux
+  - Testes com Testing Library
+  - Performance optimization
+tools:
+  - read_file
+  - write
+  - codebase_search</code></pre>
+
+
+<p><strong>Princípio:</strong> Agente que cria ou gerencia outros agentes.</p>
+
+<p>description: Meta-agente especializado em criar agentes.</p>
+<p>expertise:</p>
+<ul>
+<li>Design de agentes</li>
+<li>Prompt engineering</li>
+<li>Estruturação de conhecimento</li>
+</ul>
+<p>tools:</p>
+<ul>
+<li>read_file</li>
+<li>write</li>
+<li>codebase_search</li>
+</ul>
+<p>related_agents:</p>
+<ul>
+<li>command-creator-specialist</code></pre>
+</ul>
+
+
+<p><strong>Princípio:</strong> Delegação explícita com instruções claras.</p>
+
+<h4>Processo de Delegação</h4>
+<ol>
+<li>Analisar requisitos</li>
+<li><strong>DELEGAR para @code-reviewer</strong>:
+    <ul>
+    <li>Fornecer: código gerado</li>
+    <li>Solicitar: review de qualidade</li>
+    <li>Esperar: feedback e sugestões</li>
+    </ul>
+</li>
+<li>Aplicar feedback</li>
+<li>Retornar resultado</li>
+</ol>
+
+
+<p><strong>Princípio:</strong> Delegar baseado em condições.</p>
+
+<pre><code class="language-markdown">SE tarefa envolve código TypeScript:
+  DELEGAR para @typescript-specialist
+
+SE tarefa envolve testes:
+  DELEGAR para @test-engineer
+
+SE tarefa envolve segurança:
+  DELEGAR para @security-specialist
+
+SENÃO:
+  Executar internamente</code></pre>
+
+
+<p><strong>Princípio:</strong> Delegação em cascata para refinamento progressivo.</p>
+
+<h4>Fluxo de Delegação em Cascata</h4>
+<p>Processo onde cada agente refina o trabalho do anterior:</p>
+
+<div class="mermaid">
+flowchart TD
+    START["Início"] --> TS["@task-specialist<br/>(decomposição)"]
+    TS --> CR["@code-reviewer<br/>(validação)"]
+    CR --> TE["@test-engineer<br/>(testes)"]
+    TE --> END["Resultado Final"]
+    
+    style START fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style TS fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style CR fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style TE fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style END fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+</div>
+
+
+<p><strong>Princípio:</strong> Injetar contexto relevante no prompt do agente.</p>
+
+
+<p>Ao invocar este agente, incluir:</p>
+<ol>
+<li>Sessão atual: @.claude/sessions/<feature>/context.md</li>
+<li>Padrões do projeto: @.claude/rules/</li>
+<li>Última atividade: últimos 5 arquivos modificados</code></pre>
+</ol>
+
+
+<p><strong>Princípio:</strong> Expandir contexto progressivamente conforme necessidade.</p>
+
+<p>↓ (se insuficiente)</p>
+<p>Nível 2: Arquivos relacionados (@imports)</p>
+<p>↓ (se insuficiente)</p>
+<p>Nível 3: Módulo/pasta inteira</p>
+<p>↓ (se insuficiente)</p>
+<p>Nível 4: Projeto completo (@codebase)</code></pre>
+
+
+<p><strong>Princípio:</strong> Definir limites claros do que entra no contexto.</p>
+
+<p>include:</p>
+<ul>
+<li>&quot;.claude/sessions/current/*&quot;</li>
+<li>&quot;src/components/<component>/*&quot;</li>
+</ul>
+<p>exclude:</p>
+<ul>
+<li>&quot;node_modules/&quot;</li>
+<li>&quot;*.test.ts&quot;</li>
+<li>&quot;*.spec.ts&quot;</li>
+</ul>
+<p>max_files: 10</p>
+<p>max_tokens: 8000</code></pre>
+
+
+<p><strong>Princípio:</strong> Agentes devem ter apenas ferramentas necessárias.</p>
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Tipo de Agente</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Ferramentas Recomendadas</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Pesquisa</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>codebase_search</code>, <code>web_search</code>, <code>grep</code>, <code>read_file</code></td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Desenvolvimento</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>read_file</code>, <code>write</code>, <code>search_replace</code>, <code>run_terminal_cmd</code></td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Review</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>read_file</code>, <code>codebase_search</code>, <code>grep</code></td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Documentação</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>read_file</code>, <code>write</code>, <code>codebase_search</code></td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Teste</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>read_file</code>, <code>write</code>, <code>run_terminal_cmd</code></td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>Princípio:</strong> Ferramentas genéricas permitem agentes portáveis.</p>
+
+<p><strong>✅ Agente Agnóstico:</strong></p>
+<ul>
+<li>read_file</li>
+<li>write</li>
+<li>codebase_search</li>
+<li>grep</li>
+<li>web_search</li>
+</ul>
+
+<p><strong>⚠️ Agente Especializado:</strong></p>
+<ul>
+<li>read_file</li>
+<li>write</li>
+<li>mcp_ClickUp_*      # Acoplado ao ClickUp</li>
+</ul>
+
+
+<p><strong>Princípio:</strong> Comportamento alternativo quando ferramenta indisponível.</p>
+
+
+<pre><code class="language-markdown">SE mcp_ClickUp disponível:
+  → Usar para criar/atualizar tasks
+SENÃO:
+  → Gerar output em formato Markdown compatível
+  → Usuário pode copiar manualmente</code></pre>
+
+
+<p><strong>Princípio:</strong> Identidade clara no início do prompt.</p>
+
+
+<p>Você é o <strong>@code-reviewer</strong>, especialista em:</p>
+<ul>
+<li>Revisão de código TypeScript/JavaScript</li>
+<li>Identificação de problemas de segurança</li>
+<li>Aplicação de padrões e boas práticas</li>
+</ul>
+
+<p>Revisar código para qualidade, mantendo padrões do projeto.</p>
+
+<ul>
+<li>Seja específico nas sugestões</li>
+<li>Cite linhas de código</li>
+<li>Priorize issues críticas</code></pre>
+</ul>
+
+
+<p><strong>Princípio:</strong> Definir protocolo claro de ação.</p>
+
+
+<ul>
+<li>Ler código completo</li>
+<li>Identificar padrões usados</li>
+<li>Mapear dependências</li>
+</ul>
+
+<ul>
+<li>Listar issues encontradas</li>
+<li>Classificar por severidade</li>
+<li>Identificar melhorias</li>
+</ul>
+
+<ul>
+<li>Apresentar sumário</li>
+<li>Detalhar issues críticas</li>
+<li>Sugerir melhorias</code></pre>
+</ul>
+
+
+<p><strong>Princípio:</strong> Definir formato de saída esperado.</p>
+
+
+<ul>
+<li>Issues críticas: X</li>
+<li>Melhorias sugeridas: Y</li>
+<li>Aprovado: Sim/Não</li>
+</ul>
+
+<ol>
+<li>[SECURITY] Descrição - linha X</li>
+<li>[BUG] Descrição - linha Y</li>
+</ol>
+
+<ol>
+<li>Descrição - linha Z</li>
+</ol>
+
+<ul>
+<li>Item 1</li>
+<li>Item 2</li>
+</ul>
+
+
+<h4>Sistema Onion - Hierarquia de Agentes</h4>
+<p>Estrutura do Sistema Onion com orquestrador e agentes especializados:</p>
+
+<div class="mermaid">
+flowchart TD
+    ONION["@onion<br/>(Orquestrador)"]
+    ONION --> PA["product/<br/>agents"]
+    ONION --> DA["development/<br/>agents"]
+    ONION --> MA["meta/<br/>agents"]
+    
+    style ONION fill:#fff3e0,stroke:#f57c00,stroke-width:3px
+    style PA fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style DA fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    style MA fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+</div><table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Pattern</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Implementação Onion</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Orchestrator-Worker</td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>@onion</code> coordena especialistas</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Expert Agent</td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>@clickup-specialist</code>, <code>@react-developer</code></td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Meta Agent</td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>@agent-creator-specialist</code></td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Peer Review</td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>@code-reviewer</code> + desenvolvedor</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Context Injection</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Sessions em <code>.claude/sessions/</code></td>
+</tr>
+</tbody>
+</table>
+
+<p>name: agent-name</p>
+<p>description: |</p>
+<p>Descrição clara em 1-2 linhas.</p>
+<p>model: sonnet</p>
+<p>tools: [read_file, write, codebase_search, grep]</p>
+
+<p>color: purple</p>
+<p>priority: alta</p>
+<p>category: development</p>
+
+<p>expertise: [&quot;area-1&quot;, &quot;area-2&quot;]</p>
+<p>related_agents: [&quot;agente-1&quot;, &quot;agente-2&quot;]</p>
+<p>related_commands: [&quot;/categoria/comando&quot;]</p>
+
+<p>version: &quot;1.0.0&quot;</p>
+<p>updated: &quot;2025-11-24&quot;</p>
+
+<p>[Quem é e o que faz]</p>
+
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">MCP</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Uso</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">ClickUp</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Se disponível, gerenciar tasks</td>
+</tr>
+</tbody>
+</table>
+<p>[Regras e melhores práticas]</code></pre>
+
+
+<p><strong>❌ Problema:</strong> Um agente faz tudo</p>
+<p>expertise: [tudo]</code></pre>
+
+<p><strong>✅ Solução:</strong> Especialização + delegação</p>
+
+
+<p><strong>❌ Problema:</strong> Carregar todo o projeto no contexto</p>
+
+<p><strong>✅ Solução:</strong> Context boundary + progressive loading</p>
+
+
+<p><strong>❌ Problema:</strong> Identidade genérica</p>
+
+<p><strong>✅ Solução:</strong> Identidade específica e expertise clara</p>
+
+
+<p><strong>❌ Problema:</strong> Sem processo definido</p>
+
+<p><strong>✅ Solução:</strong> Protocolo com fases claras</p>
+
+
+<ul>
+<li><a href="specification-driven-ai-abstraction-layer.md">Specification-Driven AI Abstraction Layer</a> - Padrão para abstrações documentais</li>
+<li><a href="task-manager-abstraction.md">Task Manager Abstraction</a> - Implementação de referência do SDAAL</li>
+<li><a href="spec-as-code-strategy.md">Spec-as-Code Strategy</a> - Metodologia de especificações</li>
+</ul>
+
+<ul>
+<li><a href="https://python.langchain.com/docs/modules/agents/">LangChain Agents</a></li>
+<li><a href="https://docs.crewai.com/">CrewAI Documentation</a></li>
+<li><a href="https://microsoft.github.io/autogen/">AutoGen</a></li>
+<li><a href="https://docs.anthropic.com/claude/docs/prompt-engineering">Anthropic Prompting Guide</a></li>
+<li><a href="https://platform.openai.com/docs/guides/prompt-engineering">OpenAI Best Practices</a></li>
+</ul>
+
+<p><strong>Próxima Atualização Planejada</strong>: Janeiro 2026</p>
+<p><strong>Responsável</strong>: Sistema Onion</p>
+
+
+<hr class="section-divider">
+<h1 id="task-manager-abstraction">Task Manager Abstraction</h1>
+
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Campo</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Valor</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Versão</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">1.0.0</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Criado</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">2025-11-24</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Categoria</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Architecture</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Tags</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>task-manager</code>, <code>adapter-pattern</code>, <code>abstraction</code></td>
+</tr>
+</tbody>
+</table>
+
+<p>O <strong>Task Manager Abstraction</strong> é uma camada de abstração que permite ao Sistema Onion funcionar com diferentes gerenciadores de tarefas (ClickUp, Asana, Linear) sem modificar comandos ou agentes.</p>
+
+
+<p>Antes da abstração, comandos como <code>/product/task</code> e <code>/engineer/start</code> tinham chamadas diretas ao ClickUp MCP, criando:</p>
+<ul>
+<li><strong>Acoplamento forte</strong> a um provedor específico</li>
+<li><strong>Impossibilidade de trocar</strong> de gerenciador sem refatoração</li>
+<li><strong>Código duplicado</strong> em múltiplos comandos</li>
+</ul>
+
+
+<p>Uma camada de abstração baseada no <strong>Adapter Pattern</strong> que:</p>
+<ul>
+<li>Define interface comum (<code>ITaskManager</code>)</li>
+<li>Implementa adapters específicos por provedor</li>
+<li>Detecta provedor via variável de ambiente</li>
+<li>Oferece fallback gracioso quando não configurado</li>
+</ul>
+
+
+<h3>Arquitetura da Abstração</h3>
+<p>Como os comandos Onion interagem com a camada de abstração:</p>
+
+<div class="mermaid">
+flowchart TD
+    CMDS["Comandos Onion<br/>/product/task<br/>/engineer/start<br/>/engineer/work"]
+    CMDS --> AL["Abstraction Layer"]
+    
+    subgraph AL["Abstraction Layer"]
+        F["Factory"]
+        D["Detector"]
+        I["Interface"]
+        F --> D
+        D --> I
+    end
+    
+    AL --> FS["Estrutura de Arquivos"]
+    
+    subgraph FS["Estrutura de Arquivos"]
+        R["README.md"]
+        INT["interface.md"]
+        T["types.md"]
+        DET["detector.md"]
+        FAC["factory.md"]
+        ADAPT["adapters/"]
+        ADAPT --> C["clickup.md"]
+        ADAPT --> A["asana.md"]
+        ADAPT --> L["linear.md"]
+    end
+    
+    style CMDS fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    style AL fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    style F fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+    style D fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+    style I fill:#c8e6c9,stroke:#388e3c,stroke-width:2px
+</div>
+
+<h4>Estrutura de Arquivos da Abstração</h4>
+<p>Organização dos arquivos na camada de abstração:</p>
+
+<pre><code class="language-plaintext">├── README.md           # Visão geral da abstração
+├── interface.md        # Interface ITaskManager
+├── types.md            # Tipos compartilhados
+├── detector.md         # Detecta provedor via .env
+├── factory.md          # Cria instância do adapter
+└── adapters/
+    ├── clickup.md      # Adapter ClickUp (completo)
+    ├── asana.md        # Adapter Asana (completo)
+    └── linear.md       # Adapter Linear (API-first; MCP opcional)</code></pre>
+
+<h4>Identificação de Provedores</h4>
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Status Normalizado</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">ClickUp</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Asana</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Linear</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>backlog</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Open</td>
+<td style="border: 1px solid var(--border); padding: 12px;">-</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Backlog</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>todo</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">To Do</td>
+<td style="border: 1px solid var(--border); padding: 12px;">-</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Todo</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>in_progress</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">In Progress</td>
+<td style="border: 1px solid var(--border); padding: 12px;">In Progress</td>
+<td style="border: 1px solid var(--border); padding: 12px;">In Progress</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>in_review</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">In Review</td>
+<td style="border: 1px solid var(--border); padding: 12px;">-</td>
+<td style="border: 1px solid var(--border); padding: 12px;">In Review</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>done</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Done/Complete</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Completed</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Done</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>cancelled</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Closed</td>
+<td style="border: 1px solid var(--border); padding: 12px;">-</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Cancelled</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>blocked</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Blocked</td>
+<td style="border: 1px solid var(--border); padding: 12px;">On Hold</td>
+<td style="border: 1px solid var(--border); padding: 12px;">-</td>
+</tr>
+</tbody>
+</table>
+
+
+<ul>
+<li>Variável: <code>PROVIDER_API_KEY</code></li>
+<li>Workspace: <code>PROVIDER_WORKSPACE_ID</code></li>
+</ul>
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Normalizado</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Provider Status</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">backlog</td>
+<td style="border: 1px solid var(--border); padding: 12px;">...</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">todo</td>
+<td style="border: 1px solid var(--border); padding: 12px;">...</td>
+</tr>
+</tbody>
+</table>
+
+<h5>Exemplo de Chamada MCP</h5>
+<p>Como chamar o provedor via MCP:</p>
+
+<pre><code class="language-typescript">await mcp_provider_create_task({
+  // ... parâmetros mapeados
+});
+
+// ... implementar todos os métodos da interface</code></pre>
+
+
+<p>Adicione o novo provedor em <code>detector.md</code>:</p>
+
+<pre><code class="language-typescript">const ID_PATTERNS = {
+  clickup: /^[a-z0-9]{9}$/,
+  asana: /^[0-9]{16}$/,
+  linear: /^[A-Z]+-[0-9]+$/,
+  novo_provider: /^SEU_PATTERN$/  // ← Adicionar
+};</code></pre>
+
+
+<p>Adicione a instanciação em <code>factory.md</code>:</p>
+
+<pre><code class="language-typescript">case 'clickup': return new ClickUpAdapter();
+case 'asana': return new AsanaAdapter();
+case 'novo_provider': return new NovoProviderAdapter();  // ← Adicionar
+default: return new NoProviderAdapter();
+}</code></pre>
+
+
+<h5>Variáveis de Ambiente</h5>
+<p>Adicione as variáveis de ambiente necessárias:</p>
+
+<pre><code class="language-bash">NOVO_PROVIDER_API_KEY=xxx
+NOVO_PROVIDER_WORKSPACE=xxx</code></pre>
+
+
+<p>O sistema detecta automaticamente o provedor pelo padrão do ID:</p>
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Provedor</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Padrão</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Exemplo</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">ClickUp</td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>^[a-z0-9]{9}$</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>86adfe9eb</code></td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Asana</td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>^[0-9]{16}$</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>1234567890123456</code></td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Linear</td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>^[A-Z]+-[0-9]+$</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>ENG-123</code></td>
+</tr>
+</tbody>
+</table>
+
+<p>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</p>
+<p>Task ID: &quot;1234567890123456&quot;</p>
+<p>Provedor detectado: asana</p>
+<p>Provedor configurado: clickup</p>
+
+<p>💡 Ações sugeridas:</p>
+<ol>
+<li>Altere TASK_MANAGER_PROVIDER no .env</li>
+<li>Ou crie nova task no provedor atual</code></pre>
+</ol>
+
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Método</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">ClickUp</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Asana</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Linear</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>createTask</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅</td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅</td>
+<td style="border: 1px solid var(--border); padding: 12px;">📝</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>getTask</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅</td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅</td>
+<td style="border: 1px solid var(--border); padding: 12px;">📝</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>updateTask</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅</td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅</td>
+<td style="border: 1px solid var(--border); padding: 12px;">📝</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>deleteTask</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅</td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅</td>
+<td style="border: 1px solid var(--border); padding: 12px;">📝</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>createSubtask</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅</td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅</td>
+<td style="border: 1px solid var(--border); padding: 12px;">📝</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>getSubtasks</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅</td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅</td>
+<td style="border: 1px solid var(--border); padding: 12px;">📝</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>addComment</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅</td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅</td>
+<td style="border: 1px solid var(--border); padding: 12px;">📝</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>getComments</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅</td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅</td>
+<td style="border: 1px solid var(--border); padding: 12px;">📝</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>updateStatus</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅</td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅</td>
+<td style="border: 1px solid var(--border); padding: 12px;">📝</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>searchTasks</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅</td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅</td>
+<td style="border: 1px solid var(--border); padding: 12px;">📝</td>
+</tr>
+</tbody>
+</table>
+<p>✅ Implementado | 📝 Stub (documentado)</p>
+
+
+<ul>
+<li>Interface: <code>.claude/utils/task-manager/interface.md</code></li>
+<li>Factory: <code>.claude/utils/task-manager/factory.md</code></li>
+<li>Adapters: <code>.claude/utils/task-manager/adapters/</code></li>
+<li>Comando de setup: <code>/meta/setup-integration</code></li>
+</ul>
+
+
+<ul>
+<li><a href="specification-driven-ai-abstraction-layer.md">Specification-Driven AI Abstraction Layer</a> - Padrão de design usado nesta abstração</li>
+<li><a href="ai-agent-design-patterns.md">AI Agent Design Patterns</a></li>
+<li><a href="spec-as-code-strategy.md">Spec-as-Code Strategy</a></li>
+<li><a href="configuration-management.md">Configuration Management</a></li>
+<li><a href="../tools/claude-code-commands-best-practices-2026.md">Claude Code Commands Best Practices</a></li>
+</ul>
+
+
+<hr class="section-divider">
+<h1 id="comando-create-abstraction">Comando: create-abstraction</h1>
+
+
+<p>Gerador de camadas de abstração seguindo o padrão <strong>Specification-Driven AI Abstraction Layer</strong>.</p>
+
+
+<p>Criar estrutura completa de abstração agnóstica de provedor, permitindo trocar implementações sem modificar comandos ou agentes.</p>
+
+<h4>Estrutura de Arquivos</h4>
+<p>O padrão gera a seguinte estrutura:</p>
+
+<pre><code class="language-plaintext">├── README.md           # Visão geral e uso rápido
+├── interface.md        # Interface/Contrato principal
+├── types.md            # Tipos de entrada e saída
+├── factory.md          # Criação de instâncias
+├── detector.md         # Detecção de contexto/provedor
+└── adapters/
+├── provider-a.md   # Adapter Provider A
+├── provider-b.md   # Adapter Provider B
+└── none.md         # Fallback (Null Object Pattern)</code></pre>
+
+<h4>Validações do Comando</h4>
+<p>O comando executa as seguintes validações antes de criar a abstração:</p>
+
+<pre><code class="language-bash">if [ -d ".claude/utils/{{abstraction_name}}" ]; then
+  echo "❌ ERRO: Abstração '{{abstraction_name}}' já existe!"
+  ls -la .claude/utils/{{abstraction_name}}/
+  exit 1
+fi
+
+if [[ ! "{{abstraction_name}}" =~ ^[a-z][a-z0-9]*(-[a-z0-9]+)*$ ]]; then
+  echo "❌ ERRO: Nome deve ser kebab-case (ex: notification-manager)"
+  exit 1
+fi</code></pre>
+
+<p><strong>Checklist de Validação:</strong></p>
+<ul>
+<li>[ ] Nome único (não existe em <code>.claude/utils/</code>)</li>
+<li>[ ] Nome em kebab-case válido</li>
+<li>[ ] Pelo menos 1 provedor definido (ou usar fallback only)</li>
+</ul>
+
+
+<p><strong>Derivação Automática:</strong></p>
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Input</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Derivação</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>{{abstraction_name}}</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>notification-manager</code></td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>{{interface_name}}</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>INotificationManager</code> (auto: I + PascalCase)</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>{{providers}}</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>slack,discord,email</code> ou <code>none</code> se vazio</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>{{env_prefix}}</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>NOTIFICATION_MANAGER</code> (auto: UPPER_SNAKE)</td>
+</tr>
+</tbody>
+</table>
+
+<h4>Estrutura Gerada</h4>
+<p>Estrutura completa de arquivos que será criada:</p>
+
+<pre><code class="language-plaintext">├── README.md          # Este arquivo
+├── interface.md       # Interface {{interface_name}}
+├── types.md           # Tipos compartilhados
+├── detector.md        # Detecção de provedor
+├── factory.md         # Factory para adapters
+└── adapters/
+{{#each providers}}
+    ├── {{this}}.md    # Adapter {{this}}
+{{/each}}
+    └── none.md        # Adapter Fallback</code></pre>
+
+
+<h5>Configuração do .env</h5>
+<p>No <code>.env</code>:</p>
+
+<pre><code class="language-bash">{{env_prefix}}_PROVIDER={{providers[0]}}  # {{providers.join(' | ')}} | none</code></pre>
+
+<h5>Exemplo de Uso</h5>
+<pre><code class="language-typescript">// Importar factory
+import { get{{interface_name.slice(1)}} } from '.claude/utils/{{abstraction_name}}/factory';
+
+// Obter adapter configurado
+const instance = getFactory();
+await instance.method({ ... });</code></pre>
+
+<ul>
+<li><a href="../../docs/knowbase/concepts/specification-driven-ai-abstraction-layer.md">SDAAL Pattern</a></li>
+<li><a href="./interface.md">Interface</a></li>
+<li><a href="./factory.md">Factory</a></li>
+</ul>
+
+<p><strong>Versão</strong>: 1.0.0</p>
+<p><strong>Criado em</strong>: {{data_atual}}</p>
+
+
+<p>Define o contrato que todos os adapters devem implementar, garantindo consistência e permitindo troca transparente de provedores.</p>
+
+<h4>Template da Interface</h4>
+<pre><code class="language-typescript">/**
+ * Interface abstrata para {{description}}.
+ * Todos os adapters devem implementar esta interface.
+ */
+interface {{interface_name}} {
+  /**
+   * Nome do provedor: '{{providers.join("' | '")}}' | 'none'
+   */
+  readonly provider: string;
+  
+  /**
+   * Indica se o provedor está configurado corretamente
+   */
+  readonly isConfigured: boolean;
+  
+  /**
+   * Valida configuração do provedor.
+   * @returns true se configuração está válida
+   */
+  validateConfiguration(): boolean;
+}</code></pre>
+
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Categoria</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Métodos</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Descrição</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Identificação</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>provider</code>, <code>isConfigured</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Informações do adapter</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Principais</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;">TODO</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Operações de negócio</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><strong>Validação</strong></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>validateConfiguration</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Verificação de setup</td>
+</tr>
+</tbody>
+</table>
+
+<p>Para completar a interface:</p>
+
+<ol>
+<li>Definir métodos específicos em <a href="./types.md">types.md</a></li>
+<li>Implementar em cada adapter em <a href="./adapters/">adapters/</a></li>
+<li>Atualizar mapeamentos de campos</li>
+</ol>
+
+
+<ul>
+<li><a href="./types.md">Tipos Compartilhados</a></li>
+<li><a href="./factory.md">Factory</a></li>
+<li><a href="./adapters/">Adapters</a></li>
+</ul>
+
+<p><strong>Versão</strong>: 1.0.0</p>
+<p><strong>Criado em</strong>: {{data_atual}}</p>
+
+
+<p>Define os tipos TypeScript compartilhados entre todos os adapters, garantindo consistência nas operações de entrada e saída.</p>
+
+<h4>Template dos Tipos</h4>
+<pre><code class="language-typescript">/**
+ * Provedores suportados.
+ */
+type Provider = '{{providers.join("' | '")}}' | 'none';
+
+/**
+ * TODO: Definir tipos de entrada.
+ * Exemplo:
+ */
+interface CreateInput {
+  // Campos específicos da abstração
+}
+
+/**
+ * TODO: Definir tipos de saída.
+ * Exemplo:
+ */
+interface Output {
+  // Campos específicos da abstração
+}
+
+/**
+ * Configuração de um provedor.
+ */
+interface ProviderConfig {
+  provider: Provider;
+  isConfigured: boolean;
+}</code></pre><ul>
+<li><a href="./interface.md">Interface</a></li>
+<li><a href="./detector.md">Detector de Provedor</a></li>
+</ul>
+
+<p><strong>Versão</strong>: 1.0.0</p>
+<p><strong>Criado em</strong>: {{data_atual}}</p>
+
+
+<p>Detecta e valida o provedor configurado via variáveis de ambiente.</p>
+
+<h4>Template do Detector</h4>
+<pre><code class="language-typescript">/**
+ * Detecta o provedor configurado via variáveis de ambiente.
+ * @returns Configuração do provedor ativo
+ */
+function detectProvider(): Provider {
+  const envProvider = process.env.{{env_prefix}}_PROVIDER;
+  // Lógica de detecção
+  return envProvider as Provider || 'none';
+}
+
+/**
+ * Verifica a configuração completa do provedor.
+ * @returns Objeto com status e mensagens
+ */
+function validateProviderConfig(provider: Provider): {
+  isValid: boolean;
+  messages: string[];
+} {
+  // Lógica de validação
+  return { isValid: true, messages: [] };
+}</code></pre><ul>
+<li><a href="./types.md">Types</a></li>
+<li><a href="./factory.md">Factory</a></li>
+</ul>
+
+<p><strong>Versão</strong>: 1.0.0</p>
+<p><strong>Criado em</strong>: {{data_atual}}</p>
+
+
+<p>Fornece factory para instanciar o adapter correto baseado na configuração do ambiente.</p>
+
+<h4>Template da Factory</h4>
+<pre><code class="language-typescript">/**
+ * Retorna uma instância do manager configurado.
+ * Baseado em {{env_prefix}}_PROVIDER no .env
+ *
+ * @param options - Opções de configuração (opcional)
+ * @returns Instância do adapter apropriado
+ */
+function get{{interface_name.slice(1)}}(options?: FactoryOptions): {{interface_name}} {
+  const provider = detectProvider();
+  
+  switch (provider) {
+    case '{{providers[0]}}': return new {{Provider}}Adapter();
+    // Adicionar outros casos
+    default: return new NoProviderAdapter();
+  }
+}
+
+/**
+ * Opções para a factory.
+ */
+interface FactoryOptions {
+  // Opções específicas
+}
+
+/**
+ * Adapter de fallback quando nenhum provedor está configurado.
+ */
+class NoProviderAdapter implements {{interface_name}} {
+  readonly provider = 'none';
+  readonly isConfigured = false;
+  
+  validateConfiguration(): boolean {
+    return false;
+  }
+}</code></pre><ul>
+<li><a href="./interface.md">Interface</a></li>
+<li><a href="./detector.md">Detector</a></li>
+<li><a href="./adapters/">Adapters</a></li>
+</ul>
+
+<p><strong>Versão</strong>: 1.0.0</p>
+<p><strong>Criado em</strong>: {{data_atual}}</p>
+
+
+<p>Para cada provedor em <code>{{providers}}</code>, criar:</p>
+
+
+<h4>Template de Implementação</h4>
+<p>Implementação do {{interface_name}} para {{provider}}.</p>
+
+<h5>Variáveis de Ambiente</h5>
+<pre><code class="language-bash">{{env_prefix}}_{{provider.toUpperCase()}}_TOKEN=xxx
+{{env_prefix}}_{{provider.toUpperCase()}}_WORKSPACE=xxx</code></pre>
+
+<h5>Código do Adapter</h5>
+<pre><code class="language-typescript">/**
+ * Adapter {{provider}} implementando {{interface_name}}.
+ */
+class {{Provider}}Adapter implements {{interface_name}} {
+  // Implementação aqui
+}</code></pre>
+
+<h5>Mapeamento de Métodos</h5>
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Interface</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">{{provider}} API</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Notas</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">TODO</td>
+<td style="border: 1px solid var(--border); padding: 12px;">TODO</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Mapear campos</td>
+</tr>
+</tbody>
+</table>
+
+<h5>Via Factory (recomendado)</h5>
+<pre><code class="language-typescript">const instance = get{{interface_name.slice(1)}}();
+await instance.method({ ... });</code></pre>
+
+<h5>Referências</h5>
+<ul>
+<li><a href="../interface.md">Interface</a></li>
+<li><a href="../types.md">Types</a></li>
+</ul>
+
+<p><strong>Versão</strong>: 1.0.0</p>
+<p><strong>Criado em</strong>: {{data_atual}}</p>
+
+
+<p>Adapter de fallback que permite operação offline quando nenhum provedor está configurado.</p>
+
+
+<p>O NoProviderAdapter:</p>
+
+<ul>
+<li>✅ Permite que comandos executem sem falhar</li>
+<li>⚠️ Exibe warnings quando operações são tentadas</li>
+<li>📝 Pode gerar IDs locais para rastreamento</li>
+<li>❌ Não persiste dados em serviços externos</li>
+</ul>
+
+<h4>Template do NoProviderAdapter</h4>
+<pre><code class="language-typescript">/**
+ * Adapter de fallback - modo offline.
+ */
+class NoProviderAdapter implements {{interface_name}} {
+  readonly provider = 'none';
+  readonly isConfigured = false;
+  
+  validateConfiguration(): boolean {
+    return false;
+  }
+  
+  // Implementar métodos da interface retornando valores padrão
+}</code></pre>
+
+<h5>Comportamento Offline</h5>
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Operação</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Comportamento Offline</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Leitura</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Retorna array vazio ou null</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Escrita</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Warning + ID local</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Atualização</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Warning + throw/false</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Deleção</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Warning + false</td>
+</tr>
+</tbody>
+</table>
+
+<ul>
+<li><a href="../factory.md">Factory</a></li>
+<li><a href="../interface.md">Interface</a></li>
+</ul>
+
+<p><strong>Versão</strong>: 1.0.0</p>
+<p><strong>Criado em</strong>: {{data_atual}}</p>
+
+
+<h5>Arquivo .env.example</h5>
+<p>Adicionar ao <code>.env.example</code>:</p>
+
+<pre><code class="language-bash">{{env_prefix}}_PROVIDER=none  # {{providers.join(' | ')}} | none
+
+{{#each providers}}
+{{../env_prefix}}_{{this.toUpperCase()}}_TOKEN=
+{{../env_prefix}}_{{this.toUpperCase()}}_WORKSPACE=
+{{/each}}</code></pre>
+
+
+<h3>Mensagem de Sucesso</h3>
+<p>Após a criação bem-sucedida, o comando exibe:</p>
+
+<pre><code class="language-plaintext">✅ ABSTRACTION LAYER CRIADA (SDAAL)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📁 Estrutura:
+.claude/utils/{{abstraction_name}}/
+├── README.md           ✅
+├── interface.md        ✅
+├── types.md            ✅
+├── factory.md          ✅
+├── detector.md         ✅
+└── adapters/
+{{#each providers}}
+    ├── {{this}}.md     📝 (stub)
+{{/each}}
+    └── none.md         ✅
+
+📋 Detalhes:
+∟ Interface: {{interface_name}}
+∟ Provedores: {{providers.join(', ')}}
+∟ Env Prefix: {{env_prefix}}_PROVIDER</code></pre>
+
+<p>🔧 Próximos Passos:</p>
+<ol>
+<li>Definir métodos em interface.md</li>
+<li>Adicionar tipos em types.md</li>
+<li>Implementar adapters em adapters/</li>
+<li>Configurar .env com {{env_prefix}}_PROVIDER</li>
+</ol>
+
+<p>📚 Documentação:</p>
+<p>∟ Pattern: docs/knowbase/concepts/specification-driven-ai-abstraction-layer.md</p>
+<p>∟ Exemplo: .claude/utils/task-manager/</p>
+
+<p>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</code></pre>
+
+
+<ul>
+<li><a href="../../docs/knowbase/concepts/specification-driven-ai-abstraction-layer.md">SDAAL Pattern</a></li>
+<li><a href="../../.claude/utils/task-manager/">Task Manager (Referência)</a></li>
+<li>Agente: @onion</li>
+</ul>
+
+
+<ul>
+<li>Cada arquivo deve ter &lt; 400 linhas</li>
+<li>Interface deve ser extensível (Open/Closed)</li>
+<li>Sempre incluir NoProviderAdapter (fallback)</li>
+<li>Documentar variáveis de ambiente necessárias</li>
+<li>Usar emojis e separadores ASCII para facilitar parsing por IA</li>
+</ul>
+
+
+<hr class="section-divider">
+<h1 id="template-abstraction-layer">Template: Abstraction Layer</h1>
+
+<p>Este template define a estrutura padrão para camadas de abstração seguindo o padrão <strong>Specification-Driven AI Abstraction Layer</strong>.</p>
+
+
+<pre><code class="language-plaintext">├── README.md           # Visão geral + uso rápido
+├── interface.md        # Contrato principal
+├── types.md            # Tipos de entrada/saída
+├── factory.md          # Criação de instâncias
+├── detector.md         # Detecção de provedor
+└── adapters/
+├── {{provider}}.md # Um por provedor
+└── none.md         # Fallback obrigatório</code></pre>
+
+<h4>Descrição</h4>
+<p>[Descrição do que a abstração faz]</p>
+
+<h4>Estrutura de Diretórios</h4>
+<p>Estrutura completa gerada:</p>
+
+<pre><code class="language-plaintext">{{abstraction_name}}/
+├── README.md
+├── interface.md
+├── types.md
+├── detector.md
+├── factory.md
+└── adapters/
+    ├── [providers].md
+    └── none.md</code></pre>
+
+<h4>Variáveis de Ambiente</h4>
+<p>Configuração necessária no arquivo <code>.env</code>:</p>
+
+<pre><code class="language-bash">{{ENV_PREFIX}}_PROVIDER=[provider]</code></pre>
+
+<h4>Status dos Provedores</h4>
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Provedor</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Status</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Notas</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">[provider]</td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅/📝</td>
+<td style="border: 1px solid var(--border); padding: 12px;">[notas]</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">None</td>
+<td style="border: 1px solid var(--border); padding: 12px;">✅</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Modo offline</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>Versão</strong>: 1.0.0</p>
+<p><strong>Criado em</strong>: YYYY-MM-DD</p>
+
+
+<h4>Definição da Interface</h4>
+<p>A interface define o contrato que todos os adapters devem implementar:</p>
+
+
+<h4>Definição da Interface</h4>
+<p>Estrutura básica:</p>
+
+<pre><code class="language-typescript">interface I&lt;Nome&gt; {
+  // Propriedades e métodos
+}</code></pre>
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Categoria</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Métodos</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Descrição</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Identificação</td>
+<td style="border: 1px solid var(--border); padding: 12px;">provider, isConfigured</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Info do adapter</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Principais</td>
+<td style="border: 1px solid var(--border); padding: 12px;">[lista]</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Operações core</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Validação</td>
+<td style="border: 1px solid var(--border); padding: 12px;">validateConfiguration</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Verificação</td>
+</tr>
+</tbody>
+</table>
+
+<p><strong>Versão</strong>: 1.0.0</p>
+
+<h5>Tipos de Provedores</h5>
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Provedor</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Obrigatória</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Opcionais</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">[provider]</td>
+<td style="border: 1px solid var(--border); padding: 12px;">TOKEN</td>
+<td style="border: 1px solid var(--border); padding: 12px;">WORKSPACE</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Versão</strong>: 1.0.0</p>
+
+<h4>Template da Factory</h4>
+<pre><code class="language-typescript">function get{{interface_name.slice(1)}}(options?: FactoryOptions): {{interface_name}} {
+  // Implementação da factory
+}</code></pre>
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Interface</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">[Provider] API</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Notas</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">field</td>
+<td style="border: 1px solid var(--border); padding: 12px;">api_field</td>
+<td style="border: 1px solid var(--border); padding: 12px;">[mapeamento]</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Versão</strong>: 1.0.0</code></pre>
+
+
+<p>Fallback para modo offline.</p>
+
+
+<h5>Classes de Adapter</h5>
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Operação</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Offline</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Leitura</td>
+<td style="border: 1px solid var(--border); padding: 12px;">[] ou null</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Escrita</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Warning + ID local</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Update</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Warning + throw</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;">Delete</td>
+<td style="border: 1px solid var(--border); padding: 12px;">Warning + false</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Versão</strong>: 1.0.0</code></pre>
+
+
+<table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+<thead><tr>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Variável</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Exemplo</th>
+<th style="border: 1px solid var(--border); padding: 12px; text-align: left; background: var(--bg-tertiary);">Descrição</th>
+</tr></thead>
+<tbody>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>{{abstraction_name}}</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>notification-manager</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Nome em kebab-case</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>{{InterfaceName}}</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>INotificationManager</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Interface (I + PascalCase)</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>{{ManagerName}}</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>NotificationManager</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Sem I (PascalCase)</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>{{ENV_PREFIX}}</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>NOTIFICATION_MANAGER</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Prefixo de env (UPPER_SNAKE)</td>
+</tr>
+<tr>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>{{providers}}</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;"><code>slack,discord</code></td>
+<td style="border: 1px solid var(--border); padding: 12px;">Lista de provedores</td>
+</tr>
+</tbody>
+</table>
+
+<ul>
+<li><a href="../../../docs/knowbase/concepts/specification-driven-ai-abstraction-layer.md">SDAAL Pattern</a></li>
+<li><a href="../../../.claude/utils/task-manager/">Task Manager (Exemplo)</a></li>
+<li><a href="../meta/create-abstraction.md">Comando create-abstraction</a></li>
+</ul>
+
+<p><strong>Versão</strong>: 1.0.0</p>
+<p><strong>Criado em</strong>: 2025-11-25</p>
+
+    </div>
+    </main>
+    
+    <!-- Scroll to Top -->
+    <button class="scroll-top" id="scrollTop" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">↑</button>
+    
+    <script>
+        function setupScrollTop() {
+            const scrollTopBtn = document.getElementById('scrollTop');
+            
+            window.addEventListener('scroll', () => {
+                if (window.scrollY > 500) {
+                    scrollTopBtn.classList.add('show');
+                } else {
+                    scrollTopBtn.classList.remove('show');
+                }
+            });
+        }
+        
+        // Navigation and Search System
+        class DocumentNavigator {
+            constructor() {
+                this.sections = [];
+                this.searchIndex = [];
+                this.init();
+            }
+            
+            init() {
+                this.buildNavigation();
+                this.setupMenuToggle();
+                this.setupSearch();
+                this.setupScrollSpy();
+            }
+            
+            buildNavigation() {
+                console.log('Building navigation...');
+                const headings = document.querySelectorAll('h1, h2, h3, h4');
+                console.log('Found headings:', headings.length);
+                
+                const navTree = document.getElementById('navTree');
+                if (!navTree) {
+                    console.error('❌ navTree element not found');
+                    return;
+                }
+                
+                const navItems = [];
+                
+                headings.forEach((heading, index) => {
+                    const level = parseInt(heading.tagName.substring(1));
+                    let id = heading.id;
+                    if (!id || id === '') {
+                        // Generate ID from text
+                        const text = heading.textContent.trim();
+                        id = text
+                            .toLowerCase()
+                            .normalize('NFD')
+                            .replace(/[\u0300-\u036f]/g, '') // Remove accents
+                            .replace(/[^a-z0-9]+/g, '-')
+                            .replace(/^-+|-+$/g, '') || `section-${index}`;
+                        heading.id = id;
+                    }
+                    const text = heading.textContent.trim();
+                    
+                    if (!text) return; // Skip empty headings
+                    
+                    // Store for search
+                    this.searchIndex.push({
+                        id,
+                        title: text,
+                        level,
+                        element: heading,
+                        excerpt: this.getExcerpt(heading)
+                    });
+                    
+                    // Create nav item
+                    const navItem = document.createElement('li');
+                    navItem.className = 'nav-item';
+                    const link = document.createElement('a');
+                    link.href = `#${id}`;
+                    link.className = `nav-link h${level}`;
+                    link.textContent = text;
+                    link.dataset.level = level;
+                    
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        this.scrollToSection(id);
+                        closeSidebar(); // Usar função global
+                    });
+                    
+                    navItem.appendChild(link);
+                    navItems.push(navItem);
+                });
+                
+                navTree.innerHTML = '';
+                navItems.forEach(item => navTree.appendChild(item));
+                console.log('✅ Navigation built with', navItems.length, 'items');
+            }
+            
+            getExcerpt(heading) {
+                let excerpt = '';
+                let next = heading.nextElementSibling;
+                let count = 0;
+                
+                while (next && count < 3) {
+                    if (next.tagName && next.tagName.match(/^H[1-4]$/)) break;
+                    if (next.textContent) {
+                        excerpt += next.textContent.substring(0, 150) + ' ';
+                        count++;
+                    }
+                    next = next.nextElementSibling;
+                }
+                
+                return excerpt.trim().substring(0, 200);
+            }
+            
+            setupMenuToggle() {
+                const menuToggle = document.getElementById('menuToggle');
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('sidebarOverlay');
+                const menuIcon = document.getElementById('menuIcon');
+                
+                if (!menuToggle || !sidebar || !overlay || !menuIcon) {
+                    console.error('Menu elements not found', { menuToggle, sidebar, overlay, menuIcon });
+                    return;
+                }
+                
+                // Use global toggleSidebar function
+                menuToggle.addEventListener('click', toggleSidebar);
+                
+                // Overlay click para fechar - usar função global
+                overlay.addEventListener('click', function(e) {
+                    console.log('🔴 Overlay clicado - fechando sidebar');
+                    e.preventDefault();
+                    e.stopPropagation();
+                    closeSidebar(); // Função global
+                });
+                
+                // Garantir que cliques no sidebar não fechem
+                sidebar.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                });
+                
+                // Close on escape key
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && sidebar.classList.contains('open')) {
+                        closeSidebar();
+                    }
+                });
+            }
+            
+            setupSearch() {
+                const searchInput = document.getElementById('searchInput');
+                const searchResults = document.getElementById('searchResults');
+                const navTree = document.getElementById('navTree');
+                
+                let searchTimeout;
+                
+                searchInput.addEventListener('input', (e) => {
+                    clearTimeout(searchTimeout);
+                    const query = e.target.value.trim().toLowerCase();
+                    
+                    searchTimeout = setTimeout(() => {
+                        if (query.length < 2) {
+                            searchResults.style.display = 'none';
+                            navTree.style.display = 'block';
+                            return;
+                        }
+                        
+                        const results = this.search(query);
+                        this.displaySearchResults(results, query);
+                        navTree.style.display = 'none';
+                        searchResults.style.display = 'block';
+                    }, 200);
+                });
+                
+                // Clear search on escape
+                searchInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        searchInput.value = '';
+                        searchResults.style.display = 'none';
+                        navTree.style.display = 'block';
+                    }
+                });
+            }
+            
+            search(query) {
+                const results = [];
+                const queryWords = query.split(/\s+/).filter(w => w.length > 0);
+                
+                this.searchIndex.forEach(item => {
+                    const titleMatch = item.title.toLowerCase().includes(query);
+                    const excerptMatch = item.excerpt.toLowerCase().includes(query);
+                    
+                    if (titleMatch || excerptMatch) {
+                        let score = 0;
+                        
+                        // Title matches score higher
+                        if (titleMatch) score += 10;
+                        if (excerptMatch) score += 5;
+                        
+                        // Exact word matches score even higher
+                        queryWords.forEach(word => {
+                            if (item.title.toLowerCase().includes(word)) score += 5;
+                            if (item.excerpt.toLowerCase().includes(word)) score += 2;
+                        });
+                        
+                        results.push({ ...item, score });
+                    }
+                });
+                
+                return results.sort((a, b) => b.score - a.score).slice(0, 10);
+            }
+            
+            displaySearchResults(results, query) {
+                const searchResults = document.getElementById('searchResults');
+                
+                if (results.length === 0) {
+                    searchResults.innerHTML = `
+                        <div class="search-results-title">Nenhum resultado encontrado</div>
+                        <div style="color: var(--text-tertiary); font-size: 14px; padding: 12px;">
+                            Tente usar palavras-chave diferentes ou verifique a ortografia.
+                        </div>
+                    `;
+                    return;
+                }
+                
+                const html = `
+                    <div class="search-results-title">${results.length} resultado${results.length !== 1 ? 's' : ''} encontrado${results.length !== 1 ? 's' : ''}</div>
+                    ${results.map(item => `
+                        <div class="search-result-item" data-id="${item.id}">
+                            <div class="search-result-title">${this.highlightText(item.title, query)}</div>
+                            <div class="search-result-excerpt">${this.highlightText(item.excerpt, query)}</div>
+                        </div>
+                    `).join('')}
+                `;
+                
+                searchResults.innerHTML = html;
+                
+                // Add click handlers
+                searchResults.querySelectorAll('.search-result-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        const id = item.dataset.id;
+                        this.scrollToSection(id);
+                        closeSidebar(); // Usar função global
+                    });
+                });
+            }
+            
+            highlightText(text, query) {
+                if (!query) return text;
+                const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+                return text.replace(regex, '<span class="search-highlight">$1</span>');
+            }
+            
+            scrollToSection(id) {
+                const element = document.getElementById(id);
+                if (element) {
+                    const headerHeight = 60;
+                    const elementPosition = element.getBoundingClientRect().top + window.pageYOffset;
+                    const offsetPosition = elementPosition - headerHeight - 20;
+                    
+                    window.scrollTo({
+                        top: offsetPosition,
+                        behavior: 'smooth'
+                    });
+                }
+            }
+            
+            
+            setupScrollSpy() {
+                const navLinks = document.querySelectorAll('.nav-link');
+                const sections = Array.from(navLinks).map(link => {
+                    const id = link.getAttribute('href').substring(1);
+                    return { id, link, element: document.getElementById(id) };
+                }).filter(s => s.element);
+                
+                const updateActiveLink = () => {
+                    const scrollPosition = window.scrollY + 100;
+                    
+                    sections.forEach(({ id, link, element }) => {
+                        const top = element.offsetTop;
+                        const bottom = top + element.offsetHeight;
+                        
+                        if (scrollPosition >= top && scrollPosition < bottom) {
+                            navLinks.forEach(l => l.classList.remove('active'));
+                            link.classList.add('active');
+                        }
+                    });
+                };
+                
+                window.addEventListener('scroll', updateActiveLink);
+                updateActiveLink();
+            }
+        }
+        
+        // Initialize
+        setupScrollTop();
+        
+        // Initialize navigator when DOM is ready
+        function initNavigator() {
+            console.log('Initializing DocumentNavigator...');
+            console.log('navTree element:', document.getElementById('navTree'));
+            console.log('menuToggle element:', document.getElementById('menuToggle'));
+            console.log('sidebar element:', document.getElementById('sidebar'));
+            
+            try {
+                const navigator = new DocumentNavigator();
+                console.log('✅ DocumentNavigator initialized successfully');
+                console.log('Found sections:', navigator.searchIndex.length);
+            } catch (error) {
+                console.error('❌ Error initializing DocumentNavigator:', error);
+                console.error('Stack:', error.stack);
+            }
+        }
+        
+        // Wait for DOM to be fully ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                console.log('DOM Content Loaded');
+                setTimeout(initNavigator, 50);
+            });
+        } else {
+            // DOM already loaded, but wait a bit for all elements
+            console.log('DOM already loaded, initializing...');
+            setTimeout(initNavigator, 100);
+        }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ 
+            startOnLoad: true,
+            theme: 'default',
+            themeVariables: {
+                primaryColor: '#1e3c72',
+                primaryTextColor: '#fff',
+                primaryBorderColor: '#ff6b35',
+                lineColor: '#1e3c72',
+                secondaryColor: '#ff6b35',
+                tertiaryColor: '#e3f2fd'
+            }
+        });
+    </script>
+    
+</body>
+</html>

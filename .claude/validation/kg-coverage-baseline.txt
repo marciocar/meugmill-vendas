@@ -1,0 +1,3 @@
+# Baseline de cobertura de proveniência invertida — PASSIVO TOLERADO.
+# Gerado por: bash .claude/validation/kg-provenance-coverage.sh --emit-baseline
+# Esta lista SÓ PODE ENCOLHER. Acrescentar path aqui é regressão (HARD).
