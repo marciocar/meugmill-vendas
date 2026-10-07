@@ -47,6 +47,9 @@ importers:
       fastify:
         specifier: ^5.12.5
         version: 5.12.5
+      fastify-plugin:
+        specifier: ^6.0.0
+        version: 6.0.0
       jose:
         specifier: ^6.2.12
         version: 6.2.12
@@ -60,9 +63,6 @@ importers:
       drizzle-kit:
         specifier: ^0.31.11
         version: 0.31.11
-      fastify-plugin:
-        specifier: ^6.0.0
-        version: 6.0.0
       tsx:
         specifier: ^4.23.15
         version: 4.23.15
