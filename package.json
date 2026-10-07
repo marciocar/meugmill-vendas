@@ -9,8 +9,9 @@
   "scripts": {
     "lint": "eslint .",
     "format": "prettier --write .",
-    "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test",
+    "build:shared": "pnpm --filter @meugmill/shared build",
+    "typecheck": "pnpm build:shared && pnpm -r typecheck",
+    "test": "pnpm build:shared && pnpm -r test",
     "build": "pnpm -r build"
   },
   "devDependencies": {
