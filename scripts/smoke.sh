@@ -3,9 +3,9 @@
 # Variáveis opcionais: API_URL, WEB_URL, IDP_URL, WAIT_SECONDS.
 set -euo pipefail
 
-API_URL="${API_URL:-http://localhost:3000}"
-WEB_URL="${WEB_URL:-http://localhost:8081}"
-IDP_URL="${IDP_URL:-http://localhost:8080}"
+API_URL="${API_URL:-http://localhost:39000}"
+WEB_URL="${WEB_URL:-http://localhost:39081}"
+IDP_URL="${IDP_URL:-http://localhost:39080}"
 WAIT_SECONDS="${WAIT_SECONDS:-60}"
 
 ok() { echo "[OK]   $*"; }
@@ -59,10 +59,10 @@ cors_headers() {
   curl -s -D - -o /dev/null -X OPTIONS "${API_URL}/v1/me" \
     -H "Origin: $1" -H 'Access-Control-Request-Method: GET' || true
 }
-allowed=$(cors_headers "http://localhost:8081")
-printf '%s' "$allowed" | tr -d '\r' | grep -qix 'access-control-allow-origin: http://localhost:8081' \
-  || fail "preflight com origem http://localhost:8081 sem access-control-allow-origin correspondente: ${allowed}"
-ok "preflight CORS (origem listada) -> allow-origin http://localhost:8081"
+allowed=$(cors_headers "${WEB_URL}")
+printf '%s' "$allowed" | tr -d '\r' | grep -qix "access-control-allow-origin: ${WEB_URL}" \
+  || fail "preflight com origem ${WEB_URL} sem access-control-allow-origin correspondente: ${allowed}"
+ok "preflight CORS (origem listada) -> allow-origin ${WEB_URL}"
 denied=$(cors_headers "http://origem-nao-listada.example")
 if printf '%s' "$denied" | grep -qi '^access-control-allow-origin:'; then
   fail "preflight com origem não listada retornou access-control-allow-origin: ${denied}"
@@ -74,5 +74,13 @@ printf '%s' "$headers" | head -n1 | grep -q ' 200' || fail "GET ${WEB_URL}/gmill
 printf '%s' "$headers" | grep -i '^content-type:' | grep -qi 'javascript' \
   || fail "content-type de gmill-carteira.js não é javascript"
 ok "GET /gmill-carteira.js -> 200 (javascript)"
+
+# Proxy da demo: /api/* no nginx chega na API pela mesma origem (sem CORS e sem outra porta).
+code=$(status_of "${WEB_URL}/api/health")
+[ "$code" = "200" ] || fail "GET ${WEB_URL}/api/health (proxy) esperado 200, recebido ${code}"
+code=$(curl -s -o "$body" -w '%{http_code}' -H "Authorization: Bearer ${token}" "${WEB_URL}/api/v1/me" || true)
+[ "$code" = "200" ] || fail "GET ${WEB_URL}/api/v1/me (proxy) com token esperado 200, recebido ${code}"
+grep -q '"sub"' "$body" || fail "resposta de /api/v1/me (proxy) sem campo sub"
+ok "proxy /api da demo -> /health 200 e /v1/me 200 com token"
 
 echo "Smoke concluído com sucesso."

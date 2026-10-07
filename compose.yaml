@@ -14,7 +14,7 @@ services:
     ports:
       # Porta do IdP no host. O issuer exposto ao navegador é http://localhost:8080/default.
       # Só em 127.0.0.1: nada fica exposto na rede; acesso remoto por túnel SSH (-L porta:localhost:porta).
-      - "${BIND_ADDR:-127.0.0.1}:${IDP_PORT:-8080}:8080"
+      - "${BIND_ADDR:-127.0.0.1}:${IDP_PORT:-39080}:8080"
     environment:
       # Arquivo de configuração: tokens do issuer "default" com aud/roles/branch_ids da carteira.
       JSON_CONFIG_PATH: /config/idp-config.json
@@ -33,7 +33,7 @@ services:
     ports:
       # Porta da API no host (dentro do container é sempre PORT=3000).
       # Só em 127.0.0.1: nada fica exposto na rede; acesso remoto por túnel SSH (-L porta:localhost:porta).
-      - "${BIND_ADDR:-127.0.0.1}:${API_PORT:-3000}:3000"
+      - "${BIND_ADDR:-127.0.0.1}:${API_PORT:-39000}:3000"
     volumes:
       # Banco SQLite persistente.
       - carteira-data:/data
@@ -46,7 +46,7 @@ services:
       DATABASE_PATH: /data/carteira.sqlite
       # Issuer esperado no claim "iss". O mock monta o iss a partir do Host da requisição, e os
       # tokens são pedidos pelo host em localhost:8080, então o iss é este valor.
-      OIDC_ISSUER: ${OIDC_ISSUER:-http://localhost:8080/default}
+      OIDC_ISSUER: ${OIDC_ISSUER:-http://localhost:39080/default}
       # Audiência esperada no claim "aud" (o idp já emite aud=carteira-api).
       OIDC_AUDIENCE: ${OIDC_AUDIENCE:-carteira-api}
       # JWKS buscado pela rede interna do Compose (dentro do container, localhost não é o idp).
@@ -63,7 +63,7 @@ services:
       # Só para o IdP de teste em http; produção exige https.
       OIDC_ALLOW_INSECURE_HTTP: "true"
       # Origens autorizadas a chamar a API pelo navegador (lista separada por vírgula).
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8081}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:39081}
     restart: unless-stopped
 
   web:
@@ -74,7 +74,7 @@ services:
     ports:
       # Porta do web component + demo no host (nginx escuta 8080 dentro do container).
       # Só em 127.0.0.1: nada fica exposto na rede; acesso remoto por túnel SSH (-L porta:localhost:porta).
-      - "${BIND_ADDR:-127.0.0.1}:${WEB_PORT:-8081}:8080"
+      - "${BIND_ADDR:-127.0.0.1}:${WEB_PORT:-39081}:8080"
     restart: unless-stopped
 
 volumes:
