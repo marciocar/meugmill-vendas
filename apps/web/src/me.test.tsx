@@ -123,4 +123,67 @@ describe('<gmill-carteira> /v1/me', () => {
     await configure(el, 'http://api', 'tok');
     expect(text(el)).toContain('Serviço indisponível');
   });
+
+  it.each([
+    ['json quebrado', () => new Response('{nao-json', { status: 200 })],
+    ['sem sub', () => json(200, { roles: [], branchIds: [] })],
+    ['sub vazio', () => json(200, { sub: '', roles: [], branchIds: [] })],
+    ['roles não-array', () => json(200, { sub: 'u', roles: 'admin', branchIds: [] })],
+  ])('200 com corpo inválido (%s) mostra indisponível, não autenticado', async (_name, make) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => make()),
+    );
+    const el = await mount();
+    await configure(el, 'http://api', 'tok');
+    expect(text(el)).toContain('Serviço indisponível');
+    expect(el.shadowRoot?.querySelector('[data-testid="me-sub"]')).toBeNull();
+  });
+
+  it('ignora a resposta do token antigo quando o token troca com fetch em voo', async () => {
+    let resolveOld!: (r: Response) => void;
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(() => new Promise<Response>((r) => (resolveOld = r)))
+      .mockResolvedValueOnce(json(200, { sub: 'novo', roles: [], branchIds: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+    const el = await mount();
+    await configure(el, 'http://api', 'tok-antigo');
+    await act(async () => {
+      el.token = 'tok-novo';
+    });
+    await act(async () => {
+      resolveOld(json(200, { sub: 'antigo', roles: [], branchIds: [] }));
+      await new Promise((r) => setTimeout(r, 10));
+    });
+    expect(text(el)).toContain('novo');
+    expect(text(el)).not.toContain('antigo');
+  });
+
+  it('token B que também dá 401 emite token-expired de novo (uma vez por token)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => json(401, {})),
+    );
+    const received: Event[] = [];
+    const listener = (e: Event) => received.push(e);
+    document.addEventListener('token-expired', listener);
+    try {
+      const el = await mount();
+      await configure(el, 'http://api', 'tok-A');
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 10));
+      });
+      expect(received).toHaveLength(1);
+      await act(async () => {
+        el.token = 'tok-B';
+      });
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 10));
+      });
+      expect(received).toHaveLength(2);
+    } finally {
+      document.removeEventListener('token-expired', listener);
+    }
+  });
 });

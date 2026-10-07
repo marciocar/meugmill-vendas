@@ -9,6 +9,8 @@ services:
   idp:
     # Servidor OAuth2/OIDC de mentira. Fixe a versão: nada de :latest.
     image: ghcr.io/navikt/mock-oauth2-server:3.0.1
+    # Sem healthcheck de propósito: a imagem é distroless (sem shell/curl/wget, não verificado aqui),
+    # então não há como sondar por dentro. Quem espera o IdP é o scripts/smoke.sh (discovery 200).
     ports:
       # Porta do IdP no host. O issuer exposto ao navegador é http://localhost:8080/default.
       - "${IDP_PORT:-8080}:8080"
@@ -56,6 +58,8 @@ services:
       OIDC_CLAIM_BRANCHES: ${OIDC_CLAIM_BRANCHES:-branch_ids}
       # Tolerância de relógio (segundos) na validação de exp/nbf.
       OIDC_CLOCK_TOLERANCE_SECONDS: ${OIDC_CLOCK_TOLERANCE_SECONDS:-30}
+      # Só para o IdP de teste em http; produção exige https.
+      OIDC_ALLOW_INSECURE_HTTP: "true"
       # Origens autorizadas a chamar a API pelo navegador (lista separada por vírgula).
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8081}
     restart: unless-stopped

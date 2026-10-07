@@ -29,6 +29,16 @@ code=$(status_of "${API_URL}/v1/me")
 [ "$code" = "401" ] || fail "GET /v1/me sem token esperado 401, recebido ${code}"
 ok "GET /v1/me sem token -> 401"
 
+# O IdP pode demorar mais que a API para subir: espera o discovery responder 200 antes de pedir token.
+IDP_WAIT_SECONDS=90
+echo "Aguardando o IdP em ${IDP_URL}/default/.well-known/openid-configuration (até ${IDP_WAIT_SECONDS}s)..."
+idp_deadline=$((SECONDS + IDP_WAIT_SECONDS))
+until [ "$(status_of "${IDP_URL}/default/.well-known/openid-configuration")" = "200" ]; do
+  [ "$SECONDS" -lt "$idp_deadline" ] || fail "IdP não respondeu 200 no discovery dentro de ${IDP_WAIT_SECONDS}s"
+  sleep 2
+done
+ok "IdP pronto (discovery -> 200)"
+
 # Token do IdP de mentira (client_credentials; client_id/secret/scope quaisquer).
 token_json=$(curl -s -X POST "${IDP_URL}/default/token" \
   -d grant_type=client_credentials -d client_id=smoke -d client_secret=smoke -d scope=openid) \
@@ -43,6 +53,21 @@ code=$(curl -s -o "$body" -w '%{http_code}' -H "Authorization: Bearer ${token}" 
 [ "$code" = "200" ] || fail "GET /v1/me com token esperado 200, recebido ${code}: $(cat "$body")"
 grep -q '"sub"' "$body" || fail "resposta de /v1/me sem campo sub: $(cat "$body")"
 ok "GET /v1/me com token -> 200 com sub"
+
+# Preflight CORS real: origem listada recebe o header; origem desconhecida não.
+cors_headers() {
+  curl -s -D - -o /dev/null -X OPTIONS "${API_URL}/v1/me" \
+    -H "Origin: $1" -H 'Access-Control-Request-Method: GET' || true
+}
+allowed=$(cors_headers "http://localhost:8081")
+printf '%s' "$allowed" | tr -d '\r' | grep -qix 'access-control-allow-origin: http://localhost:8081' \
+  || fail "preflight com origem http://localhost:8081 sem access-control-allow-origin correspondente: ${allowed}"
+ok "preflight CORS (origem listada) -> allow-origin http://localhost:8081"
+denied=$(cors_headers "http://origem-nao-listada.example")
+if printf '%s' "$denied" | grep -qi '^access-control-allow-origin:'; then
+  fail "preflight com origem não listada retornou access-control-allow-origin: ${denied}"
+fi
+ok "preflight CORS (origem não listada) -> sem allow-origin"
 
 headers=$(curl -s -D - -o /dev/null "${WEB_URL}/gmill-carteira.js" || true)
 printf '%s' "$headers" | head -n1 | grep -q ' 200' || fail "GET ${WEB_URL}/gmill-carteira.js não retornou 200"

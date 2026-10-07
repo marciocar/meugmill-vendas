@@ -20,6 +20,18 @@ interface UseMeResult {
   retry: () => void;
 }
 
+const isStringArray = (v: unknown): v is string[] =>
+  Array.isArray(v) && v.every((i) => typeof i === 'string');
+
+/** Valida o corpo de `/v1/me`; null se faltar `sub` (string não vazia) ou se roles/branchIds não forem listas. */
+function parseMe(body: unknown): Me | null {
+  if (typeof body !== 'object' || body === null) return null;
+  const { sub, roles, branchIds } = body as Record<string, unknown>;
+  if (typeof sub !== 'string' || sub.trim() === '') return null;
+  if (!isStringArray(roles) || !isStringArray(branchIds)) return null;
+  return { sub, roles, branchIds };
+}
+
 /**
  * Busca `/v1/me` quando `apiBase` e `token` estão presentes. Refaz a busca ao
  * mudar qualquer um dos dois e aborta a requisição anterior. Em 401 chama
@@ -58,16 +70,10 @@ export function useMe(apiBase: string | null, token: string | null, onExpired: (
           setState({ status: 'unavailable' });
           return;
         }
-        const body = (await res.json()) as Partial<Me>;
+        const me = parseMe(await res.json());
         if (controller.signal.aborted) return;
-        setState({
-          status: 'authenticated',
-          me: {
-            sub: String(body.sub ?? ''),
-            roles: Array.isArray(body.roles) ? body.roles : [],
-            branchIds: Array.isArray(body.branchIds) ? body.branchIds : [],
-          },
-        });
+        // 200 com corpo inválido não é "autenticado": trata como indisponível.
+        setState(me ? { status: 'authenticated', me } : { status: 'unavailable' });
       })
       .catch(() => {
         if (!controller.signal.aborted) setState({ status: 'unavailable' });

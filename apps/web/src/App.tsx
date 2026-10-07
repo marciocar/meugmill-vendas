@@ -5,6 +5,8 @@ import { useMe } from './use-me';
 interface AppProps {
   apiBase: string | null;
   token: string | null;
+  /** Mostra ferramentas de depuração (item "Simular token expirado"). */
+  debug?: boolean;
 }
 
 /** Lista legível; "nenhum" quando vazia. O token nunca é exibido. */
@@ -12,7 +14,7 @@ function list(items: string[]): string {
   return items.length > 0 ? items.join(', ') : 'nenhum';
 }
 
-export function App({ apiBase, token }: AppProps) {
+export function App({ apiBase, token, debug = false }: AppProps) {
   const { emitTokenExpired } = useHost();
   const { state, retry } = useMe(apiBase, token, emitTokenExpired);
 
@@ -43,11 +45,13 @@ export function App({ apiBase, token }: AppProps) {
         )}
       </div>
       <Dropdown label="Ações">
-        <li role="none">
-          <button type="button" role="menuitem" className="gc-menu-item" onClick={emitTokenExpired}>
-            Simular token expirado
-          </button>
-        </li>
+        {debug && (
+          <li role="none">
+            <button type="button" role="menuitem" className="gc-menu-item" onClick={emitTokenExpired}>
+              Simular token expirado
+            </button>
+          </li>
+        )}
       </Dropdown>
     </section>
   );

@@ -12,15 +12,18 @@ export const TOKEN_EXPIRED_EVENT = 'token-expired';
  *
  * Contrato com o host:
  * - Atributo `api-base` (ou propriedade `apiBase`): URL base da API.
- * - Atributo `token` (ou propriedade `token`): JWT do usuário. Preferir a
- *   propriedade, pois o atributo expõe o token no DOM. Quando setado por
- *   propriedade, NÃO é refletido como atributo e nunca é persistido em storage.
+ * - Propriedade `token`: JWT do usuário. Este é o ÚNICO caminho suportado; ela
+ *   NÃO é refletida como atributo e nunca é persistida em storage. O atributo
+ *   `token` não é observado: se existir no HTML, é lido uma vez no
+ *   connectedCallback, aplicado via propriedade e removido do DOM na hora.
+ * - Atributo booleano `debug`: exibe o item "Simular token expirado" no menu
+ *   (somente para demo/desenvolvimento; ausente em produção).
  * - Evento `token-expired` (CustomEvent, bubbles + composed): emitido quando a
  *   API recusar o token; o host deve renovar e setar `token` novamente.
  * - Todo CSS vive dentro do shadow root (open); nada vaza para o host.
  */
 export class GmillCarteiraElement extends HTMLElement {
-  static observedAttributes = ['api-base', 'token'];
+  static observedAttributes = ['api-base', 'debug'];
 
   #root: Root | null = null;
   #mountPoint: HTMLDivElement | null = null;
@@ -32,6 +35,21 @@ export class GmillCarteiraElement extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
+    this.#upgradeProperty('apiBase');
+    this.#upgradeProperty('token');
+  }
+
+  /**
+   * "Lazy property upgrade": se o host setou a propriedade antes de o elemento
+   * ser definido, o valor virou propriedade própria da instância e esconde o
+   * setter da classe. Lê, remove a própria e reatribui via setter.
+   */
+  #upgradeProperty(prop: 'apiBase' | 'token'): void {
+    if (Object.prototype.hasOwnProperty.call(this, prop)) {
+      const value = (this as unknown as Record<string, string | null>)[prop];
+      delete (this as unknown as Record<string, unknown>)[prop];
+      this[prop] = value ?? null;
+    }
   }
 
   get apiBase(): string | null {
@@ -63,11 +81,18 @@ export class GmillCarteiraElement extends HTMLElement {
   attributeChangedCallback(name: string, _old: string | null, value: string | null): void {
     // Atributo -> estado interno (sem refletir de volta).
     if (name === 'api-base') this.#apiBase = value;
-    else if (name === 'token') this.#token = value;
     this.#render();
   }
 
   connectedCallback(): void {
+    this.#upgradeProperty('apiBase');
+    this.#upgradeProperty('token');
+    // Atributo `token` não é suportado: consome uma vez e tira o segredo do DOM.
+    const attrToken = this.getAttribute('token');
+    if (attrToken !== null) {
+      this.removeAttribute('token');
+      this.#token ??= attrToken;
+    }
     if (this.#root) return;
     const shadow = this.shadowRoot!;
     const style = document.createElement('style');
@@ -98,7 +123,7 @@ export class GmillCarteiraElement extends HTMLElement {
             emitTokenExpired: this.emitTokenExpired,
           }}
         >
-          <App apiBase={this.#apiBase} token={this.#token} />
+          <App apiBase={this.#apiBase} token={this.#token} debug={this.hasAttribute('debug')} />
         </HostContext.Provider>
       </StrictMode>,
     );
