@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { GmillCarteiraElement, TAG_NAME } from './element';
 
@@ -18,6 +18,7 @@ describe('<gmill-carteira>', () => {
     expect(customElements.get(TAG_NAME)).toBe(GmillCarteiraElement);
   });
   afterEach(async () => {
+    vi.unstubAllGlobals();
     await act(async () => {
       document.body.replaceChildren();
     });
@@ -31,16 +32,17 @@ describe('<gmill-carteira>', () => {
   it('lê o atributo api-base', async () => {
     const el = await mount({ 'api-base': 'http://localhost:3000' });
     expect(el.apiBase).toBe('http://localhost:3000');
-    expect(el.shadowRoot?.textContent).toContain('http://localhost:3000');
   });
 
-  it('token por propriedade atualiza o render sem refletir atributo nem expor valor', async () => {
-    const el = await mount();
-    expect(el.shadowRoot?.textContent).toContain('Token: ausente');
+  it('token por propriedade não reflete atributo nem expõe valor', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise(() => {})),
+    );
+    const el = await mount({ 'api-base': 'http://api' });
     await act(async () => {
       el.token = 'segredo-abc';
     });
-    expect(el.shadowRoot?.textContent).toContain('Token: presente');
     expect(el.hasAttribute('token')).toBe(false);
     expect(el.shadowRoot?.innerHTML).not.toContain('segredo-abc');
     expect(document.documentElement.innerHTML).not.toContain('segredo-abc');

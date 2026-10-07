@@ -21,8 +21,15 @@
   </head>
   <body>
     <h1>Sistema do host</h1>
-    <button id="set-token">Setar token fictício</button>
+    <button id="get-token">Obter token de teste</button>
     <button id="clear-token">Limpar token</button>
+    <p>
+      <label>
+        Colar token:
+        <input id="manual-token" type="text" size="40" autocomplete="off" />
+      </label>
+      <button id="apply-token">Aplicar token</button>
+    </p>
 
     <gmill-carteira api-base="http://localhost:3000"></gmill-carteira>
 
@@ -31,16 +38,46 @@
 
     <script type="module">
       import '../src/element.tsx';
+      // IdP de teste (mock-oauth2-server) da infra Docker.
+      const IDP_TOKEN_URL = 'http://localhost:8080/default/token';
       const el = document.querySelector('gmill-carteira');
       const log = document.getElementById('log');
-      document.getElementById('set-token').addEventListener('click', () => {
-        el.token = 'token-ficticio-123';
+      const write = (msg) => {
+        log.textContent += `[${new Date().toISOString()}] ${msg}\n`;
+      };
+
+      document.getElementById('get-token').addEventListener('click', async () => {
+        try {
+          const res = await fetch(IDP_TOKEN_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              grant_type: 'client_credentials',
+              client_id: 'demo',
+              client_secret: 'demo',
+              scope: 'openid',
+            }),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const { access_token } = await res.json();
+          el.token = access_token; // por propriedade: não vai para o DOM
+          write('token de teste obtido e aplicado');
+        } catch (err) {
+          write(`falha ao obter token de teste: ${err.message}`);
+        }
+      });
+      document.getElementById('apply-token').addEventListener('click', () => {
+        const input = document.getElementById('manual-token');
+        el.token = input.value.trim() || null;
+        input.value = '';
+        write('token manual aplicado');
       });
       document.getElementById('clear-token').addEventListener('click', () => {
         el.token = null;
+        write('token limpo');
       });
       document.addEventListener('token-expired', () => {
-        log.textContent += `[${new Date().toISOString()}] token-expired recebido\n`;
+        write('token-expired recebido');
       });
     </script>
   </body>

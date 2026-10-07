@@ -58,3 +58,17 @@ h1 {
 .gc-menu-item:hover {
   background: #eaf2ff;
 }
+
+.gc-me {
+  margin: 0 0 12px;
+}
+
+.gc-me dt {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: #57606a;
+}
+
+.gc-me dd {
+  margin: 0 0 8px;
+}
