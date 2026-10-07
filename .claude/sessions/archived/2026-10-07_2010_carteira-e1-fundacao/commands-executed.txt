@@ -1,0 +1,12 @@
+# Comandos que validam o E1 (rodar a partir da raiz)
+pnpm install --frozen-lockfile
+pnpm lint
+pnpm typecheck            # compila @meugmill/shared antes
+pnpm test                 # 68 testes na API + 22 no web
+pnpm build
+docker build -f docker/api.Dockerfile -t carteira-api:local .
+docker build -f docker/web.Dockerfile -t carteira-web:local .
+docker compose up -d --no-build
+bash scripts/smoke.sh
+docker compose down
+# Migrations novas: pnpm --filter @meugmill/api db:generate
