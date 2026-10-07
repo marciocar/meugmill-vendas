@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Demo do host - gmill-carteira</title>
+    <style>
+      /* CSS global agressivo do host: não deve afetar o shadow DOM. */
+      button {
+        background: red !important;
+        color: yellow !important;
+        border: 4px dashed black !important;
+      }
+      h1,
+      p,
+      ul,
+      li {
+        color: red !important;
+        font-size: 30px !important;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Sistema do host</h1>
+    <button id="set-token">Setar token fictício</button>
+    <button id="clear-token">Limpar token</button>
+
+    <gmill-carteira api-base="http://localhost:3000"></gmill-carteira>
+
+    <h2>Log</h2>
+    <pre id="log"></pre>
+
+    <script type="module">
+      import '../src/element.tsx';
+      const el = document.querySelector('gmill-carteira');
+      const log = document.getElementById('log');
+      document.getElementById('set-token').addEventListener('click', () => {
+        el.token = 'token-ficticio-123';
+      });
+      document.getElementById('clear-token').addEventListener('click', () => {
+        el.token = null;
+      });
+      document.addEventListener('token-expired', () => {
+        log.textContent += `[${new Date().toISOString()}] token-expired recebido\n`;
+      });
+    </script>
+  </body>
+</html>
