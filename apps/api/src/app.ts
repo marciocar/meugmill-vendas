@@ -3,6 +3,13 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import type { JWTVerifyGetKey } from 'jose';
 import type { AppConfig } from './config.js';
 import { authPlugin } from './plugins/auth.js';
+import {
+  buildLoggerOptions,
+  genReqId,
+  observabilityPlugin,
+  REQUEST_ID_HEADER,
+  type LogStream,
+} from './plugins/observability.js';
 import { dbPlugin } from './plugins/db.js';
 import { healthRoutes } from './routes/health.js';
 import { meRoutes } from './routes/me.js';
@@ -10,18 +17,25 @@ import { meRoutes } from './routes/me.js';
 export interface BuildAppOptions {
   /** Substitui a busca da JWKS remota (uso em testes). */
   keyGetter?: JWTVerifyGetKey;
+  /** Destino do log (uso em testes, para capturar as linhas). */
+  logStream?: LogStream;
 }
 
 export function buildApp(config: AppConfig, options: BuildAppOptions = {}): FastifyInstance {
   const app = Fastify({
-    logger: config.LOG_LEVEL === 'silent' ? false : { level: config.LOG_LEVEL },
+    logger: buildLoggerOptions(config, options.logStream),
+    // O id do cliente só é aceito se seguro; a validação fica no genReqId.
+    requestIdHeader: false,
+    genReqId,
   });
+  void app.register(observabilityPlugin);
 
   // Lista vazia = nenhuma origem cruzada liberada. Sem credentials: o token vai no header.
   void app.register(cors, {
     origin: config.CORS_ORIGINS,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Authorization', 'Content-Type'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'X-Request-Id'],
+    exposedHeaders: [REQUEST_ID_HEADER],
     credentials: false,
   });
   void app.register(dbPlugin, { config });
