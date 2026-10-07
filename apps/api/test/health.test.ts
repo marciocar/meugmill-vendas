@@ -4,7 +4,15 @@ import { loadConfig } from '../src/config.js';
 
 describe('GET /health', () => {
   it('responde 200 com status ok', async () => {
-    const app = buildApp(loadConfig({ LOG_LEVEL: 'silent', NODE_ENV: 'test', DATABASE_PATH: ':memory:' }));
+    const app = buildApp(
+      loadConfig({
+        LOG_LEVEL: 'silent',
+        NODE_ENV: 'test',
+        DATABASE_PATH: ':memory:',
+        OIDC_ISSUER: 'https://idp.test',
+        OIDC_AUDIENCE: 'meugmill',
+      }),
+    );
     const res = await app.inject({ method: 'GET', url: '/health' });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toEqual({ status: 'ok' });

@@ -12,11 +12,13 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
+    "@fastify/cors": "^11.3.0",
     "@meugmill/shared": "workspace:*",
     "@sinclair/typebox": "^0.34.52",
     "better-sqlite3": "^13.0.3",
     "drizzle-orm": "^0.45.3",
-    "fastify": "^5.12.5"
+    "fastify": "^5.12.5",
+    "jose": "^6.2.12"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",

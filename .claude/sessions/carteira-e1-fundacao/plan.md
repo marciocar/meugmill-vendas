@@ -23,24 +23,26 @@
 
 **Validar:** `pnpm -r lint && pnpm -r typecheck && pnpm -r test && pnpm -r build`
 
-## Fase 2 — Persistência SQLite e migrations [ACTIVE]
+## Fase 2 — Persistência SQLite e migrations [DONE]
 
 **Output:** banco criado por migration no boot; `/ready` reflete o banco.
 
-- [ ] `plugins/db.ts`: `better-sqlite3` + Drizzle; PRAGMAs `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout`
-- [ ] `drizzle-kit` configurado; pasta `db/migrations` versionada; migration inicial técnica
-- [ ] Migrations aplicadas no boot (ou comando dedicado) com caminho do arquivo por env (`DATABASE_PATH`)
-- [ ] `GET /ready` → 200 com banco ok, 503 sem banco
-- [ ] Testes com banco em arquivo temporário; teste de que FK está ligada
+- [x] `plugins/db.ts`: `better-sqlite3` + Drizzle; PRAGMAs `journal_mode=WAL`, `foreign_keys=ON`, `busy_timeout`
+- [x] `drizzle-kit` configurado; pasta `db/migrations` versionada; migration inicial técnica
+- [x] Migrations aplicadas no boot (ou comando dedicado) com caminho do arquivo por env (`DATABASE_PATH`)
+- [x] `GET /ready` → 200 com banco ok, 503 sem banco
+- [x] Testes com banco em arquivo temporário; teste de que FK está ligada
+
+**Concluída 2026-10-07** · commit `0571522` · 17 testes. Migrations em `apps/api/drizzle/` (fora de src; a imagem precisa copiá-las). Novas: `pnpm --filter @meugmill/api db:generate`.
 
 **Validar:** `pnpm --filter api test`
 
-## Fase 3 — Autenticação JWT/JWKS [TODO]
+## Fase 3 — Autenticação JWT/JWKS [ACTIVE]
 
 **Output:** `/v1/me` só responde com token válido do IdP configurado.
 
 - [ ] `plugins/auth.ts` com `jose` (`createRemoteJWKSet`): valida `iss`, `aud`, `exp`, `nbf`, algoritmos permitidos
-- [ ] Mapeamento de claims → `UserClaims` por configuração `[INFERIDO]` (nomes reais dependem do IdP da GMill)
+- [ ] Mapeamento de claims → `UserClaims` por configuração; defaults `sub`/`branch_ids`/`roles` (hipótese provisória, ver docs/business-context/02-product/features/carteira-de-clientes-hipoteses.md)
 - [ ] `GET /v1/me` devolvendo só `UserClaims` (minimização)
 - [ ] Falha fechada: sem token/inválido → 401; JWKS indisponível → 503
 - [ ] Testes: válido, expirado, issuer errado, audience errada, sem token, JWKS fora (JWKS local no teste)

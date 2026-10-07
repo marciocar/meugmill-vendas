@@ -10,7 +10,15 @@ const apps: FastifyInstance[] = [];
 const dirs: string[] = [];
 
 async function make(databasePath: string): Promise<FastifyInstance> {
-  const app = buildApp(loadConfig({ LOG_LEVEL: 'silent', NODE_ENV: 'test', DATABASE_PATH: databasePath }));
+  const app = buildApp(
+    loadConfig({
+      LOG_LEVEL: 'silent',
+      NODE_ENV: 'test',
+      DATABASE_PATH: databasePath,
+      OIDC_ISSUER: 'https://idp.test',
+      OIDC_AUDIENCE: 'meugmill',
+    }),
+  );
   apps.push(app);
   await app.ready();
   return app;
