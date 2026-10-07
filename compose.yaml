@@ -13,7 +13,8 @@ services:
     # então não há como sondar por dentro. Quem espera o IdP é o scripts/smoke.sh (discovery 200).
     ports:
       # Porta do IdP no host. O issuer exposto ao navegador é http://localhost:8080/default.
-      - "${IDP_PORT:-8080}:8080"
+      # Só em 127.0.0.1: nada fica exposto na rede; acesso remoto por túnel SSH (-L porta:localhost:porta).
+      - "${BIND_ADDR:-127.0.0.1}:${IDP_PORT:-8080}:8080"
     environment:
       # Arquivo de configuração: tokens do issuer "default" com aud/roles/branch_ids da carteira.
       JSON_CONFIG_PATH: /config/idp-config.json
@@ -31,7 +32,8 @@ services:
       - idp
     ports:
       # Porta da API no host (dentro do container é sempre PORT=3000).
-      - "${API_PORT:-3000}:3000"
+      # Só em 127.0.0.1: nada fica exposto na rede; acesso remoto por túnel SSH (-L porta:localhost:porta).
+      - "${BIND_ADDR:-127.0.0.1}:${API_PORT:-3000}:3000"
     volumes:
       # Banco SQLite persistente.
       - carteira-data:/data
@@ -71,7 +73,8 @@ services:
     image: carteira-web:local
     ports:
       # Porta do web component + demo no host (nginx escuta 8080 dentro do container).
-      - "${WEB_PORT:-8081}:8080"
+      # Só em 127.0.0.1: nada fica exposto na rede; acesso remoto por túnel SSH (-L porta:localhost:porta).
+      - "${BIND_ADDR:-127.0.0.1}:${WEB_PORT:-8081}:8080"
     restart: unless-stopped
 
 volumes:
