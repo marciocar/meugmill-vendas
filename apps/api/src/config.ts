@@ -1,7 +1,7 @@
 import { Type, type Static } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 
-// Para acrescentar variáveis (DATABASE_PATH, OIDC_*, CORS_ORIGINS), adicione campos aqui.
+// Para acrescentar variáveis (OIDC_*, CORS_ORIGINS), adicione campos aqui.
 const ConfigSchema = Type.Object({
   PORT: Type.Integer({ minimum: 1, maximum: 65535, default: 3000 }),
   HOST: Type.String({ minLength: 1, default: '0.0.0.0' }),
@@ -17,6 +17,8 @@ const ConfigSchema = Type.Object({
     ],
     { default: 'info' },
   ),
+  // Caminho do arquivo SQLite; ':memory:' é aceito (testes).
+  DATABASE_PATH: Type.String({ minLength: 1, default: './data/carteira.sqlite' }),
   NODE_ENV: Type.Union([Type.Literal('development'), Type.Literal('test'), Type.Literal('production')], {
     default: 'development',
   }),

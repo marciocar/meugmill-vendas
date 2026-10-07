@@ -1,27 +1,29 @@
 # Plano — carteira-e1-fundacao
 
-> Cada fase é um chunk auto-contido. Marcadores lidos por máquina: `[DONE]` / `[ACTIVE]` / `[TODO]`.
-> Exatamente uma fase `[ACTIVE]`, igual a `STATE.md` → `NEXT.phase`. Arquitetura: [architecture.md](architecture.md).
+> Cada fase é um chunk auto-contido. Marcadores lidos por máquina: `[DONE]` / `[DONE]` / `[TODO]`.
+> Exatamente uma fase `[DONE]`, igual a `STATE.md` → `NEXT.phase`. Arquitetura: [architecture.md](architecture.md).
 > Zoho: OG1-T2. Ao concluir cada fase, `completion_percentage` += 20 (o layout só tem Open/Closed).
 
-## Fase 1 — Monorepo e esqueleto [ACTIVE]
+## Fase 1 — Monorepo e esqueleto [DONE]
 
 **Input:** repo só com docs e framework. **Output:** `pnpm install && pnpm -r test && pnpm -r build` verdes.
 
-- [ ] Raiz: `package.json` (scripts `lint`, `typecheck`, `test`, `build`), `pnpm-workspace.yaml`, `.nvmrc`,
+- [x] Raiz: `package.json` (scripts `lint`, `typecheck`, `test`, `build`), `pnpm-workspace.yaml`, `.nvmrc`,
       `tsconfig.base.json`, `eslint.config.mjs`, Prettier (respeitar `.prettierignore` existente)
-- [ ] `packages/shared`: tipo `UserClaims` mínimo (`sub`, `roles`, `branchIds`) e build
-- [ ] `apps/api`: `buildApp()`, `server.ts` com shutdown gracioso, `config.ts` validado, `GET /health`
-- [ ] `apps/api/test/health.test.ts` com `fastify.inject`
-- [ ] `apps/web`: Vite library mode gerando `gmill-carteira.js`; `element.tsx` define `<gmill-carteira>`
+- [x] `packages/shared`: tipo `UserClaims` mínimo (`sub`, `roles`, `branchIds`) e build
+- [x] `apps/api`: `buildApp()`, `server.ts` com shutdown gracioso, `config.ts` validado, `GET /health`
+- [x] `apps/api/test/health.test.ts` com `fastify.inject`
+- [x] `apps/web`: Vite library mode gerando `gmill-carteira.js`; `element.tsx` define `<gmill-carteira>`
       com Shadow DOM, atributos/propriedades `api-base` e `token`, evento `token-expired`
-- [ ] `apps/web/demo/index.html` embarcando o componente como um host faria
-- [ ] Prova de risco: um componente com portal (dropdown) renderizando dentro do shadow root, com CSS injetado
-- [ ] Teste do custom element (Vitest + jsdom/happy-dom): registra, lê atributos, reage a mudança de `token`
+- [x] `apps/web/demo/index.html` embarcando o componente como um host faria
+- [x] Prova de risco: um componente com portal (dropdown) renderizando dentro do shadow root, com CSS injetado
+- [x] Teste do custom element (Vitest + jsdom/happy-dom): registra, lê atributos, reage a mudança de `token`
+
+**Concluída 2026-10-07** · commit `8770052` · 10 testes · bundle 368 kB (84 kB gzip). Node 22 (instalado). O demo ainda não foi aberto no navegador: o isolamento do CSS do host será conferido na fumaça da Fase 5.
 
 **Validar:** `pnpm -r lint && pnpm -r typecheck && pnpm -r test && pnpm -r build`
 
-## Fase 2 — Persistência SQLite e migrations [TODO]
+## Fase 2 — Persistência SQLite e migrations [ACTIVE]
 
 **Output:** banco criado por migration no boot; `/ready` reflete o banco.
 

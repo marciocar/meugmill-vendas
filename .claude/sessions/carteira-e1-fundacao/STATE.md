@@ -18,14 +18,14 @@ auth JWKS, observabilidade, Compose, CI) para os épicos E2–E10 — ver contex
 - task-manager    → main: OG1-T2 (2723266000000146018) · provider: zoho · status via completion_percentage (+20/fase)
 
 ## NEXT
-phase: 1
-phase_title: Monorepo e esqueleto (API Fastify + Web Component Vite)
+phase: 2
+phase_title: Persistência SQLite e migrations
 status: todo
-next_action: "Criar package.json raiz, pnpm-workspace.yaml, .nvmrc e tsconfig.base.json"
+next_action: "Criar apps/api/src/plugins/db.ts com better-sqlite3 + Drizzle e PRAGMAs WAL/foreign_keys/busy_timeout"
 blocked_by: none
 files_in_flight: []
-validate_with: "pnpm -r lint && pnpm -r typecheck && pnpm -r test && pnpm -r build"
-last_checkpoint: 2026-10-07T18:31Z
+validate_with: "pnpm --filter @meugmill/api test"
+last_checkpoint: 2026-10-07T18:55Z
 
 ## Native transcript
 resume_command: claude --resume <id>
