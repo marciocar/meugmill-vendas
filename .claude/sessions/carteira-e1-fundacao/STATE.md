@@ -18,14 +18,14 @@ auth JWKS, observabilidade, Compose, CI) para os épicos E2–E10 — ver contex
 - task-manager    → main: OG1-T2 (2723266000000146018) · provider: zoho · status via completion_percentage (+20/fase)
 
 ## NEXT
-phase: 3
-phase_title: Autenticação JWT/JWKS
-status: in_progress
-next_action: "Criar apps/api/src/plugins/auth.ts com jose createRemoteJWKSet e a rota GET /v1/me"
-blocked_by: none
-files_in_flight: [apps/api/src/plugins/auth.ts, apps/api/src/routes/me.ts]
-validate_with: "pnpm --filter @meugmill/api test"
-last_checkpoint: 2026-10-07T19:05Z
+phase: done
+phase_title: E1 concluído — aguardando decisão de push/PR
+status: done
+next_action: "Com o ok do maestro: git push da main e da feature/carteira-e1-fundacao e abrir o PR via /engineer:pr"
+blocked_by: decisão do maestro (push e PR são externos)
+files_in_flight: []
+validate_with: "pnpm lint && pnpm typecheck && pnpm test && bash scripts/smoke.sh"
+last_checkpoint: 2026-10-07T20:05Z
 
 ## Native transcript
 resume_command: claude --resume <id>
