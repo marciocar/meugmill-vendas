@@ -68,3 +68,27 @@ export function writeActive(
     .where(eq(table.id, id))
     .run();
 }
+
+/**
+ * Incrementa a versão do registro (para o If-Match continuar protegendo) quando só os vínculos
+ * mudaram. Com `global`, liga/desliga também o `active` do registro compartilhado.
+ */
+export function writeVersionBump(
+  conn: Conn,
+  table: AuditedTable,
+  id: number,
+  sub: string,
+  now: number,
+  global?: { active: boolean },
+): void {
+  conn
+    .update(table)
+    .set({
+      ...(global ? { active: global.active, deactivatedAt: global.active ? null : now } : {}),
+      version: sql`${table.version} + 1`,
+      updatedAt: now,
+      updatedBy: sub,
+    })
+    .where(eq(table.id, id))
+    .run();
+}

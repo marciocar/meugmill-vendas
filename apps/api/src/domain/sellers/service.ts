@@ -1,16 +1,20 @@
-import { and, asc, eq, gt, or } from 'drizzle-orm';
+import { and, asc, eq, gt, or, sql } from 'drizzle-orm';
 import { sellers } from '../../db/schema.js';
-import {
-  assertVersion,
-  auditFields,
-  requireVersion,
-  writeActive,
-  type AuditedTable,
-} from '../shared/audit.js';
+import { assertVersion, requireVersion, type AuditedTable } from '../shared/audit.js';
 import { assertAllInScope, intersects, requireAdmin, resolveScopeIds, type Actor } from '../shared/authz.js';
 import { isUniqueViolation, writeTx, type Conn, type Db, type ServiceOptions } from '../shared/db.js';
-import { DomainError, notFound } from '../shared/errors.js';
-import { assertBranchesActive, planLinkChange, sellerLinks } from '../shared/links.js';
+import { DomainError, forbidden, notFound } from '../shared/errors.js';
+import {
+  applyActiveTransition,
+  assertBranchesActive,
+  coversAllBranches,
+  effectiveState,
+  planLinkChange,
+  publicBranches,
+  sellerLinks,
+  type LinkResult,
+} from '../shared/links.js';
+import { searchKey } from '../shared/normalize.js';
 import {
   decodeCursor,
   ListQuerySchema,
@@ -20,7 +24,7 @@ import {
   type Page,
 } from '../shared/pagination.js';
 import type { CrudService } from '../shared/service.js';
-import { likeContains } from '../shared/sql.js';
+import { keyContains, likeContains } from '../shared/sql.js';
 import { cleanCode, cleanText, parseInput } from '../shared/validate.js';
 import {
   CreateSellerSchema,
@@ -32,7 +36,15 @@ import {
 
 type SellerRow = typeof sellers.$inferSelect;
 
-export type SellerService = CrudService<SellerResponse, CreateSellerInput, UpdateSellerInput>;
+export interface SellerService extends CrudService<SellerResponse, CreateSellerInput, UpdateSellerInput> {
+  /**
+   * Liga um vendedor já existente (por código) a uma filial do ator. Admin; filial no token;
+   * idempotente. Devolve SÓ `{ id, version }`: nenhum dado do vendedor sai por aqui.
+   */
+  linkSellerToBranchByCode(actor: Actor, code: string, branchId: number): LinkResult;
+}
+
+const SELLER_EXISTS = 'Já existe vendedor com este código';
 
 /**
  * Vendedores (só código e nome + filiais). Visível ao ator se ligado a >= 1 filial do token.
@@ -47,13 +59,20 @@ export function createSellerService(db: Db, opts: ServiceOptions = {}): SellerSe
       rows.map((r) => r.id),
       scopeIds,
     );
-    return rows.map((r) => ({
-      id: r.id,
-      code: r.code,
-      name: r.name,
-      branches: links.get(r.id) ?? [],
-      ...auditFields(r),
-    }));
+    return rows.map((r) => {
+      const scoped = links.get(r.id);
+      return {
+        id: r.id,
+        code: r.code,
+        name: r.name,
+        branches: publicBranches(scoped),
+        // `active`/`deactivatedAt` refletem o estado visto pelo ator (registro global + vínculos do escopo).
+        ...effectiveState(r, scoped),
+        version: r.version,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+      };
+    });
   };
 
   /** Busca o vendedor garantindo que o ator o enxerga; fora do escopo é not_found. */
@@ -71,13 +90,28 @@ export function createSellerService(db: Db, opts: ServiceOptions = {}): SellerSe
     return writeTx(db, (tx) => {
       const scopeIds = resolveScopeIds(tx, actor);
       const row = findVisible(tx, id, scopeIds);
-      if (row.active !== active) {
-        assertVersion(row.version, version);
-        writeActive(tx, sellers as unknown as AuditedTable, id, active, actor.sub, now());
-      }
+      // Semântica (vínculo x global) documentada em `applyActiveTransition`.
+      applyActiveTransition({
+        conn: tx,
+        repo: sellerLinks,
+        table: sellers as unknown as AuditedTable,
+        row,
+        scopeIds,
+        active,
+        expectedVersion: version,
+        sub: actor.sub,
+        at: now(),
+      });
       return toResponses(tx, [findRaw(tx, id)], scopeIds)[0] as SellerResponse;
     });
   }
+
+  /** `active` filtra pelo estado visto pelo ator: registro ativo E ao menos um vínculo do escopo ativo. */
+  const activeFilter = (active: boolean | undefined, scopeIds: number[]) => {
+    if (active === undefined) return undefined;
+    const effective = sellerLinks.effectiveActiveClause(sellers.active, sellers.id, scopeIds);
+    return active ? effective : sql`not ${effective}`;
+  };
 
   return {
     list(actor, params: ListParams = {}): Page<SellerResponse> {
@@ -94,8 +128,8 @@ export function createSellerService(db: Db, opts: ServiceOptions = {}): SellerSe
           and(
             sellerLinks.visibleClause(sellers.id, scopeIds),
             after === undefined ? undefined : gt(sellers.id, after),
-            p.active === undefined ? undefined : eq(sellers.active, p.active),
-            q ? or(likeContains(sellers.code, q), likeContains(sellers.name, q)) : undefined,
+            activeFilter(p.active, scopeIds),
+            q ? or(likeContains(sellers.code, q), keyContains(sellers.nameKey, q)) : undefined,
           ),
         )
         .orderBy(asc(sellers.id))
@@ -119,20 +153,28 @@ export function createSellerService(db: Db, opts: ServiceOptions = {}): SellerSe
         const scopeIds = resolveScopeIds(tx, actor);
         assertAllInScope(data.branchIds, scopeIds);
         if (tx.select({ id: sellers.id }).from(sellers).where(eq(sellers.code, code)).get()) {
-          throw new DomainError('conflict', 'Código já cadastrado');
+          throw new DomainError('seller_exists', SELLER_EXISTS);
         }
         assertBranchesActive(tx, data.branchIds);
         const at = now();
         try {
           const row = tx
             .insert(sellers)
-            .values({ code, name, createdAt: at, updatedAt: at, createdBy: actor.sub, updatedBy: actor.sub })
+            .values({
+              code,
+              name,
+              nameKey: searchKey(name),
+              createdAt: at,
+              updatedAt: at,
+              createdBy: actor.sub,
+              updatedBy: actor.sub,
+            })
             .returning()
             .get();
-          sellerLinks.add(tx, row.id, data.branchIds);
+          sellerLinks.add(tx, row.id, data.branchIds, actor.sub, at);
           return toResponses(tx, [row], scopeIds)[0] as SellerResponse;
         } catch (err) {
-          if (isUniqueViolation(err)) throw new DomainError('conflict', 'Código já cadastrado');
+          if (isUniqueViolation(err)) throw new DomainError('seller_exists', SELLER_EXISTS);
           throw err;
         }
       });
@@ -146,16 +188,23 @@ export function createSellerService(db: Db, opts: ServiceOptions = {}): SellerSe
         const scopeIds = resolveScopeIds(tx, actor);
         const row = findVisible(tx, id, scopeIds);
         assertVersion(row.version, version);
+        // O nome vale para todas as filiais: só quem cobre todas as filiais do vendedor o altera.
+        const name = data.name === undefined ? row.name : cleanText(data.name, 'name');
+        if (name !== row.name && !coversAllBranches(sellerLinks.branchIdsOf(tx, id), scopeIds)) {
+          throw forbidden('Alterar dados compartilhados exige todas as filiais do cadastro no token');
+        }
+        const at = now();
         if (data.branchIds !== undefined) {
           const plan = planLinkChange(sellerLinks, tx, id, data.branchIds, scopeIds);
           sellerLinks.remove(tx, id, plan.toRemove);
-          sellerLinks.add(tx, id, plan.toAdd);
+          sellerLinks.add(tx, id, plan.toAdd, actor.sub, at);
         }
         tx.update(sellers)
           .set({
-            name: data.name === undefined ? row.name : cleanText(data.name, 'name'),
+            name,
+            nameKey: searchKey(name),
             version: row.version + 1,
-            updatedAt: now(),
+            updatedAt: at,
             updatedBy: actor.sub,
           })
           .where(eq(sellers.id, id))
@@ -166,5 +215,27 @@ export function createSellerService(db: Db, opts: ServiceOptions = {}): SellerSe
 
     deactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, false),
     reactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, true),
+
+    linkSellerToBranchByCode(actor, rawCode, branchId) {
+      requireAdmin(actor);
+      const code = cleanCode(rawCode);
+      return writeTx(db, (tx) => {
+        const scopeIds = resolveScopeIds(tx, actor);
+        assertAllInScope([branchId], scopeIds);
+        const row = tx.select().from(sellers).where(eq(sellers.code, code)).get();
+        if (!row) throw notFound();
+        if (sellerLinks.branchIdsOf(tx, row.id).includes(branchId)) {
+          return { id: row.id, version: row.version };
+        }
+        assertBranchesActive(tx, [branchId]);
+        const at = now();
+        sellerLinks.add(tx, row.id, [branchId], actor.sub, at);
+        tx.update(sellers)
+          .set({ version: row.version + 1, updatedAt: at, updatedBy: actor.sub })
+          .where(eq(sellers.id, row.id))
+          .run();
+        return { id: row.id, version: row.version + 1 };
+      });
+    },
   };
 }

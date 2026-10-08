@@ -51,7 +51,7 @@ describe('rotas de vendedores', () => {
     expect(res.headers.etag).toBe('"1"');
     const body = res.json();
     expect(body).toMatchObject({ code: 'V1', name: NAME, version: 1, active: true });
-    expect(body.branches).toEqual([{ id: idA, code: 'FA', name: 'Filial FA' }]);
+    expect(body.branches).toEqual([{ id: idA, code: 'FA', name: 'Filial FA', active: true }]);
   });
 
   it('não-admin recebe 403 ao escrever, mas lê', async () => {
@@ -81,11 +81,11 @@ describe('rotas de vendedores', () => {
     expect(get.headers.etag).toBe('"1"');
   });
 
-  it('código duplicado dá 409 conflict; corpo inválido dá 400', async () => {
+  it('código duplicado dá 409 seller_exists; corpo inválido dá 400', async () => {
     await create('V1', [idA]);
     const dup = await create('V1', [idA]);
     expect(dup.statusCode).toBe(409);
-    expect(dup.json()).toEqual({ error: 'conflict' });
+    expect(dup.json()).toEqual({ error: 'seller_exists' });
     const bad = await t.app.inject({
       method: 'POST',
       url: '/v1/sellers',

@@ -19,7 +19,8 @@ import {
   type Page,
 } from '../shared/pagination.js';
 import type { CrudService } from '../shared/service.js';
-import { likeContains } from '../shared/sql.js';
+import { searchKey } from '../shared/normalize.js';
+import { keyContains, likeContains } from '../shared/sql.js';
 import { cleanCode, cleanText, parseInput } from '../shared/validate.js';
 import {
   CreateCatalogSchema,
@@ -76,7 +77,7 @@ export function createCatalogService(db: Db, table: CatalogTable, opts: ServiceO
           and(
             after === undefined ? undefined : gt(table.id, after),
             p.active === undefined ? undefined : eq(table.active, p.active),
-            q ? or(likeContains(table.code, q), likeContains(table.name, q)) : undefined,
+            q ? or(likeContains(table.code, q), keyContains(table.nameKey, q)) : undefined,
           ),
         )
         .orderBy(asc(table.id))
@@ -102,7 +103,15 @@ export function createCatalogService(db: Db, table: CatalogTable, opts: ServiceO
         try {
           const row = tx
             .insert(table)
-            .values({ code, name, createdAt: at, updatedAt: at, createdBy: actor.sub, updatedBy: actor.sub })
+            .values({
+              code,
+              name,
+              nameKey: searchKey(name),
+              createdAt: at,
+              updatedAt: at,
+              createdBy: actor.sub,
+              updatedBy: actor.sub,
+            })
             .returning()
             .get();
           return toResponse(row);
@@ -122,7 +131,13 @@ export function createCatalogService(db: Db, table: CatalogTable, opts: ServiceO
         const row = mustFind(tx, id);
         assertVersion(row.version, version);
         tx.update(table)
-          .set({ name, version: row.version + 1, updatedAt: now(), updatedBy: actor.sub })
+          .set({
+            name,
+            nameKey: searchKey(name),
+            version: row.version + 1,
+            updatedAt: now(),
+            updatedBy: actor.sub,
+          })
           .where(eq(table.id, id))
           .run();
         return toResponse(mustFind(tx, id));

@@ -64,7 +64,7 @@ describe('clientes: criação e validação', () => {
       active: true,
       version: 1,
     });
-    expect(c.branches).toEqual([{ id: ser, code: 'SER', name: 'Filial SER' }]);
+    expect(c.branches).toEqual([{ id: ser, code: 'SER', name: 'Filial SER', active: true }]);
   });
 
   it('CNPJ inválido, sem filial ou campo extra é validation_error', () => {
@@ -174,13 +174,11 @@ describe('clientes: unicidade e vínculo por CNPJ', () => {
     expect(codeOf(() => svc.create(adminSer, base()))).toBe('customer_exists');
   });
 
-  it('link por CNPJ liga à filial do admin, é idempotente e só incrementa uma vez', () => {
+  it('link por CNPJ liga à filial do admin, devolve só { id, version } e é idempotente', () => {
     const c = svc.create(adminSer, base());
     expect(codeOf(() => svc.get(adminCar, c.id))).toBe('not_found');
     const linked = svc.linkCustomerToBranchByCnpj(adminCar, '11.222.333/0001-81', car);
-    expect(linked.id).toBe(c.id);
-    expect(linked.version).toBe(2);
-    expect(linked.branches.map((b) => b.code)).toEqual(['CAR']);
+    expect(linked).toEqual({ id: c.id, version: 2 });
     const again = svc.linkCustomerToBranchByCnpj(adminCar, CNPJ_A, car);
     expect(again).toEqual(linked);
     expect(svc.get(adminBoth, c.id).branches.map((b) => b.code)).toEqual(['CAR', 'SER']);

@@ -14,7 +14,8 @@ import {
   type Page,
 } from '../shared/pagination.js';
 import type { CrudService } from '../shared/service.js';
-import { likeContains } from '../shared/sql.js';
+import { searchKey } from '../shared/normalize.js';
+import { keyContains, likeContains } from '../shared/sql.js';
 import { cleanCode, cleanText, parseInput } from '../shared/validate.js';
 import {
   CreateBranchSchema,
@@ -82,7 +83,7 @@ export function createBranchService(db: Db, opts: ServiceOptions = {}): BranchSe
             inArray(branches.code, actor.branchCodes),
             after === undefined ? undefined : gt(branches.id, after),
             p.active === undefined ? undefined : eq(branches.active, p.active),
-            q ? or(likeContains(branches.code, q), likeContains(branches.name, q)) : undefined,
+            q ? or(likeContains(branches.code, q), keyContains(branches.nameKey, q)) : undefined,
           ),
         )
         .orderBy(asc(branches.id))
@@ -114,6 +115,7 @@ export function createBranchService(db: Db, opts: ServiceOptions = {}): BranchSe
               .values({
                 code,
                 name,
+                nameKey: searchKey(name),
                 municipalityCode: data.municipalityCode,
                 createdAt: at,
                 updatedAt: at,
@@ -138,9 +140,11 @@ export function createBranchService(db: Db, opts: ServiceOptions = {}): BranchSe
         const row = visible(actor, find(tx, id));
         assertVersion(row.version, version);
         if (data.municipalityCode !== undefined) requireMunicipality(tx, data.municipalityCode);
+        const name = data.name === undefined ? row.name : cleanText(data.name, 'name');
         tx.update(branches)
           .set({
-            name: data.name === undefined ? row.name : cleanText(data.name, 'name'),
+            name,
+            nameKey: searchKey(name),
             municipalityCode: data.municipalityCode ?? row.municipalityCode,
             version: row.version + 1,
             updatedAt: now(),

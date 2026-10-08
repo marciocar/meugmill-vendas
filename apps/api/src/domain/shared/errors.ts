@@ -4,6 +4,7 @@ export type DomainErrorCode =
   | 'not_found'
   | 'conflict'
   | 'customer_exists'
+  | 'seller_exists'
   | 'version_conflict'
   | 'precondition_required';
 
@@ -14,6 +15,7 @@ export const DOMAIN_ERROR_STATUS: Record<DomainErrorCode, number> = {
   not_found: 404,
   conflict: 409,
   customer_exists: 409,
+  seller_exists: 409,
   version_conflict: 409,
   precondition_required: 428,
 };

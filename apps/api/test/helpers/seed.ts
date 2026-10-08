@@ -4,6 +4,7 @@ import { loadConfig } from '../../src/config.js';
 import { branches, economicGroups, retailNetworks } from '../../src/db/schema.js';
 import { toActor, type Actor } from '../../src/domain/shared/authz.js';
 import type { Db } from '../../src/domain/shared/db.js';
+import { searchKey } from '../../src/domain/shared/normalize.js';
 
 // Códigos IBGE reais do seed.
 export const SERRA = 3205002; // ES (32)
@@ -59,6 +60,7 @@ export function seedBranch(db: Db, code: string, opts: { active?: boolean; name?
     .values({
       code,
       name: opts.name ?? `Filial ${code}`,
+      nameKey: searchKey(opts.name ?? `Filial ${code}`),
       municipalityCode: SERRA,
       active: opts.active ?? true,
       deactivatedAt: opts.active === false ? NOW : null,
@@ -77,6 +79,7 @@ export function seedRetailNetwork(db: Db, code: string, active = true): number {
     .values({
       code,
       name: `Rede ${code}`,
+      nameKey: searchKey(`Rede ${code}`),
       active,
       createdAt: NOW,
       updatedAt: NOW,
@@ -93,6 +96,7 @@ export function seedEconomicGroup(db: Db, code: string): number {
     .values({
       code,
       name: `Grupo ${code}`,
+      nameKey: searchKey(`Grupo ${code}`),
       createdAt: NOW,
       updatedAt: NOW,
       createdBy: 'seed',

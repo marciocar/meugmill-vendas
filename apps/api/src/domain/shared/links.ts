@@ -1,18 +1,41 @@
 import { Type } from '@sinclair/typebox';
 import { sql, type AnyColumn, type SQL } from 'drizzle-orm';
+import { assertVersion, writeVersionBump, type AuditedTable } from './audit.js';
 import { assertAllInScope } from './authz.js';
 import type { Conn } from './db.js';
 import { invalid } from './errors.js';
 
+/** Filial do vínculo. `active` é o estado do VÍNCULO (não o da filial): ver `applyActiveTransition`. */
 export const BranchRefSchema = Type.Object({
   id: Type.Integer(),
   code: Type.String(),
   name: Type.String(),
+  active: Type.Boolean({ description: 'Estado do vínculo do cadastro com esta filial.' }),
 });
 export interface BranchRef {
   id: number;
   code: string;
   name: string;
+  active: boolean;
+}
+
+/** Resposta do link por CNPJ/código: só identifica o registro e dá a versão (If-Match), sem dados. */
+export const LinkResultSchema = Type.Object({
+  id: Type.Integer(),
+  version: Type.Integer(),
+});
+export interface LinkResult {
+  id: number;
+  version: number;
+}
+
+export interface OwnerLink {
+  branchId: number;
+  active: boolean;
+}
+
+export interface ScopedLink extends BranchRef {
+  deactivatedAt: number | null;
 }
 
 /**
@@ -21,13 +44,18 @@ export interface BranchRef {
  * então `sql.raw` é seguro; todos os valores vão como parâmetros.
  */
 export interface LinkRepo {
-  /** Cláusula "o dono tem vínculo com alguma filial do escopo". */
+  /** Cláusula "o dono tem vínculo (ativo ou não) com alguma filial do escopo". */
   visibleClause(ownerId: AnyColumn, scopeIds: number[]): SQL;
+  /** "Ativo para o ator": registro global ativo E ao menos um vínculo ATIVO do escopo. */
+  effectiveActiveClause(ownerActive: AnyColumn, ownerId: AnyColumn, scopeIds: number[]): SQL;
+  links(conn: Conn, ownerId: number): OwnerLink[];
   branchIdsOf(conn: Conn, ownerId: number): number[];
-  add(conn: Conn, ownerId: number, branchIds: number[]): void;
+  add(conn: Conn, ownerId: number, branchIds: number[], sub: string, at: number): void;
   remove(conn: Conn, ownerId: number, branchIds: number[]): void;
-  /** Filiais de cada dono restritas ao escopo do ator (ordenadas por código). */
-  scopedBranches(conn: Conn, ownerIds: number[], scopeIds: number[]): Map<number, BranchRef[]>;
+  /** Liga/desliga só os vínculos pedidos que ainda não estão no estado desejado. */
+  setActive(conn: Conn, ownerId: number, branchIds: number[], active: boolean, sub: string, at: number): void;
+  /** Vínculos de cada dono restritos ao escopo do ator (ordenados por código da filial). */
+  scopedBranches(conn: Conn, ownerIds: number[], scopeIds: number[]): Map<number, ScopedLink[]>;
 }
 
 function idList(ids: number[]): SQL {
@@ -43,37 +71,72 @@ export function makeLinkRepo(
 ): LinkRepo {
   const table = sql.raw(tableName);
   const owner = sql.raw(ownerColumn);
+  const readLinks = (conn: Conn, ownerId: number): OwnerLink[] =>
+    conn
+      .all<{ branch_id: number; active: number }>(
+        sql`select branch_id, active from ${table} where ${owner} = ${ownerId}`,
+      )
+      .map((r) => ({ branchId: r.branch_id, active: r.active === 1 }));
   return {
     visibleClause(ownerId, scopeIds) {
       if (scopeIds.length === 0) return sql`0 = 1`;
       return sql`${ownerId} in (select ${owner} from ${table} where branch_id in (${idList(scopeIds)}))`;
     },
-    branchIdsOf(conn, ownerId) {
-      return conn
-        .all<{ branch_id: number }>(sql`select branch_id from ${table} where ${owner} = ${ownerId}`)
-        .map((r) => r.branch_id);
+    effectiveActiveClause(ownerActive, ownerId, scopeIds) {
+      if (scopeIds.length === 0) return sql`0 = 1`;
+      return sql`(${ownerActive} = 1 and ${ownerId} in (select ${owner} from ${table} where branch_id in (${idList(scopeIds)}) and active = 1))`;
     },
-    add(conn, ownerId, branchIds) {
+    links: readLinks,
+    branchIdsOf(conn, ownerId) {
+      return readLinks(conn, ownerId).map((l) => l.branchId);
+    },
+    add(conn, ownerId, branchIds, sub, at) {
       for (const branchId of branchIds) {
-        conn.run(sql`insert into ${table} (${owner}, branch_id) values (${ownerId}, ${branchId})`);
+        conn.run(
+          sql`insert into ${table} (${owner}, branch_id, active, updated_at, updated_by)
+              values (${ownerId}, ${branchId}, 1, ${at}, ${sub})`,
+        );
       }
     },
     remove(conn, ownerId, branchIds) {
       if (branchIds.length === 0) return;
       conn.run(sql`delete from ${table} where ${owner} = ${ownerId} and branch_id in (${idList(branchIds)})`);
     },
+    setActive(conn, ownerId, branchIds, active, sub, at) {
+      if (branchIds.length === 0) return;
+      conn.run(
+        sql`update ${table}
+            set active = ${active ? 1 : 0}, deactivated_at = ${active ? null : at},
+                updated_at = ${at}, updated_by = ${sub}
+            where ${owner} = ${ownerId} and branch_id in (${idList(branchIds)}) and active != ${active ? 1 : 0}`,
+      );
+    },
     scopedBranches(conn, ownerIds, scopeIds) {
-      const out = new Map<number, BranchRef[]>();
+      const out = new Map<number, ScopedLink[]>();
       if (ownerIds.length === 0 || scopeIds.length === 0) return out;
-      const rows = conn.all<{ owner_id: number; id: number; code: string; name: string }>(
-        sql`select l.${owner} as owner_id, b.id as id, b.code as code, b.name as name
+      const rows = conn.all<{
+        owner_id: number;
+        id: number;
+        code: string;
+        name: string;
+        active: number;
+        deactivated_at: number | null;
+      }>(
+        sql`select l.${owner} as owner_id, b.id as id, b.code as code, b.name as name,
+                   l.active as active, l.deactivated_at as deactivated_at
             from ${table} l join branches b on b.id = l.branch_id
             where l.${owner} in (${idList(ownerIds)}) and l.branch_id in (${idList(scopeIds)})
             order by b.code`,
       );
       for (const r of rows) {
         const list = out.get(r.owner_id) ?? [];
-        list.push({ id: r.id, code: r.code, name: r.name });
+        list.push({
+          id: r.id,
+          code: r.code,
+          name: r.name,
+          active: r.active === 1,
+          deactivatedAt: r.deactivated_at,
+        });
         out.set(r.owner_id, list);
       }
       return out;
@@ -83,6 +146,74 @@ export function makeLinkRepo(
 
 export const customerLinks = makeLinkRepo('customer_branches', 'customer_id');
 export const sellerLinks = makeLinkRepo('seller_branches', 'seller_id');
+
+/** Remove o campo interno `deactivatedAt` das filiais devolvidas na resposta. */
+export function publicBranches(links: ScopedLink[] | undefined): BranchRef[] {
+  return (links ?? []).map(({ id, code, name, active }) => ({ id, code, name, active }));
+}
+
+/**
+ * Estado do registro VISTO PELO ATOR: ativo = registro global ativo E ao menos um vínculo ativo
+ * dentro do escopo dele. Quando inativo, `deactivatedAt` é o do registro (se foi inativado
+ * globalmente) ou o mais recente entre os vínculos do escopo.
+ */
+export function effectiveState(
+  row: { active: boolean; deactivatedAt: number | null },
+  scoped: ScopedLink[] | undefined,
+): { active: boolean; deactivatedAt: number | null } {
+  const links = scoped ?? [];
+  const active = row.active && links.some((l) => l.active);
+  if (active) return { active: true, deactivatedAt: null };
+  if (!row.active) return { active: false, deactivatedAt: row.deactivatedAt };
+  const stamps = links.map((l) => l.deactivatedAt).filter((v): v is number => v !== null);
+  return { active: false, deactivatedAt: stamps.length > 0 ? Math.max(...stamps) : null };
+}
+
+/** O ator cobre TODAS as filiais vinculadas ao registro (condição para mexer em dado compartilhado). */
+export function coversAllBranches(linkedBranchIds: number[], scopeIds: number[]): boolean {
+  const scope = new Set(scopeIds);
+  return linkedBranchIds.every((id) => scope.has(id));
+}
+
+/**
+ * Inativar/reativar um cadastro compartilhado entre filiais (cliente, vendedor).
+ *
+ * SEMÂNTICA (decisão do maestro): a rota é uma só e age conforme a cobertura do ator.
+ *  - Sempre muda os VÍNCULOS das filiais do token do admin (dentro do registro), por vínculo e
+ *    de forma idempotente.
+ *  - Se o ator cobre TODAS as filiais vinculadas ao registro, muda também o `active` GLOBAL do
+ *    registro. Se não cobre, o `active` global não é tocado: as outras filiais seguem como estavam.
+ *  - Reativar sem cobertura total reativa só os vínculos do ator; se o registro estiver inativo
+ *    globalmente, ele continua inativo para todos até alguém com cobertura total reativá-lo.
+ *  - Algo mudou -> confere o If-Match e incrementa a versão uma vez. Nada mudou -> no-op sem
+ *    exigir versão (idempotente).
+ */
+export function applyActiveTransition(args: {
+  conn: Conn;
+  repo: LinkRepo;
+  table: AuditedTable;
+  row: { id: number; active: boolean; version: number };
+  scopeIds: number[];
+  active: boolean;
+  expectedVersion: number;
+  sub: string;
+  at: number;
+}): void {
+  const { conn, repo, table, row, scopeIds, active } = args;
+  const all = repo.links(conn, row.id);
+  const scope = new Set(scopeIds);
+  const toChange = all.filter((l) => scope.has(l.branchId) && l.active !== active).map((l) => l.branchId);
+  const globalChange = coversAllBranches(
+    all.map((l) => l.branchId),
+    scopeIds,
+  )
+    ? row.active !== active
+    : false;
+  if (toChange.length === 0 && !globalChange) return;
+  assertVersion(row.version, args.expectedVersion);
+  repo.setActive(conn, row.id, toChange, active, args.sub, args.at);
+  writeVersionBump(conn, table, row.id, args.sub, args.at, globalChange ? { active } : undefined);
+}
 
 export interface LinkPlan {
   toAdd: number[];

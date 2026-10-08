@@ -10,7 +10,7 @@ import { generateOpenApiJson } from '../../scripts/openapi-lib.js';
 type Operation = {
   security?: unknown[];
   parameters?: { name: string; in: string }[];
-  responses?: Record<string, unknown>;
+  responses?: Record<string, { description?: string; headers?: Record<string, unknown> }>;
 };
 type Doc = {
   openapi: string;
@@ -24,6 +24,7 @@ const PATHS = [
   '/v1/customers/{id}',
   '/v1/customers/by-cnpj/{cnpj}/branches',
   '/v1/sellers',
+  '/v1/sellers/by-code/{code}/branches',
   '/v1/branches',
   '/v1/product-subgroups',
   '/v1/retail-networks',
@@ -81,6 +82,38 @@ describe('OpenAPI v1', () => {
       expect(op, `${method} ${path}`).toBeDefined();
       expect(op?.parameters).toContainEqual(expect.objectContaining({ name: 'if-match', in: 'header' }));
       expect(Object.keys(op?.responses ?? {})).toEqual(expect.arrayContaining(['409', '428']));
+    }
+  });
+
+  it('declara o header ETag nas respostas de GET por id, POST, PATCH, deactivate, reactivate e links', () => {
+    const ops: [string, string, string][] = [
+      ['/v1/customers/{id}', 'get', '200'],
+      ['/v1/customers', 'post', '201'],
+      ['/v1/customers/{id}', 'patch', '200'],
+      ['/v1/customers/{id}/deactivate', 'post', '200'],
+      ['/v1/customers/{id}/reactivate', 'post', '200'],
+      ['/v1/customers/by-cnpj/{cnpj}/branches', 'post', '200'],
+      ['/v1/sellers/{id}', 'get', '200'],
+      ['/v1/sellers', 'post', '201'],
+      ['/v1/sellers/{id}', 'patch', '200'],
+      ['/v1/sellers/{id}/deactivate', 'post', '200'],
+      ['/v1/sellers/{id}/reactivate', 'post', '200'],
+      ['/v1/sellers/by-code/{code}/branches', 'post', '200'],
+      ['/v1/branches/{id}', 'get', '200'],
+      ['/v1/retail-networks', 'post', '201'],
+    ];
+    for (const [path, method, status] of ops) {
+      const response = doc.paths[path]?.[method]?.responses?.[status];
+      expect(response?.headers, `${method} ${path} ${status}`).toHaveProperty('ETag');
+    }
+    // listas não têm ETag
+    expect(doc.paths['/v1/customers']?.get?.responses?.['200']?.headers).toBeUndefined();
+  });
+
+  it('documenta os códigos de conflito 409, incluindo seller_exists', () => {
+    const description = doc.paths['/v1/sellers']?.post?.responses?.['409']?.description ?? '';
+    for (const code of ['conflict', 'customer_exists', 'seller_exists', 'version_conflict']) {
+      expect(description).toContain(code);
     }
   });
 

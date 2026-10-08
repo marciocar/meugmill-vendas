@@ -103,7 +103,7 @@ describe('rotas de clientes', () => {
       payload: { branchId: idA },
     });
     expect(link.statusCode).toBe(200);
-    expect(link.json().cnpj).toBe('12ABC34501DE35');
+    expect(link.json()).toEqual({ id: res.json().id, version: 1 });
     const bad = await create({ cnpj: '12ABC34501DE34' });
     expect(bad.statusCode).toBe(400);
     expect(bad.body).not.toContain('12ABC34501DE34');
@@ -138,13 +138,14 @@ describe('rotas de clientes', () => {
     const first = await link();
     expect(first.statusCode).toBe(200);
     expect(first.headers.etag).toBe('"2"');
-    expect(first.json().id).toBe(onlyB.id);
-    // A resposta mostra só a filial do escopo do ator (A), não a B.
-    expect(first.json().branches.map((b: { code: string }) => b.code)).toEqual(['FA']);
+    // Só { id, version }: nenhum dado do cliente (razão social, endereço, filiais...).
+    expect(first.json()).toEqual({ id: onlyB.id, version: 2 });
+    expect(first.body).not.toContain(LEGAL_NAME);
 
     const second = await link();
     expect(second.statusCode).toBe(200);
     expect(second.headers.etag).toBe('"2"');
+    expect(second.json()).toEqual({ id: onlyB.id, version: 2 });
 
     // Também aceita só dígitos no path.
     const digits = await t.app.inject({

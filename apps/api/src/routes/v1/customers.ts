@@ -7,7 +7,8 @@ import {
 } from '../../domain/customers/schemas.js';
 import { createCustomerService, type CustomerService } from '../../domain/customers/service.js';
 import { registerCrudRoutes } from './crud.js';
-import { actorOf, ERROR_RESPONSES, sendDomainError, setEtag } from './http.js';
+import { LinkResultSchema } from '../../domain/shared/links.js';
+import { actorOf, ERROR_RESPONSES, sendDomainError, setEtag, withEtag } from './http.js';
 
 /**
  * CNPJ no path: numérico ou alfanumérico, com ou sem máscara (a máscara chega codificada, `%2F`).
@@ -35,7 +36,8 @@ export function registerCustomerRoutes(
     tag: 'customers',
   });
 
-  // Liga um cliente já cadastrado (em outra filial) à filial do admin. Idempotente.
+  // Liga um cliente já cadastrado (em outra filial) à filial do admin. Idempotente. Responde SÓ
+  // { id, version } (+ ETag): nenhum dado do cliente é exposto antes de ele entrar no escopo do ator.
   app.post(
     `${prefix}/by-cnpj/:cnpj/branches`,
     {
@@ -44,7 +46,7 @@ export function registerCustomerRoutes(
         tags: ['customers'],
         params: CnpjParamsSchema,
         body: LinkBodySchema,
-        response: { 200: CustomerResponseSchema, ...ERROR_RESPONSES },
+        response: { 200: withEtag(LinkResultSchema), ...ERROR_RESPONSES },
       },
     },
     async (request, reply) => {

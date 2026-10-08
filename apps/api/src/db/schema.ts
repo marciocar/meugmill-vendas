@@ -42,6 +42,7 @@ export const branches = sqliteTable('branches', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   code: text('code').notNull().unique(),
   name: text('name').notNull(),
+  nameKey: text('name_key').notNull().default(''),
   municipalityCode: integer('municipality_code')
     .notNull()
     .references(() => municipalities.ibgeCode),
@@ -52,6 +53,7 @@ export const productSubgroups = sqliteTable('product_subgroups', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   code: text('code').notNull().unique(),
   name: text('name').notNull(),
+  nameKey: text('name_key').notNull().default(''),
   ...auditColumns(),
 });
 
@@ -59,6 +61,7 @@ export const retailNetworks = sqliteTable('retail_networks', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   code: text('code').notNull().unique(),
   name: text('name').notNull(),
+  nameKey: text('name_key').notNull().default(''),
   ...auditColumns(),
 });
 
@@ -66,6 +69,7 @@ export const economicGroups = sqliteTable('economic_groups', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   code: text('code').notNull().unique(),
   name: text('name').notNull(),
+  nameKey: text('name_key').notNull().default(''),
   ...auditColumns(),
 });
 
@@ -73,6 +77,7 @@ export const sellers = sqliteTable('sellers', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   code: text('code').notNull().unique(),
   name: text('name').notNull(),
+  nameKey: text('name_key').notNull().default(''),
   ...auditColumns(),
 });
 
@@ -85,10 +90,16 @@ export const sellerBranches = sqliteTable(
     branchId: integer('branch_id')
       .notNull()
       .references(() => branches.id, { onDelete: 'cascade' }),
+    // Estado do vínculo: inativar um cadastro compartilhado vale só para as filiais do ator.
+    active: integer('active', { mode: 'boolean' }).notNull().default(true),
+    deactivatedAt: integer('deactivated_at'),
+    updatedAt: integer('updated_at'),
+    updatedBy: text('updated_by'),
   },
   (t) => [
     primaryKey({ columns: [t.sellerId, t.branchId] }),
-    index('seller_branches_branch_id_idx').on(t.branchId),
+    // Cobre a listagem com escopo (branch_id in (...)) sem tocar a tabela.
+    index('seller_branches_branch_id_seller_id_idx').on(t.branchId, t.sellerId),
   ],
 );
 
@@ -98,7 +109,10 @@ export const customers = sqliteTable(
     id: integer('id').primaryKey({ autoIncrement: true }),
     cnpj: text('cnpj', { length: 14 }).notNull().unique(),
     legalName: text('legal_name').notNull(),
+    // Chaves de busca: texto em maiúsculas, sem acento e com espaços colapsados (ver searchKey).
+    legalNameKey: text('legal_name_key').notNull().default(''),
     tradeName: text('trade_name'),
+    tradeNameKey: text('trade_name_key'),
     stateCode: integer('state_code')
       .notNull()
       .references(() => states.ibgeCode),
@@ -128,10 +142,16 @@ export const customerBranches = sqliteTable(
     branchId: integer('branch_id')
       .notNull()
       .references(() => branches.id, { onDelete: 'cascade' }),
+    // Estado do vínculo: inativar um cadastro compartilhado vale só para as filiais do ator.
+    active: integer('active', { mode: 'boolean' }).notNull().default(true),
+    deactivatedAt: integer('deactivated_at'),
+    updatedAt: integer('updated_at'),
+    updatedBy: text('updated_by'),
   },
   (t) => [
     primaryKey({ columns: [t.customerId, t.branchId] }),
-    index('customer_branches_branch_id_idx').on(t.branchId),
+    // Cobre a listagem com escopo (branch_id in (...)) sem tocar a tabela.
+    index('customer_branches_branch_id_customer_id_idx').on(t.branchId, t.customerId),
   ],
 );
 

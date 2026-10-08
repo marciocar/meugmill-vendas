@@ -1,7 +1,7 @@
-import { Type } from '@sinclair/typebox';
+import { Type, type TSchema } from '@sinclair/typebox';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { toActor, type Actor } from '../../domain/shared/authz.js';
-import { DomainError, invalid } from '../../domain/shared/errors.js';
+import { DOMAIN_ERROR_STATUS, DomainError, invalid } from '../../domain/shared/errors.js';
 
 /**
  * Lê o `If-Match` e devolve a versão esperada. Aceita `"3"`, `3` e `W/"3"`.
@@ -48,13 +48,36 @@ export const ErrorResponseSchema = Type.Object({
   message: Type.Optional(Type.String()),
 });
 
+/** Códigos de domínio com status 409 (documentados na resposta 409 do OpenAPI). */
+const CONFLICT_CODES = Object.entries(DOMAIN_ERROR_STATUS)
+  .filter(([, status]) => status === 409)
+  .map(([code]) => code);
+
+const ConflictResponseSchema = Type.Object(
+  { error: Type.String(), message: Type.Optional(Type.String()) },
+  { description: `Conflito: ${CONFLICT_CODES.join(', ')}.` },
+);
+
+/**
+ * Anexa ao schema de resposta o header `ETag` (só documentação OpenAPI: o Fastify não valida
+ * headers de resposta e o serializador ignora a chave).
+ */
+export function withEtag<T extends TSchema>(schema: T): T {
+  return {
+    ...schema,
+    headers: {
+      ETag: { type: 'string', description: 'Versão atual do registro entre aspas (`"3"`); use em If-Match.' },
+    },
+  };
+}
+
 /** Respostas de erro comuns, para espalhar em `schema.response`. */
 export const ERROR_RESPONSES = {
   400: ErrorResponseSchema,
   401: ErrorResponseSchema,
   403: ErrorResponseSchema,
   404: ErrorResponseSchema,
-  409: ErrorResponseSchema,
+  409: ConflictResponseSchema,
   428: ErrorResponseSchema,
 } as const;
 

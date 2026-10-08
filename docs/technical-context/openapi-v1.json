@@ -287,6 +287,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -302,7 +303,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -418,7 +419,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -508,6 +517,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -523,7 +533,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -620,7 +630,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -710,6 +728,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -725,7 +744,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -852,7 +871,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -942,6 +969,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -957,7 +985,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -1063,7 +1091,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -1153,6 +1189,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -1168,7 +1205,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -1274,7 +1311,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -1364,6 +1409,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -1379,7 +1425,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -1468,6 +1514,10 @@
                           "branches": {
                             "items": {
                               "properties": {
+                                "active": {
+                                  "description": "Estado do vínculo do cadastro com esta filial.",
+                                  "type": "boolean"
+                                },
                                 "code": {
                                   "type": "string"
                                 },
@@ -1481,7 +1531,8 @@
                               "required": [
                                 "id",
                                 "code",
-                                "name"
+                                "name",
+                                "active"
                               ],
                               "type": "object"
                             },
@@ -1659,6 +1710,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -1674,7 +1726,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -1788,6 +1840,10 @@
                     "branches": {
                       "items": {
                         "properties": {
+                          "active": {
+                            "description": "Estado do vínculo do cadastro com esta filial.",
+                            "type": "boolean"
+                          },
                           "code": {
                             "type": "string"
                           },
@@ -1801,7 +1857,8 @@
                         "required": [
                           "id",
                           "code",
-                          "name"
+                          "name",
+                          "active"
                         ],
                         "type": "object"
                       },
@@ -1876,7 +1933,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -1966,6 +2031,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -1981,7 +2047,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -2056,72 +2122,7 @@
               "application/json": {
                 "schema": {
                   "properties": {
-                    "active": {
-                      "type": "boolean"
-                    },
-                    "branches": {
-                      "items": {
-                        "properties": {
-                          "code": {
-                            "type": "string"
-                          },
-                          "id": {
-                            "type": "integer"
-                          },
-                          "name": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "code",
-                          "name"
-                        ],
-                        "type": "object"
-                      },
-                      "type": "array"
-                    },
-                    "cnpj": {
-                      "type": "string"
-                    },
-                    "createdAt": {
-                      "type": "integer"
-                    },
-                    "deactivatedAt": {
-                      "nullable": true,
-                      "type": "integer"
-                    },
-                    "economicGroupId": {
-                      "nullable": true,
-                      "type": "integer"
-                    },
                     "id": {
-                      "type": "integer"
-                    },
-                    "legalName": {
-                      "type": "string"
-                    },
-                    "municipalityCode": {
-                      "type": "integer"
-                    },
-                    "neighborhood": {
-                      "type": "string"
-                    },
-                    "neighborhoodKey": {
-                      "type": "string"
-                    },
-                    "retailNetworkId": {
-                      "nullable": true,
-                      "type": "integer"
-                    },
-                    "stateCode": {
-                      "type": "integer"
-                    },
-                    "tradeName": {
-                      "nullable": true,
-                      "type": "string"
-                    },
-                    "updatedAt": {
                       "type": "integer"
                     },
                     "version": {
@@ -2130,27 +2131,21 @@
                   },
                   "required": [
                     "id",
-                    "cnpj",
-                    "legalName",
-                    "tradeName",
-                    "stateCode",
-                    "municipalityCode",
-                    "neighborhood",
-                    "neighborhoodKey",
-                    "retailNetworkId",
-                    "economicGroupId",
-                    "branches",
-                    "active",
-                    "deactivatedAt",
-                    "version",
-                    "createdAt",
-                    "updatedAt"
+                    "version"
                   ],
                   "type": "object"
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -2240,6 +2235,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -2255,7 +2251,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -2314,6 +2310,10 @@
                     "branches": {
                       "items": {
                         "properties": {
+                          "active": {
+                            "description": "Estado do vínculo do cadastro com esta filial.",
+                            "type": "boolean"
+                          },
                           "code": {
                             "type": "string"
                           },
@@ -2327,7 +2327,8 @@
                         "required": [
                           "id",
                           "code",
-                          "name"
+                          "name",
+                          "active"
                         ],
                         "type": "object"
                       },
@@ -2402,7 +2403,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -2492,6 +2501,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -2507,7 +2517,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -2629,6 +2639,10 @@
                     "branches": {
                       "items": {
                         "properties": {
+                          "active": {
+                            "description": "Estado do vínculo do cadastro com esta filial.",
+                            "type": "boolean"
+                          },
                           "code": {
                             "type": "string"
                           },
@@ -2642,7 +2656,8 @@
                         "required": [
                           "id",
                           "code",
-                          "name"
+                          "name",
+                          "active"
                         ],
                         "type": "object"
                       },
@@ -2717,7 +2732,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -2807,6 +2830,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -2822,7 +2846,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -2890,6 +2914,10 @@
                     "branches": {
                       "items": {
                         "properties": {
+                          "active": {
+                            "description": "Estado do vínculo do cadastro com esta filial.",
+                            "type": "boolean"
+                          },
                           "code": {
                             "type": "string"
                           },
@@ -2903,7 +2931,8 @@
                         "required": [
                           "id",
                           "code",
-                          "name"
+                          "name",
+                          "active"
                         ],
                         "type": "object"
                       },
@@ -2978,7 +3007,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -3068,6 +3105,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -3083,7 +3121,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -3151,6 +3189,10 @@
                     "branches": {
                       "items": {
                         "properties": {
+                          "active": {
+                            "description": "Estado do vínculo do cadastro com esta filial.",
+                            "type": "boolean"
+                          },
                           "code": {
                             "type": "string"
                           },
@@ -3164,7 +3206,8 @@
                         "required": [
                           "id",
                           "code",
-                          "name"
+                          "name",
+                          "active"
                         ],
                         "type": "object"
                       },
@@ -3239,7 +3282,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -3329,6 +3380,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -3344,7 +3396,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -3570,6 +3622,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -3585,7 +3638,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -3692,7 +3745,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -3782,6 +3843,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -3797,7 +3859,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -3890,7 +3952,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -3980,6 +4050,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -3995,7 +4066,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -4116,7 +4187,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -4206,6 +4285,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -4221,7 +4301,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -4323,7 +4403,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -4413,6 +4501,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -4428,7 +4517,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -4530,7 +4619,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -4620,6 +4717,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -4635,7 +4733,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -4846,6 +4944,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -4861,7 +4960,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -5015,6 +5114,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -5030,7 +5130,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -5299,6 +5399,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -5314,7 +5415,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -5421,7 +5522,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -5511,6 +5620,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -5526,7 +5636,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -5619,7 +5729,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -5709,6 +5827,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -5724,7 +5843,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -5845,7 +5964,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -5935,6 +6062,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -5950,7 +6078,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -6052,7 +6180,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -6142,6 +6278,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -6157,7 +6294,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -6259,7 +6396,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -6349,6 +6494,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -6364,7 +6510,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -6590,6 +6736,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -6605,7 +6752,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -6712,7 +6859,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -6802,6 +6957,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -6817,7 +6973,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -6910,7 +7066,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -7000,6 +7164,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -7015,7 +7180,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -7136,7 +7301,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -7226,6 +7399,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -7241,7 +7415,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -7343,7 +7517,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -7433,6 +7615,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -7448,7 +7631,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -7550,7 +7733,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -7640,6 +7831,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -7655,7 +7847,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -7744,6 +7936,10 @@
                           "branches": {
                             "items": {
                               "properties": {
+                                "active": {
+                                  "description": "Estado do vínculo do cadastro com esta filial.",
+                                  "type": "boolean"
+                                },
                                 "code": {
                                   "type": "string"
                                 },
@@ -7757,7 +7953,8 @@
                               "required": [
                                 "id",
                                 "code",
-                                "name"
+                                "name",
+                                "active"
                               ],
                               "type": "object"
                             },
@@ -7904,6 +8101,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -7919,7 +8117,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -8003,6 +8201,10 @@
                     "branches": {
                       "items": {
                         "properties": {
+                          "active": {
+                            "description": "Estado do vínculo do cadastro com esta filial.",
+                            "type": "boolean"
+                          },
                           "code": {
                             "type": "string"
                           },
@@ -8016,7 +8218,8 @@
                         "required": [
                           "id",
                           "code",
-                          "name"
+                          "name",
+                          "active"
                         ],
                         "type": "object"
                       },
@@ -8060,7 +8263,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -8150,6 +8361,28 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
+          },
+          "428": {
+            "content": {
+              "application/json": {
+                "schema": {
                   "properties": {
                     "error": {
                       "type": "string"
@@ -8166,6 +8399,188 @@
               }
             },
             "description": "Default Response"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "sellers"
+        ]
+      }
+    },
+    "/v1/sellers/by-code/{code}/branches": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "maxLength": 32,
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "branchId": {
+                    "minimum": 1,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "branchId"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "id": {
+                      "type": "integer"
+                    },
+                    "version": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "version"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -8224,6 +8639,10 @@
                     "branches": {
                       "items": {
                         "properties": {
+                          "active": {
+                            "description": "Estado do vínculo do cadastro com esta filial.",
+                            "type": "boolean"
+                          },
                           "code": {
                             "type": "string"
                           },
@@ -8237,7 +8656,8 @@
                         "required": [
                           "id",
                           "code",
-                          "name"
+                          "name",
+                          "active"
                         ],
                         "type": "object"
                       },
@@ -8281,7 +8701,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -8371,6 +8799,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -8386,7 +8815,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -8480,6 +8909,10 @@
                     "branches": {
                       "items": {
                         "properties": {
+                          "active": {
+                            "description": "Estado do vínculo do cadastro com esta filial.",
+                            "type": "boolean"
+                          },
                           "code": {
                             "type": "string"
                           },
@@ -8493,7 +8926,8 @@
                         "required": [
                           "id",
                           "code",
-                          "name"
+                          "name",
+                          "active"
                         ],
                         "type": "object"
                       },
@@ -8537,7 +8971,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -8627,6 +9069,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -8642,7 +9085,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -8710,6 +9153,10 @@
                     "branches": {
                       "items": {
                         "properties": {
+                          "active": {
+                            "description": "Estado do vínculo do cadastro com esta filial.",
+                            "type": "boolean"
+                          },
                           "code": {
                             "type": "string"
                           },
@@ -8723,7 +9170,8 @@
                         "required": [
                           "id",
                           "code",
-                          "name"
+                          "name",
+                          "active"
                         ],
                         "type": "object"
                       },
@@ -8767,7 +9215,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -8857,6 +9313,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -8872,7 +9329,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {
@@ -8940,6 +9397,10 @@
                     "branches": {
                       "items": {
                         "properties": {
+                          "active": {
+                            "description": "Estado do vínculo do cadastro com esta filial.",
+                            "type": "boolean"
+                          },
                           "code": {
                             "type": "string"
                           },
@@ -8953,7 +9414,8 @@
                         "required": [
                           "id",
                           "code",
-                          "name"
+                          "name",
+                          "active"
                         ],
                         "type": "object"
                       },
@@ -8997,7 +9459,15 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "content": {
@@ -9087,6 +9557,7 @@
             "content": {
               "application/json": {
                 "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -9102,7 +9573,7 @@
                 }
               }
             },
-            "description": "Default Response"
+            "description": "Conflito: conflict, customer_exists, seller_exists, version_conflict."
           },
           "428": {
             "content": {

@@ -1,19 +1,22 @@
-import { and, asc, eq, gt, or } from 'drizzle-orm';
+import { and, asc, eq, gt, or, sql } from 'drizzle-orm';
 import { customers, economicGroups, retailNetworks } from '../../db/schema.js';
-import {
-  assertVersion,
-  auditFields,
-  requireVersion,
-  writeActive,
-  type AuditedTable,
-} from '../shared/audit.js';
+import { assertVersion, requireVersion, type AuditedTable } from '../shared/audit.js';
 import { assertAllInScope, intersects, requireAdmin, resolveScopeIds, type Actor } from '../shared/authz.js';
 import { isUniqueViolation, writeTx, type Conn, type Db, type ServiceOptions } from '../shared/db.js';
-import { DomainError, invalid, notFound } from '../shared/errors.js';
+import { DomainError, forbidden, invalid, notFound } from '../shared/errors.js';
 import { findMunicipality } from '../geo/repository.js';
-import { assertBranchesActive, customerLinks, planLinkChange } from '../shared/links.js';
+import {
+  applyActiveTransition,
+  assertBranchesActive,
+  coversAllBranches,
+  customerLinks,
+  effectiveState,
+  planLinkChange,
+  publicBranches,
+  type LinkResult,
+} from '../shared/links.js';
 import { isValidCnpj, normalizeCnpj } from '../shared/cnpj.js';
-import { neighborhoodKey } from '../shared/normalize.js';
+import { neighborhoodKey, searchKey } from '../shared/normalize.js';
 import {
   decodeCursor,
   ListQuerySchema,
@@ -23,7 +26,7 @@ import {
   type Page,
 } from '../shared/pagination.js';
 import type { CrudService } from '../shared/service.js';
-import { likeContains } from '../shared/sql.js';
+import { keyContains, likeContains } from '../shared/sql.js';
 import { cleanOptionalText, cleanText, parseInput } from '../shared/validate.js';
 import {
   CreateCustomerSchema,
@@ -42,9 +45,10 @@ export interface CustomerService extends CrudService<
 > {
   /**
    * Liga um cliente já existente (por CNPJ) a uma filial do ator. Admin; filial no token;
-   * idempotente (já ligado devolve o registro sem incrementar a versão).
+   * idempotente (já ligado não incrementa a versão). Devolve SÓ `{ id, version }`: nenhum dado do
+   * cliente sai por aqui (o ator passa a enxergá-lo pelo GET normal, agora dentro do escopo).
    */
-  linkCustomerToBranchByCnpj(actor: Actor, cnpj: string, branchId: number): CustomerResponse;
+  linkCustomerToBranchByCnpj(actor: Actor, cnpj: string, branchId: number): LinkResult;
 }
 
 const CUSTOMER_EXISTS = 'Já existe cliente com este CNPJ';
@@ -91,20 +95,27 @@ export function createCustomerService(db: Db, opts: ServiceOptions = {}): Custom
       rows.map((r) => r.id),
       scopeIds,
     );
-    return rows.map((r) => ({
-      id: r.id,
-      cnpj: r.cnpj,
-      legalName: r.legalName,
-      tradeName: r.tradeName,
-      stateCode: r.stateCode,
-      municipalityCode: r.municipalityCode,
-      neighborhood: r.neighborhood,
-      neighborhoodKey: r.neighborhoodKey,
-      retailNetworkId: r.retailNetworkId,
-      economicGroupId: r.economicGroupId,
-      branches: links.get(r.id) ?? [],
-      ...auditFields(r),
-    }));
+    return rows.map((r) => {
+      const scoped = links.get(r.id);
+      return {
+        id: r.id,
+        cnpj: r.cnpj,
+        legalName: r.legalName,
+        tradeName: r.tradeName,
+        stateCode: r.stateCode,
+        municipalityCode: r.municipalityCode,
+        neighborhood: r.neighborhood,
+        neighborhoodKey: r.neighborhoodKey,
+        retailNetworkId: r.retailNetworkId,
+        economicGroupId: r.economicGroupId,
+        branches: publicBranches(scoped),
+        // `active`/`deactivatedAt` refletem o estado visto pelo ator (registro global + vínculos do escopo).
+        ...effectiveState(r, scoped),
+        version: r.version,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+      };
+    });
   };
   const respond = (conn: Conn, id: number, scopeIds: number[]): CustomerResponse =>
     toResponses(conn, [findRaw(conn, id)], scopeIds)[0] as CustomerResponse;
@@ -123,13 +134,28 @@ export function createCustomerService(db: Db, opts: ServiceOptions = {}): Custom
     return writeTx(db, (tx) => {
       const scopeIds = resolveScopeIds(tx, actor);
       const row = findVisible(tx, id, scopeIds);
-      if (row.active !== active) {
-        assertVersion(row.version, version);
-        writeActive(tx, customers as unknown as AuditedTable, id, active, actor.sub, now());
-      }
+      // Semântica (vínculo x global) documentada em `applyActiveTransition`.
+      applyActiveTransition({
+        conn: tx,
+        repo: customerLinks,
+        table: customers as unknown as AuditedTable,
+        row,
+        scopeIds,
+        active,
+        expectedVersion: version,
+        sub: actor.sub,
+        at: now(),
+      });
       return respond(tx, id, scopeIds);
     });
   }
+
+  /** `active` filtra pelo estado visto pelo ator: registro ativo E ao menos um vínculo do escopo ativo. */
+  const activeFilter = (active: boolean | undefined, scopeIds: number[]) => {
+    if (active === undefined) return undefined;
+    const effective = customerLinks.effectiveActiveClause(customers.active, customers.id, scopeIds);
+    return active ? effective : sql`not ${effective}`;
+  };
 
   return {
     list(actor, params: ListParams = {}): Page<CustomerResponse> {
@@ -147,11 +173,11 @@ export function createCustomerService(db: Db, opts: ServiceOptions = {}): Custom
           and(
             customerLinks.visibleClause(customers.id, scopeIds),
             after === undefined ? undefined : gt(customers.id, after),
-            p.active === undefined ? undefined : eq(customers.active, p.active),
+            activeFilter(p.active, scopeIds),
             q
               ? or(
-                  likeContains(customers.legalName, q),
-                  likeContains(customers.tradeName, q),
+                  keyContains(customers.legalNameKey, q),
+                  keyContains(customers.tradeNameKey, q),
                   digits ? likeContains(customers.cnpj, digits) : undefined,
                 )
               : undefined,
@@ -193,7 +219,9 @@ export function createCustomerService(db: Db, opts: ServiceOptions = {}): Custom
             .values({
               cnpj,
               legalName,
+              legalNameKey: searchKey(legalName),
               tradeName,
+              tradeNameKey: tradeName === null ? null : searchKey(tradeName),
               ...geo,
               neighborhood,
               neighborhoodKey: neighborhoodKey(neighborhood),
@@ -206,7 +234,7 @@ export function createCustomerService(db: Db, opts: ServiceOptions = {}): Custom
             })
             .returning()
             .get();
-          customerLinks.add(tx, row.id, data.branchIds);
+          customerLinks.add(tx, row.id, data.branchIds, actor.sub, at);
           return toResponses(tx, [row], scopeIds)[0] as CustomerResponse;
         } catch (err) {
           if (isUniqueViolation(err)) throw new DomainError('customer_exists', CUSTOMER_EXISTS);
@@ -224,6 +252,25 @@ export function createCustomerService(db: Db, opts: ServiceOptions = {}): Custom
         const row = findVisible(tx, id, scopeIds);
         assertVersion(row.version, version);
 
+        // Dados compartilhados (valem para todas as filiais) exigem cobertura total do registro.
+        // Só conta como alteração o que muda de fato: reenviar o mesmo valor não exige nada.
+        const legalName =
+          data.legalName === undefined ? row.legalName : cleanText(data.legalName, 'legalName');
+        const tradeName = data.tradeName === undefined ? row.tradeName : cleanOptionalText(data.tradeName);
+        const neighborhood =
+          data.neighborhood === undefined ? row.neighborhood : cleanText(data.neighborhood, 'neighborhood');
+        const sharedChanged =
+          legalName !== row.legalName ||
+          tradeName !== row.tradeName ||
+          neighborhood !== row.neighborhood ||
+          (data.municipalityCode !== undefined && data.municipalityCode !== row.municipalityCode) ||
+          (data.stateCode !== undefined && data.stateCode !== row.stateCode) ||
+          (data.retailNetworkId !== undefined && data.retailNetworkId !== row.retailNetworkId) ||
+          (data.economicGroupId !== undefined && data.economicGroupId !== row.economicGroupId);
+        if (sharedChanged && !coversAllBranches(customerLinks.branchIdsOf(tx, id), scopeIds)) {
+          throw forbidden('Alterar dados compartilhados exige todas as filiais do cadastro no token');
+        }
+
         const geo =
           data.municipalityCode !== undefined || data.stateCode !== undefined
             ? resolveGeo(tx, data.municipalityCode ?? row.municipalityCode, data.stateCode)
@@ -235,24 +282,25 @@ export function createCustomerService(db: Db, opts: ServiceOptions = {}): Custom
         if (data.economicGroupId != null && data.economicGroupId !== row.economicGroupId) {
           requireActiveReference(tx, 'economicGroup', data.economicGroupId);
         }
+        const at = now();
         if (data.branchIds !== undefined) {
           const plan = planLinkChange(customerLinks, tx, id, data.branchIds, scopeIds);
           customerLinks.remove(tx, id, plan.toRemove);
-          customerLinks.add(tx, id, plan.toAdd);
+          customerLinks.add(tx, id, plan.toAdd, actor.sub, at);
         }
-        const neighborhood =
-          data.neighborhood === undefined ? row.neighborhood : cleanText(data.neighborhood, 'neighborhood');
         tx.update(customers)
           .set({
-            legalName: data.legalName === undefined ? row.legalName : cleanText(data.legalName, 'legalName'),
-            tradeName: data.tradeName === undefined ? row.tradeName : cleanOptionalText(data.tradeName),
+            legalName,
+            legalNameKey: searchKey(legalName),
+            tradeName,
+            tradeNameKey: tradeName === null ? null : searchKey(tradeName),
             ...geo,
             neighborhood,
             neighborhoodKey: neighborhoodKey(neighborhood),
             retailNetworkId: data.retailNetworkId === undefined ? row.retailNetworkId : data.retailNetworkId,
             economicGroupId: data.economicGroupId === undefined ? row.economicGroupId : data.economicGroupId,
             version: row.version + 1,
-            updatedAt: now(),
+            updatedAt: at,
             updatedBy: actor.sub,
           })
           .where(eq(customers.id, id))
@@ -272,15 +320,17 @@ export function createCustomerService(db: Db, opts: ServiceOptions = {}): Custom
         assertAllInScope([branchId], scopeIds);
         const row = tx.select().from(customers).where(eq(customers.cnpj, cnpj)).get();
         if (!row) throw notFound();
-        if (!customerLinks.branchIdsOf(tx, row.id).includes(branchId)) {
-          assertBranchesActive(tx, [branchId]);
-          customerLinks.add(tx, row.id, [branchId]);
-          tx.update(customers)
-            .set({ version: row.version + 1, updatedAt: now(), updatedBy: actor.sub })
-            .where(eq(customers.id, row.id))
-            .run();
+        if (customerLinks.branchIdsOf(tx, row.id).includes(branchId)) {
+          return { id: row.id, version: row.version };
         }
-        return respond(tx, row.id, scopeIds);
+        assertBranchesActive(tx, [branchId]);
+        const at = now();
+        customerLinks.add(tx, row.id, [branchId], actor.sub, at);
+        tx.update(customers)
+          .set({ version: row.version + 1, updatedAt: at, updatedBy: actor.sub })
+          .where(eq(customers.id, row.id))
+          .run();
+        return { id: row.id, version: row.version + 1 };
       });
     },
   };

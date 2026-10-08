@@ -24,7 +24,7 @@ describe('vendedores', () => {
   it('cria só com código, nome e filiais; rejeita campos pessoais extras', () => {
     const s = svc.create(adminSer, { code: ' V1 ', name: ' Maria  Silva ', branchIds: [ser] });
     expect(s).toMatchObject({ code: 'V1', name: 'Maria Silva', active: true, version: 1 });
-    expect(s.branches).toEqual([{ id: ser, code: 'SER', name: 'Filial SER' }]);
+    expect(s.branches).toEqual([{ id: ser, code: 'SER', name: 'Filial SER', active: true }]);
     expect(
       codeOf(() =>
         svc.create(adminSer, { code: 'V2', name: 'X', branchIds: [ser], email: 'a@b.c' } as never),
@@ -45,7 +45,9 @@ describe('vendedores', () => {
   it('código único mesmo inativo', () => {
     const s = svc.create(adminSer, { code: 'V1', name: 'X', branchIds: [ser] });
     svc.deactivate(adminSer, s.id, 1);
-    expect(codeOf(() => svc.create(adminSer, { code: 'V1', name: 'Y', branchIds: [ser] }))).toBe('conflict');
+    expect(codeOf(() => svc.create(adminSer, { code: 'V1', name: 'Y', branchIds: [ser] }))).toBe(
+      'seller_exists',
+    );
   });
 
   it('escopo por vínculo: vendedor só da filial B é not_found para A', () => {

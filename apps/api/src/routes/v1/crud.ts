@@ -2,7 +2,15 @@ import { Type, type TSchema } from '@sinclair/typebox';
 import type { FastifyInstance } from 'fastify';
 import { ListQuerySchema, PageSchema, type ListParams } from '../../domain/shared/pagination.js';
 import type { CrudService } from '../../domain/shared/service.js';
-import { actorOf, ERROR_RESPONSES, IdParamsSchema, parseIfMatch, sendDomainError, setEtag } from './http.js';
+import {
+  actorOf,
+  ERROR_RESPONSES,
+  IdParamsSchema,
+  parseIfMatch,
+  sendDomainError,
+  setEtag,
+  withEtag,
+} from './http.js';
 
 export interface CrudRoutesOptions<R extends { version: number }, C, U> {
   /** Caminho do recurso, ex.: `/branches`. */
@@ -51,7 +59,7 @@ export function registerCrudRoutes<R extends { version: number }, C, U>(
       schema: {
         tags,
         params: IdParamsSchema,
-        response: { 200: o.responseSchema, ...ERROR_RESPONSES },
+        response: { 200: withEtag(o.responseSchema), ...ERROR_RESPONSES },
       },
     },
     async (request, reply) => {
@@ -73,7 +81,7 @@ export function registerCrudRoutes<R extends { version: number }, C, U>(
       schema: {
         tags,
         body: o.createSchema,
-        response: { 201: o.responseSchema, ...ERROR_RESPONSES },
+        response: { 201: withEtag(o.responseSchema), ...ERROR_RESPONSES },
       },
     },
     async (request, reply) => {
@@ -96,7 +104,7 @@ export function registerCrudRoutes<R extends { version: number }, C, U>(
         params: IdParamsSchema,
         headers: ifMatch,
         body: o.updateSchema,
-        response: { 200: o.responseSchema, ...ERROR_RESPONSES },
+        response: { 200: withEtag(o.responseSchema), ...ERROR_RESPONSES },
       },
     },
     async (request, reply) => {
@@ -125,7 +133,7 @@ export function registerCrudRoutes<R extends { version: number }, C, U>(
           tags,
           params: IdParamsSchema,
           headers: ifMatch,
-          response: { 200: o.responseSchema, ...ERROR_RESPONSES },
+          response: { 200: withEtag(o.responseSchema), ...ERROR_RESPONSES },
         },
       },
       async (request, reply) => {
