@@ -10,6 +10,8 @@ export type DomainErrorCode =
   | 'portfolio_has_conflicts'
   | 'link_conflict'
   | 'version_conflict'
+  | 'import_not_ready'
+  | 'too_many_imports'
   | 'precondition_required';
 
 /** Status HTTP de cada código (usado pelas rotas das próximas fases). */
@@ -25,6 +27,8 @@ export const DOMAIN_ERROR_STATUS: Record<DomainErrorCode, number> = {
   portfolio_has_conflicts: 409,
   link_conflict: 409,
   version_conflict: 409,
+  import_not_ready: 409,
+  too_many_imports: 409,
   precondition_required: 428,
 };
 

@@ -1,0 +1,2306 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "7e6105de-165a-43bc-908f-aea1d3c8b88c",
+  "prevId": "d8261857-6d40-4eb5-b69c-674d3abdce0c",
+  "tables": {
+    "branches": {
+      "name": "branches",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name_key": {
+          "name": "name_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "municipality_code": {
+          "name": "municipality_code",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "active": {
+          "name": "active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "deactivated_at": {
+          "name": "deactivated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "branches_code_unique": {
+          "name": "branches_code_unique",
+          "columns": ["code"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "branches_municipality_code_municipalities_ibge_code_fk": {
+          "name": "branches_municipality_code_municipalities_ibge_code_fk",
+          "tableFrom": "branches",
+          "tableTo": "municipalities",
+          "columnsFrom": ["municipality_code"],
+          "columnsTo": ["ibge_code"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "customer_branches": {
+      "name": "customer_branches",
+      "columns": {
+        "customer_id": {
+          "name": "customer_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "branch_id": {
+          "name": "branch_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "active": {
+          "name": "active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "deactivated_at": {
+          "name": "deactivated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "customer_branches_branch_id_customer_id_idx": {
+          "name": "customer_branches_branch_id_customer_id_idx",
+          "columns": ["branch_id", "customer_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "customer_branches_customer_id_customers_id_fk": {
+          "name": "customer_branches_customer_id_customers_id_fk",
+          "tableFrom": "customer_branches",
+          "tableTo": "customers",
+          "columnsFrom": ["customer_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "customer_branches_branch_id_branches_id_fk": {
+          "name": "customer_branches_branch_id_branches_id_fk",
+          "tableFrom": "customer_branches",
+          "tableTo": "branches",
+          "columnsFrom": ["branch_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "customer_branches_customer_id_branch_id_pk": {
+          "columns": ["customer_id", "branch_id"],
+          "name": "customer_branches_customer_id_branch_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "customers": {
+      "name": "customers",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "cnpj": {
+          "name": "cnpj",
+          "type": "text(14)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "legal_name": {
+          "name": "legal_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "legal_name_key": {
+          "name": "legal_name_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "trade_name": {
+          "name": "trade_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "trade_name_key": {
+          "name": "trade_name_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "state_code": {
+          "name": "state_code",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "municipality_code": {
+          "name": "municipality_code",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "neighborhood": {
+          "name": "neighborhood",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "neighborhood_key": {
+          "name": "neighborhood_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "retail_network_id": {
+          "name": "retail_network_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "economic_group_id": {
+          "name": "economic_group_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "active": {
+          "name": "active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "deactivated_at": {
+          "name": "deactivated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "customers_cnpj_unique": {
+          "name": "customers_cnpj_unique",
+          "columns": ["cnpj"],
+          "isUnique": true
+        },
+        "customers_municipality_neighborhood_idx": {
+          "name": "customers_municipality_neighborhood_idx",
+          "columns": ["municipality_code", "neighborhood_key"],
+          "isUnique": false
+        },
+        "customers_state_code_idx": {
+          "name": "customers_state_code_idx",
+          "columns": ["state_code"],
+          "isUnique": false
+        },
+        "customers_retail_network_id_idx": {
+          "name": "customers_retail_network_id_idx",
+          "columns": ["retail_network_id"],
+          "isUnique": false
+        },
+        "customers_economic_group_id_idx": {
+          "name": "customers_economic_group_id_idx",
+          "columns": ["economic_group_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "customers_state_code_states_ibge_code_fk": {
+          "name": "customers_state_code_states_ibge_code_fk",
+          "tableFrom": "customers",
+          "tableTo": "states",
+          "columnsFrom": ["state_code"],
+          "columnsTo": ["ibge_code"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "customers_municipality_code_municipalities_ibge_code_fk": {
+          "name": "customers_municipality_code_municipalities_ibge_code_fk",
+          "tableFrom": "customers",
+          "tableTo": "municipalities",
+          "columnsFrom": ["municipality_code"],
+          "columnsTo": ["ibge_code"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "customers_retail_network_id_retail_networks_id_fk": {
+          "name": "customers_retail_network_id_retail_networks_id_fk",
+          "tableFrom": "customers",
+          "tableTo": "retail_networks",
+          "columnsFrom": ["retail_network_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "customers_economic_group_id_economic_groups_id_fk": {
+          "name": "customers_economic_group_id_economic_groups_id_fk",
+          "tableFrom": "customers",
+          "tableTo": "economic_groups",
+          "columnsFrom": ["economic_group_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "economic_groups": {
+      "name": "economic_groups",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name_key": {
+          "name": "name_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "active": {
+          "name": "active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "deactivated_at": {
+          "name": "deactivated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "economic_groups_code_unique": {
+          "name": "economic_groups_code_unique",
+          "columns": ["code"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "import_job_lines": {
+      "name": "import_job_lines",
+      "columns": {
+        "job_id": {
+          "name": "job_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "line": {
+          "name": "line",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "activation": {
+          "name": "activation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "error_code": {
+          "name": "error_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "warning": {
+          "name": "warning",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "target_id": {
+          "name": "target_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "target_version": {
+          "name": "target_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "import_job_lines_job_id_import_jobs_id_fk": {
+          "name": "import_job_lines_job_id_import_jobs_id_fk",
+          "tableFrom": "import_job_lines",
+          "tableTo": "import_jobs",
+          "columnsFrom": ["job_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "import_job_lines_job_id_line_pk": {
+          "columns": ["job_id", "line"],
+          "name": "import_job_lines_job_id_line_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "import_job_lines_status_check": {
+          "name": "import_job_lines_status_check",
+          "value": "status in ('valid', 'invalid', 'applied', 'failed')"
+        }
+      }
+    },
+    "import_jobs": {
+      "name": "import_jobs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "layout": {
+          "name": "layout",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "file_sha256": {
+          "name": "file_sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "file_bytes": {
+          "name": "file_bytes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content": {
+          "name": "content",
+          "type": "blob",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "total_rows": {
+          "name": "total_rows",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "processed_rows": {
+          "name": "processed_rows",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "error_rows": {
+          "name": "error_rows",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "counts": {
+          "name": "counts",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{}'"
+        },
+        "file_error": {
+          "name": "file_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "file_error_line": {
+          "name": "file_error_line",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "validated_at": {
+          "name": "validated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "confirmed_by": {
+          "name": "confirmed_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "confirmed_at": {
+          "name": "confirmed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "import_jobs_created_by_id_idx": {
+          "name": "import_jobs_created_by_id_idx",
+          "columns": ["created_by", "id"],
+          "isUnique": false
+        },
+        "import_jobs_status_idx": {
+          "name": "import_jobs_status_idx",
+          "columns": ["status"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "import_jobs_status_check": {
+          "name": "import_jobs_status_check",
+          "value": "status in ('validating', 'validated', 'invalid', 'applying', 'applied', 'partially_applied', 'failed', 'cancelled', 'expired', 'interrupted')"
+        }
+      }
+    },
+    "municipalities": {
+      "name": "municipalities",
+      "columns": {
+        "ibge_code": {
+          "name": "ibge_code",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "state_code": {
+          "name": "state_code",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "municipalities_state_code_name_idx": {
+          "name": "municipalities_state_code_name_idx",
+          "columns": ["state_code", "name"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "municipalities_state_code_states_ibge_code_fk": {
+          "name": "municipalities_state_code_states_ibge_code_fk",
+          "tableFrom": "municipalities",
+          "tableTo": "states",
+          "columnsFrom": ["state_code"],
+          "columnsTo": ["ibge_code"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "portfolio_assignments": {
+      "name": "portfolio_assignments",
+      "columns": {
+        "portfolio_id": {
+          "name": "portfolio_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "customer_id": {
+          "name": "customer_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "product_subgroup_id": {
+          "name": "product_subgroup_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "seller_id": {
+          "name": "seller_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "portfolio_assignments_portfolio_subgroup_seller_idx": {
+          "name": "portfolio_assignments_portfolio_subgroup_seller_idx",
+          "columns": ["portfolio_id", "product_subgroup_id", "seller_id"],
+          "isUnique": false
+        },
+        "portfolio_assignments_customer_id_idx": {
+          "name": "portfolio_assignments_customer_id_idx",
+          "columns": ["customer_id"],
+          "isUnique": false
+        },
+        "portfolio_assignments_seller_id_idx": {
+          "name": "portfolio_assignments_seller_id_idx",
+          "columns": ["seller_id"],
+          "isUnique": false
+        },
+        "portfolio_assignments_product_subgroup_id_idx": {
+          "name": "portfolio_assignments_product_subgroup_id_idx",
+          "columns": ["product_subgroup_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "portfolio_assignments_portfolio_id_portfolios_id_fk": {
+          "name": "portfolio_assignments_portfolio_id_portfolios_id_fk",
+          "tableFrom": "portfolio_assignments",
+          "tableTo": "portfolios",
+          "columnsFrom": ["portfolio_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "portfolio_assignments_customer_id_customers_id_fk": {
+          "name": "portfolio_assignments_customer_id_customers_id_fk",
+          "tableFrom": "portfolio_assignments",
+          "tableTo": "customers",
+          "columnsFrom": ["customer_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "portfolio_assignments_product_subgroup_id_product_subgroups_id_fk": {
+          "name": "portfolio_assignments_product_subgroup_id_product_subgroups_id_fk",
+          "tableFrom": "portfolio_assignments",
+          "tableTo": "product_subgroups",
+          "columnsFrom": ["product_subgroup_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "portfolio_assignments_seller_id_sellers_id_fk": {
+          "name": "portfolio_assignments_seller_id_sellers_id_fk",
+          "tableFrom": "portfolio_assignments",
+          "tableTo": "sellers",
+          "columnsFrom": ["seller_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "portfolio_assignments_portfolio_id_customer_id_product_subgroup_id_pk": {
+          "columns": ["portfolio_id", "customer_id", "product_subgroup_id"],
+          "name": "portfolio_assignments_portfolio_id_customer_id_product_subgroup_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "portfolio_customer_overrides": {
+      "name": "portfolio_customer_overrides",
+      "columns": {
+        "portfolio_id": {
+          "name": "portfolio_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "customer_id": {
+          "name": "customer_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "portfolio_customer_overrides_customer_id_idx": {
+          "name": "portfolio_customer_overrides_customer_id_idx",
+          "columns": ["customer_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "portfolio_customer_overrides_portfolio_id_portfolios_id_fk": {
+          "name": "portfolio_customer_overrides_portfolio_id_portfolios_id_fk",
+          "tableFrom": "portfolio_customer_overrides",
+          "tableTo": "portfolios",
+          "columnsFrom": ["portfolio_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "portfolio_customer_overrides_customer_id_customers_id_fk": {
+          "name": "portfolio_customer_overrides_customer_id_customers_id_fk",
+          "tableFrom": "portfolio_customer_overrides",
+          "tableTo": "customers",
+          "columnsFrom": ["customer_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "portfolio_customer_overrides_portfolio_id_customer_id_pk": {
+          "columns": ["portfolio_id", "customer_id"],
+          "name": "portfolio_customer_overrides_portfolio_id_customer_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "portfolio_customer_overrides_kind_check": {
+          "name": "portfolio_customer_overrides_kind_check",
+          "value": "\"portfolio_customer_overrides\".\"kind\" in ('include', 'exclude')"
+        }
+      }
+    },
+    "portfolio_economic_groups": {
+      "name": "portfolio_economic_groups",
+      "columns": {
+        "portfolio_id": {
+          "name": "portfolio_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "economic_group_id": {
+          "name": "economic_group_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "portfolio_economic_groups_portfolio_id_portfolios_id_fk": {
+          "name": "portfolio_economic_groups_portfolio_id_portfolios_id_fk",
+          "tableFrom": "portfolio_economic_groups",
+          "tableTo": "portfolios",
+          "columnsFrom": ["portfolio_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "portfolio_economic_groups_economic_group_id_economic_groups_id_fk": {
+          "name": "portfolio_economic_groups_economic_group_id_economic_groups_id_fk",
+          "tableFrom": "portfolio_economic_groups",
+          "tableTo": "economic_groups",
+          "columnsFrom": ["economic_group_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "portfolio_economic_groups_portfolio_id_economic_group_id_pk": {
+          "columns": ["portfolio_id", "economic_group_id"],
+          "name": "portfolio_economic_groups_portfolio_id_economic_group_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "portfolio_link_events": {
+      "name": "portfolio_link_events",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "link_id": {
+          "name": "link_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "portfolio_id": {
+          "name": "portfolio_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "branch_id": {
+          "name": "branch_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "customer_id": {
+          "name": "customer_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "product_subgroup_id": {
+          "name": "product_subgroup_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "seller_id": {
+          "name": "seller_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "portfolio_link_events_branch_id_idx": {
+          "name": "portfolio_link_events_branch_id_idx",
+          "columns": ["branch_id", "id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "portfolio_link_events_link_id_portfolio_links_id_fk": {
+          "name": "portfolio_link_events_link_id_portfolio_links_id_fk",
+          "tableFrom": "portfolio_link_events",
+          "tableTo": "portfolio_links",
+          "columnsFrom": ["link_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "portfolio_link_events_kind_check": {
+          "name": "portfolio_link_events_kind_check",
+          "value": "\"portfolio_link_events\".\"kind\" in ('created', 'ended')"
+        }
+      }
+    },
+    "portfolio_links": {
+      "name": "portfolio_links",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "portfolio_id": {
+          "name": "portfolio_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "branch_id": {
+          "name": "branch_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "customer_id": {
+          "name": "customer_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "product_subgroup_id": {
+          "name": "product_subgroup_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "seller_id": {
+          "name": "seller_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "active": {
+          "name": "active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "valid_from": {
+          "name": "valid_from",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "valid_to": {
+          "name": "valid_to",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "ended_by": {
+          "name": "ended_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "portfolio_links_active_cell_unique": {
+          "name": "portfolio_links_active_cell_unique",
+          "columns": ["branch_id", "customer_id", "product_subgroup_id"],
+          "isUnique": true,
+          "where": "\"portfolio_links\".\"active\" = 1"
+        },
+        "portfolio_links_portfolio_active_idx": {
+          "name": "portfolio_links_portfolio_active_idx",
+          "columns": ["portfolio_id", "active"],
+          "isUnique": false
+        },
+        "portfolio_links_seller_id_idx": {
+          "name": "portfolio_links_seller_id_idx",
+          "columns": ["seller_id"],
+          "isUnique": false
+        },
+        "portfolio_links_portfolio_id_idx": {
+          "name": "portfolio_links_portfolio_id_idx",
+          "columns": ["portfolio_id"],
+          "isUnique": false
+        },
+        "portfolio_links_portfolio_customer_idx": {
+          "name": "portfolio_links_portfolio_customer_idx",
+          "columns": ["portfolio_id", "customer_id"],
+          "isUnique": false
+        },
+        "portfolio_links_customer_id_idx": {
+          "name": "portfolio_links_customer_id_idx",
+          "columns": ["customer_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "portfolio_links_portfolio_id_portfolios_id_fk": {
+          "name": "portfolio_links_portfolio_id_portfolios_id_fk",
+          "tableFrom": "portfolio_links",
+          "tableTo": "portfolios",
+          "columnsFrom": ["portfolio_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "portfolio_links_branch_id_branches_id_fk": {
+          "name": "portfolio_links_branch_id_branches_id_fk",
+          "tableFrom": "portfolio_links",
+          "tableTo": "branches",
+          "columnsFrom": ["branch_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "portfolio_links_customer_id_customers_id_fk": {
+          "name": "portfolio_links_customer_id_customers_id_fk",
+          "tableFrom": "portfolio_links",
+          "tableTo": "customers",
+          "columnsFrom": ["customer_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "portfolio_links_product_subgroup_id_product_subgroups_id_fk": {
+          "name": "portfolio_links_product_subgroup_id_product_subgroups_id_fk",
+          "tableFrom": "portfolio_links",
+          "tableTo": "product_subgroups",
+          "columnsFrom": ["product_subgroup_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "portfolio_links_seller_id_sellers_id_fk": {
+          "name": "portfolio_links_seller_id_sellers_id_fk",
+          "tableFrom": "portfolio_links",
+          "tableTo": "sellers",
+          "columnsFrom": ["seller_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "portfolio_regions": {
+      "name": "portfolio_regions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "portfolio_id": {
+          "name": "portfolio_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "level": {
+          "name": "level",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "state_code": {
+          "name": "state_code",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "municipality_code": {
+          "name": "municipality_code",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "neighborhood_key": {
+          "name": "neighborhood_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "neighborhood_label": {
+          "name": "neighborhood_label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "region_key": {
+          "name": "region_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "generated": {
+            "as": "(\"level\" || ':' || \"state_code\" || ':' || coalesce(\"municipality_code\", 0) || ':' || coalesce(\"neighborhood_key\", ''))",
+            "type": "stored"
+          }
+        }
+      },
+      "indexes": {
+        "portfolio_regions_portfolio_id_region_key_unique": {
+          "name": "portfolio_regions_portfolio_id_region_key_unique",
+          "columns": ["portfolio_id", "region_key"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "portfolio_regions_portfolio_id_portfolios_id_fk": {
+          "name": "portfolio_regions_portfolio_id_portfolios_id_fk",
+          "tableFrom": "portfolio_regions",
+          "tableTo": "portfolios",
+          "columnsFrom": ["portfolio_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "portfolio_regions_state_code_states_ibge_code_fk": {
+          "name": "portfolio_regions_state_code_states_ibge_code_fk",
+          "tableFrom": "portfolio_regions",
+          "tableTo": "states",
+          "columnsFrom": ["state_code"],
+          "columnsTo": ["ibge_code"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "portfolio_regions_municipality_code_municipalities_ibge_code_fk": {
+          "name": "portfolio_regions_municipality_code_municipalities_ibge_code_fk",
+          "tableFrom": "portfolio_regions",
+          "tableTo": "municipalities",
+          "columnsFrom": ["municipality_code"],
+          "columnsTo": ["ibge_code"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "portfolio_regions_level_check": {
+          "name": "portfolio_regions_level_check",
+          "value": "(\"portfolio_regions\".\"level\" = 'state' and \"portfolio_regions\".\"municipality_code\" is null and \"portfolio_regions\".\"neighborhood_key\" is null and \"portfolio_regions\".\"neighborhood_label\" is null)\n        or (\"portfolio_regions\".\"level\" = 'municipality' and \"portfolio_regions\".\"municipality_code\" is not null and \"portfolio_regions\".\"neighborhood_key\" is null and \"portfolio_regions\".\"neighborhood_label\" is null)\n        or (\"portfolio_regions\".\"level\" = 'neighborhood' and \"portfolio_regions\".\"municipality_code\" is not null and \"portfolio_regions\".\"neighborhood_key\" is not null and \"portfolio_regions\".\"neighborhood_key\" <> '' and \"portfolio_regions\".\"neighborhood_label\" is not null)"
+        }
+      }
+    },
+    "portfolio_retail_networks": {
+      "name": "portfolio_retail_networks",
+      "columns": {
+        "portfolio_id": {
+          "name": "portfolio_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "retail_network_id": {
+          "name": "retail_network_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "portfolio_retail_networks_portfolio_id_portfolios_id_fk": {
+          "name": "portfolio_retail_networks_portfolio_id_portfolios_id_fk",
+          "tableFrom": "portfolio_retail_networks",
+          "tableTo": "portfolios",
+          "columnsFrom": ["portfolio_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "portfolio_retail_networks_retail_network_id_retail_networks_id_fk": {
+          "name": "portfolio_retail_networks_retail_network_id_retail_networks_id_fk",
+          "tableFrom": "portfolio_retail_networks",
+          "tableTo": "retail_networks",
+          "columnsFrom": ["retail_network_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "portfolio_retail_networks_portfolio_id_retail_network_id_pk": {
+          "columns": ["portfolio_id", "retail_network_id"],
+          "name": "portfolio_retail_networks_portfolio_id_retail_network_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "portfolio_sellers": {
+      "name": "portfolio_sellers",
+      "columns": {
+        "portfolio_id": {
+          "name": "portfolio_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "seller_id": {
+          "name": "seller_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "product_subgroup_id": {
+          "name": "product_subgroup_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "portfolio_sellers_seller_id_idx": {
+          "name": "portfolio_sellers_seller_id_idx",
+          "columns": ["seller_id"],
+          "isUnique": false
+        },
+        "portfolio_sellers_product_subgroup_id_idx": {
+          "name": "portfolio_sellers_product_subgroup_id_idx",
+          "columns": ["product_subgroup_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "portfolio_sellers_portfolio_id_portfolios_id_fk": {
+          "name": "portfolio_sellers_portfolio_id_portfolios_id_fk",
+          "tableFrom": "portfolio_sellers",
+          "tableTo": "portfolios",
+          "columnsFrom": ["portfolio_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "portfolio_sellers_seller_id_sellers_id_fk": {
+          "name": "portfolio_sellers_seller_id_sellers_id_fk",
+          "tableFrom": "portfolio_sellers",
+          "tableTo": "sellers",
+          "columnsFrom": ["seller_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "portfolio_sellers_product_subgroup_id_product_subgroups_id_fk": {
+          "name": "portfolio_sellers_product_subgroup_id_product_subgroups_id_fk",
+          "tableFrom": "portfolio_sellers",
+          "tableTo": "product_subgroups",
+          "columnsFrom": ["product_subgroup_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "portfolio_sellers_portfolio_id_seller_id_product_subgroup_id_pk": {
+          "columns": ["portfolio_id", "seller_id", "product_subgroup_id"],
+          "name": "portfolio_sellers_portfolio_id_seller_id_product_subgroup_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "portfolio_types": {
+      "name": "portfolio_types",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name_key": {
+          "name": "name_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "active": {
+          "name": "active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "deactivated_at": {
+          "name": "deactivated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "portfolio_types_code_unique": {
+          "name": "portfolio_types_code_unique",
+          "columns": ["code"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "portfolios": {
+      "name": "portfolios",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "branch_id": {
+          "name": "branch_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name_key": {
+          "name": "name_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "responsible_sub": {
+          "name": "responsible_sub",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "portfolio_type_id": {
+          "name": "portfolio_type_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'draft'"
+        },
+        "finalized_at": {
+          "name": "finalized_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "finalized_by": {
+          "name": "finalized_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "active": {
+          "name": "active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "deactivated_at": {
+          "name": "deactivated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "portfolios_responsible_sub_idx": {
+          "name": "portfolios_responsible_sub_idx",
+          "columns": ["responsible_sub"],
+          "isUnique": false
+        },
+        "portfolios_portfolio_type_id_idx": {
+          "name": "portfolios_portfolio_type_id_idx",
+          "columns": ["portfolio_type_id"],
+          "isUnique": false
+        },
+        "portfolios_branch_id_name_key_unique": {
+          "name": "portfolios_branch_id_name_key_unique",
+          "columns": ["branch_id", "name_key"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "portfolios_branch_id_branches_id_fk": {
+          "name": "portfolios_branch_id_branches_id_fk",
+          "tableFrom": "portfolios",
+          "tableTo": "branches",
+          "columnsFrom": ["branch_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "portfolios_portfolio_type_id_portfolio_types_id_fk": {
+          "name": "portfolios_portfolio_type_id_portfolio_types_id_fk",
+          "tableFrom": "portfolios",
+          "tableTo": "portfolio_types",
+          "columnsFrom": ["portfolio_type_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "portfolios_status_check": {
+          "name": "portfolios_status_check",
+          "value": "\"portfolios\".\"status\" in ('draft', 'active')"
+        }
+      }
+    },
+    "product_subgroups": {
+      "name": "product_subgroups",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name_key": {
+          "name": "name_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "active": {
+          "name": "active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "deactivated_at": {
+          "name": "deactivated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "product_subgroups_code_unique": {
+          "name": "product_subgroups_code_unique",
+          "columns": ["code"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "retail_networks": {
+      "name": "retail_networks",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name_key": {
+          "name": "name_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "active": {
+          "name": "active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "deactivated_at": {
+          "name": "deactivated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "retail_networks_code_unique": {
+          "name": "retail_networks_code_unique",
+          "columns": ["code"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "seller_branches": {
+      "name": "seller_branches",
+      "columns": {
+        "seller_id": {
+          "name": "seller_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "branch_id": {
+          "name": "branch_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "active": {
+          "name": "active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "deactivated_at": {
+          "name": "deactivated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "seller_branches_branch_id_seller_id_idx": {
+          "name": "seller_branches_branch_id_seller_id_idx",
+          "columns": ["branch_id", "seller_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "seller_branches_seller_id_sellers_id_fk": {
+          "name": "seller_branches_seller_id_sellers_id_fk",
+          "tableFrom": "seller_branches",
+          "tableTo": "sellers",
+          "columnsFrom": ["seller_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "seller_branches_branch_id_branches_id_fk": {
+          "name": "seller_branches_branch_id_branches_id_fk",
+          "tableFrom": "seller_branches",
+          "tableTo": "branches",
+          "columnsFrom": ["branch_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "seller_branches_seller_id_branch_id_pk": {
+          "columns": ["seller_id", "branch_id"],
+          "name": "seller_branches_seller_id_branch_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "sellers": {
+      "name": "sellers",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name_key": {
+          "name": "name_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "user_sub": {
+          "name": "user_sub",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "active": {
+          "name": "active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "deactivated_at": {
+          "name": "deactivated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "sellers_code_unique": {
+          "name": "sellers_code_unique",
+          "columns": ["code"],
+          "isUnique": true
+        },
+        "sellers_user_sub_unique": {
+          "name": "sellers_user_sub_unique",
+          "columns": ["user_sub"],
+          "isUnique": true,
+          "where": "\"sellers\".\"user_sub\" is not null"
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "service_meta": {
+      "name": "service_meta",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "states": {
+      "name": "states",
+      "columns": {
+        "ibge_code": {
+          "name": "ibge_code",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "uf": {
+          "name": "uf",
+          "type": "text(2)",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "states_uf_unique": {
+          "name": "states_uf_unique",
+          "columns": ["uf"],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

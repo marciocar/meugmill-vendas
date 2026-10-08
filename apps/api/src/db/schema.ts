@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  blob,
   check,
   index,
   integer,
@@ -416,6 +417,85 @@ export const portfolioLinkEvents = sqliteTable(
   ],
 );
 
+// Jobs de importação de CSV (E10). Auditoria: quem, quando, layout, hash e contagens. O conteúdo do
+// arquivo (`content`) é apagado ao terminar (LGPD); o relatório por linha nunca guarda o conteúdo da linha.
+export const IMPORT_JOB_STATUSES = [
+  'validating',
+  'validated',
+  'invalid',
+  'applying',
+  'applied',
+  'partially_applied',
+  'failed',
+  'cancelled',
+  'expired',
+  'interrupted',
+] as const;
+
+export const importJobs = sqliteTable(
+  'import_jobs',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    layout: text('layout').notNull(),
+    status: text('status', { enum: IMPORT_JOB_STATUSES }).notNull(),
+    createdBy: text('created_by').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    fileSha256: text('file_sha256').notNull(),
+    fileBytes: integer('file_bytes').notNull(),
+    content: blob('content', { mode: 'buffer' }),
+    totalRows: integer('total_rows').notNull().default(0),
+    processedRows: integer('processed_rows').notNull().default(0),
+    errorRows: integer('error_rows').notNull().default(0),
+    // JSON: contagens por ação (create, update...) e da unidade (linksEnded...).
+    counts: text('counts').notNull().default('{}'),
+    fileError: text('file_error'),
+    fileErrorLine: integer('file_error_line'),
+    validatedAt: integer('validated_at'),
+    expiresAt: integer('expires_at'),
+    confirmedBy: text('confirmed_by'),
+    confirmedAt: integer('confirmed_at'),
+    finishedAt: integer('finished_at'),
+  },
+  (t) => [
+    index('import_jobs_created_by_id_idx').on(t.createdBy, t.id),
+    index('import_jobs_status_idx').on(t.status),
+    check(
+      'import_jobs_status_check',
+      sql.raw(`status in (${IMPORT_JOB_STATUSES.map((s) => `'${s}'`).join(', ')})`),
+    ),
+  ],
+);
+
+export const IMPORT_LINE_STATUSES = ['valid', 'invalid', 'applied', 'failed'] as const;
+
+export const importJobLines = sqliteTable(
+  'import_job_lines',
+  {
+    jobId: integer('job_id')
+      .notNull()
+      .references(() => importJobs.id, { onDelete: 'cascade' }),
+    line: integer('line').notNull(),
+    status: text('status', { enum: IMPORT_LINE_STATUSES }).notNull(),
+    action: text('action'),
+    activation: text('activation'),
+    errorCode: text('error_code'),
+    // Mensagem fixa do domínio (sem eco do valor enviado).
+    message: text('message'),
+    warning: text('warning'),
+    // Alvo e versão vistos na simulação; a confirmação confere que não mudaram.
+    targetId: integer('target_id'),
+    targetVersion: integer('target_version'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.jobId, t.line] }),
+    check(
+      'import_job_lines_status_check',
+      sql.raw(`status in (${IMPORT_LINE_STATUSES.map((s) => `'${s}'`).join(', ')})`),
+    ),
+  ],
+);
+
 export type State = typeof states.$inferSelect;
 export type NewState = typeof states.$inferInsert;
 export type Municipality = typeof municipalities.$inferSelect;
@@ -452,3 +532,5 @@ export type PortfolioCustomerOverride = typeof portfolioCustomerOverrides.$infer
 export type NewPortfolioCustomerOverride = typeof portfolioCustomerOverrides.$inferInsert;
 export type PortfolioAssignment = typeof portfolioAssignments.$inferSelect;
 export type NewPortfolioAssignment = typeof portfolioAssignments.$inferInsert;
+export type ImportJob = typeof importJobs.$inferSelect;
+export type ImportJobLine = typeof importJobLines.$inferSelect;
