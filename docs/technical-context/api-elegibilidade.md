@@ -22,8 +22,8 @@ filtros (E3) com os cadastros (E2) e os ajustes manuais.
 - **[auto] Calculada sob demanda, não materializada.** Nada da prévia é gravado. O que persiste são só os
   **ajustes manuais**. Os cadastros mudam, e uma prévia gravada envelheceria; a regra fica num lugar só.
 - A gravação dos vínculos cliente x vendedor só acontece no **E7** (finalizar).
-- Conflitos entre carteiras **não** são calculados aqui (E5); a prévia só informa o nível de região que
-  casou.
+- Conflitos entre carteiras da filial (E5) são resolvidos na própria prévia: cada item traz `rank`,
+  `resolution` e `competitors` (ver [`api-conflitos.md`](./api-conflitos.md)).
 
 ## Regra de elegibilidade
 
@@ -52,6 +52,14 @@ ou `null` quando nenhuma região casou (cliente que veio só por rede ou grupo) 
 inclusão manual** (`source: manual`), mesmo que a região tenha casado: quem não casou o filtro inteiro não
 ganha prioridade por região. `matchedBy` continua informativo e indica quais critérios casaram (`region`,
 `retailNetwork`, `economicGroup`). O E5 usa esse nível para a prioridade bairro > cidade > estado.
+
+## Campos de conflito (E5)
+
+Cada item traz também `rank` (posto da carteira para o cliente: 1 UF, 2 município, 3 bairro, 4 rede,
+5 grupo econômico, 6 inclusão manual), `resolution` (`assigned`, `lost` ou `blocked`) e `competitors`
+(`[{ portfolioId, name, rank }]`, carteiras não inativas da mesma filial em que o cliente também tem
+posto). O agregado da carteira ganha `conflictsBlocked` e `conflictsLost`. Regras e desempenho em
+[`api-conflitos.md`](./api-conflitos.md).
 
 ## Ajustes manuais
 
@@ -117,10 +125,11 @@ Iguais ao E3 ([`api-carteiras.md`](./api-carteiras.md)).
 | --------- | ----------------------------------------------------------------------------------------------- |
 | `q`       | Busca por razão social, nome fantasia ou CNPJ (texto normalizado, sem acento e sem caixa)       |
 | `source`  | `filter` ou `manual`                                                                            |
+| `resolution` | `assigned`, `lost` ou `blocked` (E5); o `total` respeita o filtro                            |
 | `cursor`  | Cursor opaco da página seguinte (`nextCursor` da resposta anterior)                             |
 | `limit`   | Tamanho da página (1 até o teto comum de paginação)                                             |
 
-Parâmetro desconhecido responde `400`. A resposta traz o `total` de itens da prévia (com `q` e `source` aplicados). Teto de `limit`: 200.
+Parâmetro desconhecido responde `400`. A resposta traz o `total` de itens da prévia (com `q`, `source` e `resolution` aplicados). Teto de `limit`: 200.
 
 ## Desempenho
 
@@ -147,7 +156,8 @@ GET /v1/portfolios/7/preview?q=Cliente%20Alfa&limit=20
                   "municipalityName": "Serra", "neighborhood": "Centro de Serra" },
     "source": "filter",
     "matchedRegionLevel": "neighborhood",
-    "matchedBy": { "region": true, "retailNetwork": false, "economicGroup": false } } ],
+    "matchedBy": { "region": true, "retailNetwork": false, "economicGroup": false },
+    "rank": 3, "resolution": "assigned", "competitors": [] } ],
   "nextCursor": null, "total": 1 }
 
 PUT /v1/portfolios/7/overrides      If-Match: "3"
@@ -182,7 +192,7 @@ Formato `{ "error": "<codigo>", "message"?: "..." }`, sem eco do valor enviado.
 
 ## Fica para os próximos épicos
 
-- **E5**: conflitos entre carteiras e bloqueio por empate, usando `matchedRegionLevel`.
+- ~~E5~~ (entregue): conflitos entre carteiras e bloqueio por empate, ver [`api-conflitos.md`](./api-conflitos.md).
 - **E6**: distribuição dos clientes entre os vendedores por subgrupo.
 - **E7**: finalizar (`draft` -> `active`) e **gravar os vínculos** cliente x vendedor (materialização).
 - **E8**: visibilidade por perfil.
