@@ -7,12 +7,13 @@ export interface Me {
   branchIds: string[];
 }
 
+/** Os estados com resultado levam o token a que se referem (o App só confia no `me` do token atual). */
 export type MeState =
   | { status: 'unconfigured' }
   | { status: 'loading' }
-  | { status: 'authenticated'; me: Me }
-  | { status: 'expired' }
-  | { status: 'unavailable' };
+  | { status: 'authenticated'; me: Me; token: string }
+  | { status: 'expired'; token: string }
+  | { status: 'unavailable'; token: string };
 
 interface UseMeResult {
   state: MeState;
@@ -59,7 +60,7 @@ export function useMe(apiBase: string | null, token: string | null, onExpired: (
       .then(async (res) => {
         if (controller.signal.aborted) return;
         if (res.status === 401) {
-          setState({ status: 'expired' });
+          setState({ status: 'expired', token });
           if (expiredFor.current !== token) {
             expiredFor.current = token;
             onExpiredRef.current();
@@ -67,16 +68,16 @@ export function useMe(apiBase: string | null, token: string | null, onExpired: (
           return;
         }
         if (!res.ok) {
-          setState({ status: 'unavailable' });
+          setState({ status: 'unavailable', token });
           return;
         }
         const me = parseMe(await res.json());
         if (controller.signal.aborted) return;
         // 200 com corpo inválido não é "autenticado": trata como indisponível.
-        setState(me ? { status: 'authenticated', me } : { status: 'unavailable' });
+        setState(me ? { status: 'authenticated', me, token } : { status: 'unavailable', token });
       })
       .catch(() => {
-        if (!controller.signal.aborted) setState({ status: 'unavailable' });
+        if (!controller.signal.aborted) setState({ status: 'unavailable', token });
       });
 
     return () => controller.abort();

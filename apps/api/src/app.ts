@@ -38,8 +38,9 @@ export function buildApp(config: AppConfig, options: BuildAppOptions = {}): Fast
   void app.register(cors, {
     origin: config.CORS_ORIGINS,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Authorization', 'Content-Type', 'X-Request-Id'],
-    exposedHeaders: [REQUEST_ID_HEADER],
+    // If-Match: toda escrita versionada (E3+) o exige; sem ele no preflight, host de outra origem não grava.
+    allowedHeaders: ['Authorization', 'Content-Type', 'If-Match', 'X-Request-Id'],
+    exposedHeaders: [REQUEST_ID_HEADER, 'ETag', 'Content-Disposition'],
     credentials: false,
   });
   void app.register(dbPlugin, { config });
