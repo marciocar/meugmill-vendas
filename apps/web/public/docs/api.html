@@ -102,8 +102,11 @@
             }),
           });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          render((await res.json()).access_token);
-          status.textContent = `token de teste de ${clientId} aplicado (vale 1 hora)`;
+          const token = (await res.json()).access_token;
+          // O mock cai no perfil padrão em silêncio se um proxy repassar outra credencial: mostra quem veio.
+          const claims = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+          render(token);
+          status.textContent = `token de teste aplicado: login ${claims.sub}, filiais ${(claims.branch_ids ?? []).join(', ')} (vale 1 hora)`;
         } catch (err) {
           status.textContent = `falha ao obter token de teste: ${err.message}`;
         }
