@@ -685,6 +685,26 @@ code=$(upload_csv product-subgroups "$csv_file" "Authorization: Bearer ${supervi
 code=$(curl -s -o /dev/null -w '%{http_code}' -H "$auth_seller" "${WEB_URL}/api/v1/exports/customers" || true)
 [ "$code" = "200" ] || fail "exportação pelo proxy (vendedor) esperada 200, recebido ${code}"
 ok "supervisão não importa (403); vendedor exporta pelo proxy /api (200)"
+
+# E9: a tela envia o CSV pelo proxy /api do nginx (padrão de 1 MB) e escreve com If-Match a partir de outra
+# origem. Arquivo de 2 MB num campo só: o proxy precisa deixar passar (202) e a API recusa na leitura.
+{
+  printf 'codigo;nome;ativo\n'
+  head -c 2097152 /dev/zero | tr '\0' 'x'
+  printf ';Nome;S\n'
+} > "$csv_file"
+code=$(curl -s -o "$body" -w '%{http_code}' -X POST "${WEB_URL}/api/v1/imports?layout=product-subgroups" \
+  -H "$auth_admin" -H 'Content-Type: text/csv' --data-binary "@$csv_file" || true)
+[ "$code" = "202" ] || fail "upload de 2 MB pelo proxy esperado 202, recebido ${code}"
+csv_job=$(json_get 'j.id')
+wait_job "$csv_job"
+[ "$job_status" = "invalid" ] || fail "campo gigante esperado invalid: $(cat "$body")"
+ok "upload de 2 MB pelo proxy /api -> 202 (nginx não barra); campo gigante invalid"
+preflight=$(curl -s -D - -o /dev/null -X OPTIONS "${API_URL}/v1/portfolios/1" -H "Origin: ${WEB_URL}" \
+  -H 'Access-Control-Request-Method: PATCH' -H 'Access-Control-Request-Headers: authorization, content-type, if-match' || true)
+printf '%s' "$preflight" | tr -d '\r' | grep -qi '^access-control-allow-headers:.*if-match' \
+  || fail "preflight sem If-Match em allow-headers: ${preflight}"
+ok "preflight CORS de escrita libera If-Match"
 rm -f "$csv_file"
 
 echo "Smoke concluído com sucesso."

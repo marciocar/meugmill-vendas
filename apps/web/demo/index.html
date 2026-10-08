@@ -21,6 +21,16 @@
   </head>
   <body>
     <h1>Sistema do host</h1>
+    <label>
+      Perfil do token de teste:
+      <select id="profile">
+        <option value="smoke-admin">admin (admin-01)</option>
+        <option value="smoke-gestor">gestor (gest-01)</option>
+        <option value="smoke-vendedor">vendedor (vend-01)</option>
+        <option value="smoke-supervisao">supervisão (sup-01)</option>
+        <option value="demo">sem client_id conhecido (vendedor-01)</option>
+      </select>
+    </label>
     <button id="get-token">Obter token de teste</button>
     <button id="clear-token">Limpar token</button>
     <p>
@@ -54,7 +64,8 @@
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: new URLSearchParams({
               grant_type: 'client_credentials',
-              client_id: 'demo',
+              // O IdP de teste escolhe sub, perfis e filiais pelo client_id (docker/idp-config.json).
+              client_id: document.getElementById('profile').value,
               client_secret: 'demo',
               scope: 'openid',
             }),
@@ -62,7 +73,7 @@
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const { access_token } = await res.json();
           el.token = access_token; // por propriedade: não vai para o DOM
-          write('token de teste obtido e aplicado');
+          write(`token de teste (${document.getElementById('profile').value}) obtido e aplicado`);
         } catch (err) {
           write(`falha ao obter token de teste: ${err.message}`);
         }

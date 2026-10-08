@@ -24,6 +24,10 @@ async function configure(el: GmillCarteiraElement, apiBase: string | null, token
 
 const text = (el: GmillCarteiraElement) => el.shadowRoot?.textContent ?? '';
 
+/** Só as chamadas ao /v1/me (autenticado, as telas também chamam a API). */
+const meCalls = (m: { mock: { calls: unknown[][] } }) =>
+  m.mock.calls.filter((c) => String(c[0]).endsWith('/v1/me'));
+
 describe('<gmill-carteira> /v1/me', () => {
   afterEach(async () => {
     vi.unstubAllGlobals();
@@ -44,7 +48,7 @@ describe('<gmill-carteira> /v1/me', () => {
     expect(text(el)).toContain('vendedor, gestor');
     expect(text(el)).toContain('ES01, ES02');
     expect(el.shadowRoot?.innerHTML).not.toContain('tok-secreto');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(meCalls(fetchMock)).toHaveLength(1);
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe('http://api/v1/me');
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok-secreto');
@@ -91,8 +95,8 @@ describe('<gmill-carteira> /v1/me', () => {
     await act(async () => {
       el.token = 'tok-2';
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    const init = fetchMock.mock.calls[1]?.[1] as RequestInit;
+    expect(meCalls(fetchMock)).toHaveLength(2);
+    const init = meCalls(fetchMock)[1]?.[1] as RequestInit;
     expect((init.headers as Record<string, string>).Authorization).toBe('Bearer tok-2');
     expect(text(el)).toContain('user-2');
   });
@@ -113,7 +117,7 @@ describe('<gmill-carteira> /v1/me', () => {
     await act(async () => {
       retry?.click();
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(meCalls(fetchMock)).toHaveLength(2);
     expect(text(el)).toContain('user-3');
   });
 

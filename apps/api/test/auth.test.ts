@@ -354,6 +354,27 @@ describe('rotas públicas e CORS', () => {
     expect(res.headers['access-control-allow-methods']).toBe('GET, POST, PUT, PATCH, DELETE');
   });
 
+  it('preflight libera If-Match e a resposta expõe ETag e Content-Disposition (escrita e download do front)', async () => {
+    const app = await make({ CORS_ORIGINS: 'http://localhost:5173' });
+    const pre = await app.inject({
+      method: 'OPTIONS',
+      url: '/v1/portfolios/1',
+      headers: {
+        origin: 'http://localhost:5173',
+        'access-control-request-method': 'PATCH',
+        'access-control-request-headers': 'authorization, content-type, if-match',
+      },
+    });
+    expect(pre.headers['access-control-allow-headers']).toMatch(/if-match/i);
+    const res = await app.inject({
+      method: 'GET',
+      url: '/health',
+      headers: { origin: 'http://localhost:5173' },
+    });
+    expect(res.headers['access-control-expose-headers']).toMatch(/etag/i);
+    expect(res.headers['access-control-expose-headers']).toMatch(/content-disposition/i);
+  });
+
   it('origem não listada não recebe Access-Control-Allow-Origin', async () => {
     const app = await make({ CORS_ORIGINS: 'http://localhost:5173' });
     const res = await app.inject({ method: 'GET', url: '/health', headers: { origin: 'https://evil.test' } });

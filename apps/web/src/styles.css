@@ -72,3 +72,324 @@ h1 {
 .gc-me dd {
   margin: 0 0 8px;
 }
+
+/* E9: telas do produto. */
+.gc-header,
+.gc-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.gc-header {
+  justify-content: space-between;
+}
+
+h2 {
+  margin: 8px 0;
+  font-size: 1.1rem;
+}
+
+h3 {
+  margin: 16px 0 8px;
+  font-size: 1rem;
+}
+
+.gc-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.gc-button-secondary {
+  background: #fff;
+  color: #1f6feb;
+}
+
+.gc-link {
+  font: inherit;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: #1f6feb;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.gc-tabs,
+.gc-subtabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid #d0d7de;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+
+.gc-tab {
+  font: inherit;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: #57606a;
+  cursor: pointer;
+}
+
+.gc-tab-active {
+  color: #1a1a1a;
+  border-bottom-color: #1f6feb;
+  font-weight: 600;
+}
+
+.gc-steps {
+  display: flex;
+  gap: 8px;
+  padding: 0;
+  margin: 12px 0;
+  list-style: none;
+  flex-wrap: wrap;
+}
+
+.gc-step {
+  font: inherit;
+  padding: 6px 10px;
+  border: 1px solid #d0d7de;
+  border-radius: 16px;
+  background: #fff;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+.gc-step:disabled {
+  color: #8c959f;
+  cursor: not-allowed;
+}
+
+.gc-step-current {
+  border-color: #1f6feb;
+  background: #eaf2ff;
+  font-weight: 600;
+}
+
+.gc-step-number {
+  display: inline-block;
+  min-width: 1.2em;
+  font-weight: 700;
+}
+
+.gc-form,
+.gc-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 960px;
+}
+
+.gc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gc-field-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #57606a;
+}
+
+.gc-field-hint {
+  font-size: 0.75rem;
+  color: #57606a;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  padding: 5px 8px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #fff;
+  color: #1a1a1a;
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background: #f6f8fa;
+}
+
+.gc-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+
+.gc-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+
+.gc-fieldset {
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.gc-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 200px;
+  overflow: auto;
+}
+
+.gc-check {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.gc-filter {
+  margin-bottom: 6px;
+}
+
+.gc-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 0;
+  margin: 0 0 8px;
+  list-style: none;
+}
+
+.gc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #eaf2ff;
+}
+
+.gc-chip-remove {
+  font: inherit;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: #57606a;
+}
+
+.gc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.gc-table th,
+.gc-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #eaeef2;
+  text-align: left;
+  vertical-align: top;
+}
+
+.gc-table th {
+  font-size: 0.8rem;
+  color: #57606a;
+}
+
+.gc-pager {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0;
+}
+
+.gc-muted {
+  color: #57606a;
+}
+
+.gc-notice {
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin: 8px 0;
+}
+
+.gc-notice-error {
+  background: #ffebe9;
+  color: #82071e;
+}
+
+.gc-notice-success {
+  background: #dafbe1;
+  color: #116329;
+}
+
+.gc-notice-info {
+  background: #ddf4ff;
+  color: #0a3069;
+}
+
+.gc-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  margin-right: 4px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  background: #eaeef2;
+}
+
+.gc-badge-ok {
+  background: #dafbe1;
+  color: #116329;
+}
+
+.gc-badge-warn {
+  background: #fff8c5;
+  color: #6f4400;
+}
+
+.gc-badge-bad {
+  background: #ffebe9;
+  color: #82071e;
+}
+
+.gc-dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0;
+}
+
+.gc-dl dt {
+  font-weight: 600;
+  color: #57606a;
+}
+
+.gc-dl dd {
+  margin: 0;
+}
+
+.gc-list {
+  padding-left: 18px;
+}
+
+.gc-details summary {
+  cursor: pointer;
+  margin: 8px 0;
+}
+
+.gc-hash {
+  word-break: break-all;
+  font-size: 0.75rem;
+}
+
+progress {
+  width: 100%;
+}
