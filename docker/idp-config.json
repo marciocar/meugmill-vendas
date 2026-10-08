@@ -70,6 +70,70 @@
           }
         },
         {
+          "requestParam": "client_id",
+          "match": "demo-admin",
+          "claims": {
+            "sub": "demo-admin",
+            "aud": [
+              "carteira-api"
+            ],
+            "roles": [
+              "admin"
+            ],
+            "branch_ids": [
+              "DEMO-ES"
+            ]
+          }
+        },
+        {
+          "requestParam": "client_id",
+          "match": "demo-gestor",
+          "claims": {
+            "sub": "demo-gestor",
+            "aud": [
+              "carteira-api"
+            ],
+            "roles": [
+              "gestor"
+            ],
+            "branch_ids": [
+              "DEMO-ES"
+            ]
+          }
+        },
+        {
+          "requestParam": "client_id",
+          "match": "demo-vendedor",
+          "claims": {
+            "sub": "demo-vend",
+            "aud": [
+              "carteira-api"
+            ],
+            "roles": [
+              "vendedor"
+            ],
+            "branch_ids": [
+              "DEMO-ES"
+            ]
+          }
+        },
+        {
+          "requestParam": "client_id",
+          "match": "demo-supervisao",
+          "claims": {
+            "sub": "demo-sup",
+            "aud": [
+              "carteira-api"
+            ],
+            "roles": [
+              "supervisao"
+            ],
+            "branch_ids": [
+              "DEMO-ES"
+            ]
+          }
+        },
+        {
           "requestParam": "grant_type",
           "match": "*",
           "claims": {

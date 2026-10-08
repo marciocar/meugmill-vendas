@@ -10,7 +10,7 @@
     }
   },
   "info": {
-    "description": "API REST dos dados mestres da carteira de clientes: clientes, vendedores, filiais, subgrupos de produto, redes de varejo, grupos econômicos e localidades IBGE.",
+    "description": "API REST da **Carteira de Clientes** do MeuGmill Vendas: quem atende cada farmácia, filial por filial.\n\n- **Autenticação**: JWT do usuário em `Authorization: Bearer`. Os perfis vêm da claim `roles` e as filiais\n  da claim `branch_ids`. Fora das filiais do token, tudo responde `404`, como se não existisse.\n- **Versão**: toda escrita versionada exige `If-Match: \"<versão>\"`; sem ele, `428`; versão velha, `409\n  version_conflict`. A versão vem no `ETag` e no campo `version` do corpo.\n- **Erros**: `{ \"error\": \"<código>\", \"message\"?: \"...\" }`, com mensagem fixa e sem eco do valor enviado.\n- **Paginação**: por cursor (`cursor`, `limit`, `nextCursor`).\n- **LGPD**: só dado de empresa do cliente; nenhum CPF nem dado de paciente.",
     "title": "MeuGmill Vendas — Carteira de Clientes API",
     "version": "0.1.0"
   },
@@ -40,7 +40,10 @@
             },
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Saúde"
+        ]
       }
     },
     "/ready": {
@@ -88,7 +91,10 @@
             },
             "description": "Default Response"
           }
-        }
+        },
+        "tags": [
+          "Saúde"
+        ]
       }
     },
     "/v1/branches": {
@@ -435,7 +441,7 @@
           }
         ],
         "tags": [
-          "branches"
+          "Dados mestres"
         ]
       },
       "post": {
@@ -767,7 +773,7 @@
           }
         ],
         "tags": [
-          "branches"
+          "Dados mestres"
         ]
       }
     },
@@ -1080,7 +1086,7 @@
           }
         ],
         "tags": [
-          "branches"
+          "Dados mestres"
         ]
       },
       "patch": {
@@ -1423,7 +1429,7 @@
           }
         ],
         "tags": [
-          "branches"
+          "Dados mestres"
         ]
       }
     },
@@ -1745,7 +1751,7 @@
           }
         ],
         "tags": [
-          "branches"
+          "Dados mestres"
         ]
       }
     },
@@ -2067,7 +2073,7 @@
           }
         ],
         "tags": [
-          "branches"
+          "Dados mestres"
         ]
       }
     },
@@ -2478,7 +2484,7 @@
           }
         ],
         "tags": [
-          "csv"
+          "Importação e exportação CSV"
         ]
       }
     },
@@ -2933,7 +2939,7 @@
           }
         ],
         "tags": [
-          "csv"
+          "Importação e exportação CSV"
         ]
       }
     },
@@ -3336,7 +3342,7 @@
           }
         ],
         "tags": [
-          "customers"
+          "Dados mestres"
         ]
       },
       "post": {
@@ -3759,7 +3765,7 @@
           }
         ],
         "tags": [
-          "customers"
+          "Dados mestres"
         ]
       }
     },
@@ -4065,7 +4071,7 @@
           }
         ],
         "tags": [
-          "customers"
+          "Dados mestres"
         ]
       }
     },
@@ -4433,7 +4439,7 @@
           }
         ],
         "tags": [
-          "customers"
+          "Dados mestres"
         ]
       },
       "patch": {
@@ -4864,7 +4870,7 @@
           }
         ],
         "tags": [
-          "customers"
+          "Dados mestres"
         ]
       }
     },
@@ -5241,7 +5247,7 @@
           }
         ],
         "tags": [
-          "customers"
+          "Dados mestres"
         ]
       }
     },
@@ -5618,7 +5624,7 @@
           }
         ],
         "tags": [
-          "customers"
+          "Dados mestres"
         ]
       }
     },
@@ -5995,7 +6001,7 @@
           }
         ],
         "tags": [
-          "customers"
+          "Dados mestres"
         ]
       }
     },
@@ -6372,7 +6378,7 @@
           }
         ],
         "tags": [
-          "customers"
+          "Dados mestres"
         ]
       }
     },
@@ -6716,7 +6722,7 @@
           }
         ],
         "tags": [
-          "economic-groups"
+          "Dados mestres"
         ]
       },
       "post": {
@@ -7039,7 +7045,7 @@
           }
         ],
         "tags": [
-          "economic-groups"
+          "Dados mestres"
         ]
       }
     },
@@ -7348,7 +7354,7 @@
           }
         ],
         "tags": [
-          "economic-groups"
+          "Dados mestres"
         ]
       },
       "patch": {
@@ -7685,7 +7691,7 @@
           }
         ],
         "tags": [
-          "economic-groups"
+          "Dados mestres"
         ]
       }
     },
@@ -8003,7 +8009,7 @@
           }
         ],
         "tags": [
-          "economic-groups"
+          "Dados mestres"
         ]
       }
     },
@@ -8321,7 +8327,7 @@
           }
         ],
         "tags": [
-          "economic-groups"
+          "Dados mestres"
         ]
       }
     },
@@ -8635,7 +8641,7 @@
           }
         ],
         "tags": [
-          "csv"
+          "Importação e exportação CSV"
         ]
       }
     },
@@ -8964,7 +8970,7 @@
           }
         ],
         "tags": [
-          "geo"
+          "Localidades (IBGE)"
         ]
       }
     },
@@ -9236,7 +9242,7 @@
           }
         ],
         "tags": [
-          "geo"
+          "Localidades (IBGE)"
         ]
       }
     },
@@ -9731,7 +9737,7 @@
           }
         ],
         "tags": [
-          "csv"
+          "Importação e exportação CSV"
         ]
       },
       "post": {
@@ -10247,7 +10253,7 @@
           }
         ],
         "tags": [
-          "csv"
+          "Importação e exportação CSV"
         ]
       }
     },
@@ -10716,7 +10722,7 @@
           }
         ],
         "tags": [
-          "csv"
+          "Importação e exportação CSV"
         ]
       }
     },
@@ -11185,7 +11191,7 @@
           }
         ],
         "tags": [
-          "csv"
+          "Importação e exportação CSV"
         ]
       }
     },
@@ -11655,7 +11661,7 @@
           }
         ],
         "tags": [
-          "csv"
+          "Importação e exportação CSV"
         ]
       }
     },
@@ -12109,7 +12115,7 @@
           }
         ],
         "tags": [
-          "csv"
+          "Importação e exportação CSV"
         ]
       }
     },
@@ -12514,7 +12520,7 @@
           }
         ],
         "tags": [
-          "links"
+          "Vínculos"
         ]
       }
     },
@@ -12558,6 +12564,9 @@
           {
             "bearerAuth": []
           }
+        ],
+        "tags": [
+          "Usuário e visibilidade"
         ]
       }
     },
@@ -12960,7 +12969,7 @@
           }
         ],
         "tags": [
-          "visibility"
+          "Usuário e visibilidade"
         ]
       }
     },
@@ -13301,7 +13310,7 @@
           }
         ],
         "tags": [
-          "visibility"
+          "Usuário e visibilidade"
         ]
       }
     },
@@ -13645,7 +13654,7 @@
           }
         ],
         "tags": [
-          "portfolio-types"
+          "Carteiras"
         ]
       },
       "post": {
@@ -13968,7 +13977,7 @@
           }
         ],
         "tags": [
-          "portfolio-types"
+          "Carteiras"
         ]
       }
     },
@@ -14277,7 +14286,7 @@
           }
         ],
         "tags": [
-          "portfolio-types"
+          "Carteiras"
         ]
       },
       "patch": {
@@ -14614,7 +14623,7 @@
           }
         ],
         "tags": [
-          "portfolio-types"
+          "Carteiras"
         ]
       }
     },
@@ -14932,7 +14941,7 @@
           }
         ],
         "tags": [
-          "portfolio-types"
+          "Carteiras"
         ]
       }
     },
@@ -15250,7 +15259,7 @@
           }
         ],
         "tags": [
-          "portfolio-types"
+          "Carteiras"
         ]
       }
     },
@@ -15695,7 +15704,7 @@
           }
         ],
         "tags": [
-          "portfolios"
+          "Carteiras"
         ]
       },
       "post": {
@@ -16276,7 +16285,7 @@
           }
         ],
         "tags": [
-          "portfolios"
+          "Carteiras"
         ]
       }
     },
@@ -16840,7 +16849,7 @@
           }
         ],
         "tags": [
-          "portfolios"
+          "Carteiras"
         ]
       },
       "patch": {
@@ -17436,7 +17445,7 @@
           }
         ],
         "tags": [
-          "portfolios"
+          "Carteiras"
         ]
       }
     },
@@ -17872,7 +17881,7 @@
           }
         ],
         "tags": [
-          "portfolios"
+          "Distribuição"
         ]
       },
       "put": {
@@ -18493,7 +18502,7 @@
           }
         ],
         "tags": [
-          "portfolios"
+          "Distribuição"
         ]
       }
     },
@@ -18863,7 +18872,7 @@
           }
         ],
         "tags": [
-          "portfolios"
+          "Distribuição"
         ]
       }
     },
@@ -19424,7 +19433,7 @@
           }
         ],
         "tags": [
-          "portfolios"
+          "Carteiras"
         ]
       }
     },
@@ -20055,7 +20064,7 @@
           }
         ],
         "tags": [
-          "portfolios"
+          "Distribuição"
         ]
       }
     },
@@ -20699,7 +20708,7 @@
           }
         ],
         "tags": [
-          "portfolios"
+          "Carteiras"
         ]
       }
     },
@@ -21301,7 +21310,7 @@
           }
         ],
         "tags": [
-          "links"
+          "Vínculos"
         ]
       }
     },
@@ -21705,7 +21714,7 @@
           }
         ],
         "tags": [
-          "links"
+          "Vínculos"
         ]
       }
     },
@@ -22095,7 +22104,7 @@
           }
         ],
         "tags": [
-          "links"
+          "Vínculos"
         ]
       }
     },
@@ -22477,7 +22486,7 @@
           }
         ],
         "tags": [
-          "portfolios"
+          "Elegibilidade e ajustes"
         ]
       },
       "put": {
@@ -23069,7 +23078,7 @@
           }
         ],
         "tags": [
-          "portfolios"
+          "Elegibilidade e ajustes"
         ]
       }
     },
@@ -23596,7 +23605,7 @@
           }
         ],
         "tags": [
-          "portfolios"
+          "Elegibilidade e ajustes"
         ]
       }
     },
@@ -24157,7 +24166,7 @@
           }
         ],
         "tags": [
-          "portfolios"
+          "Carteiras"
         ]
       }
     },
@@ -24756,7 +24765,7 @@
           }
         ],
         "tags": [
-          "portfolios"
+          "Carteiras"
         ]
       }
     },
@@ -25100,7 +25109,7 @@
           }
         ],
         "tags": [
-          "product-subgroups"
+          "Dados mestres"
         ]
       },
       "post": {
@@ -25423,7 +25432,7 @@
           }
         ],
         "tags": [
-          "product-subgroups"
+          "Dados mestres"
         ]
       }
     },
@@ -25732,7 +25741,7 @@
           }
         ],
         "tags": [
-          "product-subgroups"
+          "Dados mestres"
         ]
       },
       "patch": {
@@ -26069,7 +26078,7 @@
           }
         ],
         "tags": [
-          "product-subgroups"
+          "Dados mestres"
         ]
       }
     },
@@ -26387,7 +26396,7 @@
           }
         ],
         "tags": [
-          "product-subgroups"
+          "Dados mestres"
         ]
       }
     },
@@ -26705,7 +26714,7 @@
           }
         ],
         "tags": [
-          "product-subgroups"
+          "Dados mestres"
         ]
       }
     },
@@ -27049,7 +27058,7 @@
           }
         ],
         "tags": [
-          "retail-networks"
+          "Dados mestres"
         ]
       },
       "post": {
@@ -27372,7 +27381,7 @@
           }
         ],
         "tags": [
-          "retail-networks"
+          "Dados mestres"
         ]
       }
     },
@@ -27681,7 +27690,7 @@
           }
         ],
         "tags": [
-          "retail-networks"
+          "Dados mestres"
         ]
       },
       "patch": {
@@ -28018,7 +28027,7 @@
           }
         ],
         "tags": [
-          "retail-networks"
+          "Dados mestres"
         ]
       }
     },
@@ -28336,7 +28345,7 @@
           }
         ],
         "tags": [
-          "retail-networks"
+          "Dados mestres"
         ]
       }
     },
@@ -28654,7 +28663,7 @@
           }
         ],
         "tags": [
-          "retail-networks"
+          "Dados mestres"
         ]
       }
     },
@@ -29031,7 +29040,7 @@
           }
         ],
         "tags": [
-          "sellers"
+          "Dados mestres"
         ]
       },
       "post": {
@@ -29403,7 +29412,7 @@
           }
         ],
         "tags": [
-          "sellers"
+          "Dados mestres"
         ]
       }
     },
@@ -29708,7 +29717,7 @@
           }
         ],
         "tags": [
-          "sellers"
+          "Dados mestres"
         ]
       }
     },
@@ -30050,7 +30059,7 @@
           }
         ],
         "tags": [
-          "sellers"
+          "Dados mestres"
         ]
       },
       "patch": {
@@ -30432,7 +30441,7 @@
           }
         ],
         "tags": [
-          "sellers"
+          "Dados mestres"
         ]
       }
     },
@@ -30783,7 +30792,7 @@
           }
         ],
         "tags": [
-          "sellers"
+          "Dados mestres"
         ]
       }
     },
@@ -31134,7 +31143,7 @@
           }
         ],
         "tags": [
-          "sellers"
+          "Dados mestres"
         ]
       }
     },
@@ -31485,7 +31494,7 @@
           }
         ],
         "tags": [
-          "sellers"
+          "Dados mestres"
         ]
       }
     },
@@ -31836,7 +31845,7 @@
           }
         ],
         "tags": [
-          "sellers"
+          "Dados mestres"
         ]
       }
     },
@@ -32125,9 +32134,47 @@
           }
         ],
         "tags": [
-          "visibility"
+          "Usuário e visibilidade"
         ]
       }
     }
-  }
+  },
+  "tags": [
+    {
+      "description": "Quem está logado e quais clientes cada perfil enxerga (E8).",
+      "name": "Usuário e visibilidade"
+    },
+    {
+      "description": "Prévia dos clientes que a carteira alcança, disputa entre carteiras e inclusões e exclusões manuais (E4/E5).",
+      "name": "Elegibilidade e ajustes"
+    },
+    {
+      "description": "Quem atende cada cliente em cada subgrupo: grade, resumo, edição manual e distribuição automática (E6).",
+      "name": "Distribuição"
+    },
+    {
+      "description": "Finalizar a carteira, vínculos ativos, histórico e a outbox de eventos para o sistema principal (E7).",
+      "name": "Vínculos"
+    },
+    {
+      "description": "O agregado da carteira (etapas 1 a 4 do wizard) e os tipos de carteira (E3).",
+      "name": "Carteiras"
+    },
+    {
+      "description": "Layouts, envio com simulação, relatório por linha, confirmação e exportação (E10).",
+      "name": "Importação e exportação CSV"
+    },
+    {
+      "description": "Filiais, vendedores, clientes, subgrupos de produto, redes e grupos econômicos (E2).",
+      "name": "Dados mestres"
+    },
+    {
+      "description": "Estados e municípios, para os filtros de região.",
+      "name": "Localidades (IBGE)"
+    },
+    {
+      "description": "Sondas de vida e prontidão, sem autenticação.",
+      "name": "Saúde"
+    }
+  ]
 }

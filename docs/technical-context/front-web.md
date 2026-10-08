@@ -26,16 +26,16 @@ O contrato nasceu no E1 e não mudou:
 
 ## Telas
 
-| Aba | O que faz | API |
-|---|---|---|
-| Carteiras | Lista com busca, situação e ativa; "Nova carteira" (só admin); abre o wizard | `GET /v1/portfolios` |
-| Wizard 1, Informações | Cria o rascunho ou altera **só o que mudou** | `POST`/`PATCH /v1/portfolios` |
-| Wizard 2, Filtros | Regiões (estado, município, bairro), redes e grupos; grava o conjunto | `PUT /filters`, `/v1/geo/*` |
-| Wizard 3, Vendedores | Pares vendedor x subgrupo (só vendedores ativos na filial da carteira) | `PUT /sellers` |
-| Wizard 4, Resumo | Leitura do agregado, com ajustes e conflitos | `GET /v1/portfolios/{id}?include=conflicts` |
-| Wizard 5, Clientes | Prévia com disputa, ajustes (excluir, incluir, desfazer), distribuição manual e automática, finalizar | `/preview`, `/overrides`, `/assignments`, `/distribute`, `/finalize`, `/links` |
-| Meus clientes | Resumo da visibilidade e clientes visíveis | `/v1/me/visibility`, `/v1/me/customers` |
-| Importar e exportar | Dicionário dos layouts, exportação, envio com simulação, relatório por linha, confirmar ou cancelar, histórico | `/v1/csv-layouts`, `/v1/exports/*`, `/v1/imports*` |
+| Aba                   | O que faz                                                                                                      | API                                                                            |
+| --------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Carteiras             | Lista com busca, situação e ativa; "Nova carteira" (só admin); abre o wizard                                   | `GET /v1/portfolios`                                                           |
+| Wizard 1, Informações | Cria o rascunho ou altera **só o que mudou**                                                                   | `POST`/`PATCH /v1/portfolios`                                                  |
+| Wizard 2, Filtros     | Regiões (estado, município, bairro), redes e grupos; grava o conjunto                                          | `PUT /filters`, `/v1/geo/*`                                                    |
+| Wizard 3, Vendedores  | Pares vendedor x subgrupo (só vendedores ativos na filial da carteira)                                         | `PUT /sellers`                                                                 |
+| Wizard 4, Resumo      | Leitura do agregado, com ajustes e conflitos                                                                   | `GET /v1/portfolios/{id}?include=conflicts`                                    |
+| Wizard 5, Clientes    | Prévia com disputa, ajustes (excluir, incluir, desfazer), distribuição manual e automática, finalizar          | `/preview`, `/overrides`, `/assignments`, `/distribute`, `/finalize`, `/links` |
+| Meus clientes         | Resumo da visibilidade e clientes visíveis                                                                     | `/v1/me/visibility`, `/v1/me/customers`                                        |
+| Importar e exportar   | Dicionário dos layouts, exportação, envio com simulação, relatório por linha, confirmar ou cancelar, histórico | `/v1/csv-layouts`, `/v1/exports/*`, `/v1/imports*`                             |
 
 Inativar e reativar ficam no cabeçalho do wizard, só para o admin da filial.
 
@@ -83,9 +83,22 @@ Inativar e reativar ficam no cabeçalho do wizard, só para o admin da filial.
   isso, toda escrita de um host de outra origem falhava no preflight.
 - **nginx** (`docker/nginx.conf`): `client_max_body_size 17m` no proxy `/api/`. O padrão de 1 MB barrava o
   CSV.
-- **Demo** (`apps/web/demo/index.html`): escolha do perfil do token de teste (admin, gestor, vendedor,
-  supervisão).
+- **Demo** (`apps/web/demo/index.html`): escolha do perfil do token de teste. O grupo "Demonstração" usa
+  os logins `demo-*` da filial `DEMO-ES` (dados de `scripts/demo/seed.mjs`, roteiro em
+  [`docs/demo/roteiro-gmill.md`](../demo/roteiro-gmill.md)); o grupo "Testes do smoke" usa a `filial-01`.
 - **Smoke**: um upload de 2 MB pelo proxy e um preflight de escrita com `If-Match`.
+
+## Documentação servida pela imagem web (`/docs/`)
+
+- **`/docs/`**: entrada da documentação.
+- **`/docs/manual.html`**: manual de uso das telas. É Markdown (`apps/web/public/docs/manual.md`) renderizado no
+  navegador com `marked`, com índice gerado pelos títulos e capturas reais da demo.
+- **`/docs/api.html`**: referência da API com o **Scalar** (o padrão mais adotado para projetos novos em 2026),
+  lendo o OpenAPI que a própria API gera. As chamadas de teste passam pelo proxy `/api` da mesma origem, e o seletor
+  "Testar como" aplica um token de teste de demonstração. As versões do Scalar e do `marked` são fixas e vêm do
+  jsDelivr.
+- O OpenAPI ganhou 9 grupos em pt-BR (tags) e uma introdução sobre autenticação, versão, erros, paginação e LGPD.
+  Um teste falha se alguma rota ficar sem grupo.
 
 ## Testes
 

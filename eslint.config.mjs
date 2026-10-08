@@ -16,4 +16,18 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   prettier,
+  {
+    // Scripts de apoio (ex.: scripts/demo/seed.mjs) rodam direto no Node 22.
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        Buffer: 'readonly',
+        console: 'readonly',
+        fetch: 'readonly',
+        process: 'readonly',
+        setTimeout: 'readonly',
+        URLSearchParams: 'readonly',
+      },
+    },
+  },
 );

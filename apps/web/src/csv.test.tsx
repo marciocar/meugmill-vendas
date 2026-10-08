@@ -329,4 +329,48 @@ describe('telas de CSV: modos de falha', () => {
     expect(reads).toBe(afterOpen);
     expect(text(el)).not.toContain('Tentando de novo');
   });
+
+  it('o dicionário mostra os trechos entre crases como código, sem as crases', async () => {
+    routeFetch([
+      ['GET', /\/v1\/me$/, () => json(200, ADMIN)],
+      [
+        'GET',
+        /\/v1\/csv-layouts$/,
+        () => json(200, { ...LAYOUTS, format: 'separador `;`, booleano `S`/`N`' }),
+      ],
+    ]);
+    const el = await mountWith();
+    await click(el, 'Importar e exportar');
+    expect(text(el)).toContain('separador ;, booleano S/N');
+    expect(el.shadowRoot?.querySelectorAll('.gc-muted code').length).toBe(3);
+  });
+
+  it('withCode: crase ímpar não quebra e o dicionário (descrição e colunas) também sai como código', async () => {
+    const { withCode } = await import('./csv/CsvView');
+    const parts = withCode('a `b` c `d');
+    expect(parts).toHaveLength(4);
+    routeFetch([
+      ['GET', /\/v1\/me$/, () => json(200, ADMIN)],
+      [
+        'GET',
+        /\/v1\/csv-layouts$/,
+        () =>
+          json(200, {
+            ...LAYOUTS,
+            layouts: [
+              {
+                ...LAYOUTS.layouts[0],
+                description: 'Chave `codigo`.',
+                columns: [{ ...LAYOUTS.layouts[0]!.columns[0], description: '`S` ou `N`.' }],
+              },
+            ],
+          }),
+      ],
+    ]);
+    const el = await mountWith();
+    await click(el, 'Importar e exportar');
+    const codes = [...(el.shadowRoot?.querySelectorAll('details code') ?? [])].map((c) => c.textContent);
+    expect(codes).toEqual(expect.arrayContaining(['codigo', 'S', 'N']));
+    expect(text(el)).not.toContain('`');
+  });
 });

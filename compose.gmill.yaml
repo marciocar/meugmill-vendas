@@ -1,0 +1,17 @@
+# Override da demonstração para a GMill num domínio público (https://gmill.onionevolve.com).
+#
+#   docker compose -f compose.yaml -f compose.gmill.yaml up -d
+#
+# O que muda: o emissor esperado no token passa a ser o do domínio (o IdP de teste monta o `iss` a partir do
+# Host e do X-Forwarded-Proto que o proxy envia; medido: https://gmill.onionevolve.com/default), e o CORS
+# aceita essa origem. Nada mais abre: as portas continuam presas a 127.0.0.1 e quem publica é o Caddy da VPS,
+# que DEVE exigir senha (basic auth) na frente de tudo, porque o IdP de teste entrega token de admin a quem pedir.
+#
+# Efeito colateral: com este override, o acesso por túnel SSH em localhost deixa de autenticar (o token local
+# traz outro `iss`). Para voltar ao modo local: docker compose up -d (sem o override).
+
+services:
+  api:
+    environment:
+      OIDC_ISSUER: https://gmill.onionevolve.com/default
+      CORS_ORIGINS: https://gmill.onionevolve.com

@@ -31,9 +31,15 @@ jobs:
     needs: check
     steps:
       - uses: actions/checkout@v4
+      # O seed da demo (scripts/demo/seed.mjs) roda no Node do projeto, não no da imagem do runner.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
       - run: docker compose build
       - run: docker compose up -d
       - run: bash scripts/smoke.sh
+      - name: Demo da GMill (carga e 2ª execução sem mudança)
+        run: node scripts/demo/seed.mjs && node scripts/demo/seed.mjs --expect-unchanged
       - name: Logs da stack (falha)
         if: failure()
         run: docker compose logs

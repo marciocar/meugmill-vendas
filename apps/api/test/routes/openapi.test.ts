@@ -6,6 +6,7 @@ import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/app.js';
 import { loadConfig } from '../../src/config.js';
 import { generateOpenApiJson } from '../../scripts/openapi-lib.js';
+import { TAGS } from '../../src/plugins/openapi.js';
 
 type Operation = {
   security?: unknown[];
@@ -126,6 +127,24 @@ describe('OpenAPI v1', () => {
     expect(doc.paths['/health']?.get?.security).toBeUndefined();
     expect(doc.paths['/ready']?.get?.security).toBeUndefined();
     expect(doc.paths['/v1/openapi.json']).toBeUndefined();
+  });
+
+  it('toda operação cai num grupo da documentação, e só nos grupos declarados', () => {
+    const names = TAGS.map((t) => t.name);
+    const raw = doc as unknown as {
+      tags?: { name: string }[];
+      paths: Record<string, Record<string, { tags?: string[] }>>;
+    };
+    expect(raw.tags?.map((t) => t.name)).toEqual(names);
+    const untagged: string[] = [];
+    for (const [path, ops] of Object.entries(raw.paths)) {
+      for (const [method, op] of Object.entries(ops)) {
+        if (op.tags?.length !== 1 || !names.includes(op.tags[0]!)) untagged.push(`${method} ${path}`);
+      }
+    }
+    expect(untagged).toEqual([]);
+    expect(raw.paths['/v1/portfolios/{id}/preview']?.get?.tags).toEqual(['Elegibilidade e ajustes']);
+    expect(raw.paths['/v1/link-events']?.get?.tags).toEqual(['Vínculos']);
   });
 
   it('não expõe interface visual', async () => {

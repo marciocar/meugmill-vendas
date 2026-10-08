@@ -24,11 +24,19 @@
     <label>
       Perfil do token de teste:
       <select id="profile">
-        <option value="smoke-admin">admin (admin-01)</option>
-        <option value="smoke-gestor">gestor (gest-01)</option>
-        <option value="smoke-vendedor">vendedor (vend-01)</option>
-        <option value="smoke-supervisao">supervisão (sup-01)</option>
-        <option value="demo">sem client_id conhecido (vendedor-01)</option>
+        <optgroup label="Demonstração (filial DEMO-ES, ver scripts/demo)">
+          <option value="demo-admin">admin (demo-admin)</option>
+          <option value="demo-gestor">gestor (demo-gestor)</option>
+          <option value="demo-vendedor">vendedor (demo-vend, Ana Martins)</option>
+          <option value="demo-supervisao">supervisão (demo-sup)</option>
+        </optgroup>
+        <optgroup label="Testes do smoke (filial-01)">
+          <option value="smoke-admin">admin (admin-01)</option>
+          <option value="smoke-gestor">gestor (gest-01)</option>
+          <option value="smoke-vendedor">vendedor (vend-01)</option>
+          <option value="smoke-supervisao">supervisão (sup-01)</option>
+          <option value="demo">sem client_id conhecido (vendedor-01)</option>
+        </optgroup>
       </select>
     </label>
     <button id="get-token">Obter token de teste</button>
@@ -50,7 +58,10 @@
       import '../src/element.tsx';
       // IdP de teste (mock-oauth2-server) da infra Docker.
       // O issuer dos tokens é http://localhost:39080/default: o navegador precisa pedir o token nesse endereço.
-      const IDP_TOKEN_URL = 'http://localhost:39080/default/token';
+      // Local (túnel SSH ou a própria máquina): o IdP direto na porta dele. Num domínio (ex.: a demonstração
+      // da GMill), o nginx da imagem repassa /default/token ao IdP na mesma origem.
+      const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
+      const IDP_TOKEN_URL = LOCAL ? 'http://localhost:39080/default/token' : '/default/token';
       const el = document.querySelector('gmill-carteira');
       const log = document.getElementById('log');
       const write = (msg) => {
