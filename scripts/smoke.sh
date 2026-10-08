@@ -74,6 +74,10 @@ printf '%s' "$headers" | head -n1 | grep -q ' 200' || fail "GET ${WEB_URL}/gmill
 printf '%s' "$headers" | grep -i '^content-type:' | grep -qi 'javascript' \
   || fail "content-type de gmill-carteira.js não é javascript"
 ok "GET /gmill-carteira.js -> 200 (javascript)"
+# Atrás de um proxy (domínio da GMill), redirect absoluto vazaria a porta interna 8080: tem de ser relativo.
+loc=$(curl -s -D - -o /dev/null "${WEB_URL}/" | tr -d '\r' | sed -n 's/^[Ll]ocation: //p')
+[ "$loc" = "/demo/index.html" ] || fail "redirect de / esperado relativo (/demo/index.html), recebido: ${loc}"
+ok "GET / -> redirect relativo para /demo/index.html"
 
 # Proxy da demo: /api/* no nginx chega na API pela mesma origem (sem CORS e sem outra porta).
 code=$(status_of "${WEB_URL}/api/health")
