@@ -8,6 +8,20 @@
       "when": 1791398548152,
       "tag": "0000_fearless_sunfire",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1791418829912,
+      "tag": "0001_e2_master_data",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791418833529,
+      "tag": "0002_seed_ibge",
+      "breakpoints": true
     }
   ]
 }
