@@ -1,0 +1,1 @@
+CREATE INDEX `customers_state_code_idx` ON `customers` (`state_code`);

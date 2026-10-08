@@ -308,4 +308,95 @@ code=$(preview "${WEB_URL}/api" "$name_b")
 [ "$code" = "200" ] || fail "GET ${WEB_URL}/api/v1/portfolios/{id}/preview (proxy) esperado 200, recebido ${code}"
 ok "proxy /api da demo -> /v1/portfolios/{id}/preview 200"
 
+# Conflitos entre carteiras da filial (E5). As execuções anteriores deixaram carteiras na filial-01
+# que também concorrem; por isso o cliente C fica num bairro ÚNICO por execução, numa UF (RJ) que
+# nenhuma carteira antiga alcança, e as carteiras do teste usam esse bairro.
+conflict_hood="Bairro Conflito ${epoch}"
+cnpj_c=$(make_cnpj "$epoch" 3)
+[ "${#cnpj_c}" = "14" ] || fail "geração de CNPJ do cliente C falhou (${cnpj_c})"
+name_c="Cliente Gama ${epoch}"
+code=$(json_post /v1/customers \
+  "{\"cnpj\":\"${cnpj_c}\",\"legalName\":\"${name_c}\",\"municipalityCode\":3304557,\"neighborhood\":\"${conflict_hood}\",\"branchIds\":[${branch_id}]}")
+[ "$code" = "201" ] || fail "POST /v1/customers (C, conflito) esperado 201, recebido ${code}: $(cat "$body")"
+customer_c=$(json_get 'j.id')
+[ -n "$customer_c" ] || fail "cliente C criado sem id"
+ok "cliente C (${customer_c}) criado no bairro único '${conflict_hood}' (RJ)"
+
+make_portfolio() { # make_portfolio <nome> <regioes-json> -> id em $new_pid, ETag atual em $new_version
+  code=$(json_post /v1/portfolios \
+    "{\"name\":\"$1\",\"branchId\":${branch_id},\"responsibleSub\":\"admin-01\",\"portfolioTypeId\":${type_id}}")
+  [ "$code" = "201" ] || fail "POST /v1/portfolios ($1) esperado 201, recebido ${code}: $(cat "$body")"
+  new_pid=$(json_get 'j.id')
+  code=$(json_put "/v1/portfolios/${new_pid}/filters" 1 \
+    "{\"regions\":$2,\"retailNetworkIds\":[],\"economicGroupIds\":[]}")
+  [ "$code" = "200" ] || fail "PUT /filters ($1) esperado 200, recebido ${code}: $(cat "$body")"
+  code=$(json_put "/v1/portfolios/${new_pid}/sellers" 2 \
+    "{\"assignments\":[{\"sellerId\":${seller_id},\"productSubgroupId\":${pf_subgroup_id}}]}")
+  [ "$code" = "200" ] || fail "PUT /sellers ($1) esperado 200, recebido ${code}: $(cat "$body")"
+  new_version=$(tr -d '\r' < "$hdrs" | sed -n 's/^[Ee][Tt][Aa][Gg]:[[:space:]]*"\([0-9]*\)".*/\1/p' | head -n1)
+  [ -n "$new_version" ] || fail "carteira $1 sem ETag: $(cat "$hdrs")"
+}
+
+preview_c() { # preview_c <carteira> -> código HTTP (corpo em $body), buscando só o cliente C
+  curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" -G "${API_URL}/v1/portfolios/$1/preview" \
+    --data-urlencode "q=$name_c" || true
+}
+
+# C na carteira $1: espera resolução $2 e posto $3.
+expect_c() {
+  code=$(preview_c "$1")
+  [ "$code" = "200" ] || fail "GET preview da carteira $1 esperado 200, recebido ${code}: $(cat "$body")"
+  [ "$(json_get "j.items.filter(i=>i.customer.id===${customer_c} && i.resolution==='$2' && i.rank===$3).length")" = "1" ] \
+    || fail "carteira $1: C esperado com resolution=$2 e rank=$3: $(cat "$body")"
+}
+
+deactivate_portfolio() { # deactivate_portfolio <id> <versão>
+  code=$(curl -s -o "$body" -w '%{http_code}' -X POST "${API_URL}/v1/portfolios/$1/deactivate" \
+    -H "$auth_admin" -H "If-Match: \"$2\"" || true)
+  [ "$code" = "200" ] || fail "deactivate da carteira $1 esperado 200, recebido ${code}: $(cat "$body")"
+}
+
+hood_region="{\"level\":\"neighborhood\",\"stateCode\":33,\"municipalityCode\":3304557,\"neighborhoodLabel\":\"${conflict_hood}\"}"
+city_region='{"level":"municipality","stateCode":33,"municipalityCode":3304557}'
+
+make_portfolio "Conflito bairro ${epoch}" "[${hood_region}]"
+pf_hood=$new_pid
+hood_version=$new_version
+make_portfolio "Conflito cidade ${epoch}" "[${city_region}]"
+pf_city=$new_pid
+city_version=$new_version
+ok "carteiras do conflito criadas: bairro (${pf_hood}) e município (${pf_city}), mesmo vendedor/subgrupo"
+
+expect_c "$pf_hood" assigned 3
+expect_c "$pf_city" lost 2
+code=$(preview_c "$pf_city")
+[ "$(json_get "j.items[0].competitors.filter(c=>c.portfolioId===${pf_hood} && c.rank===3).length")" = "1" ] \
+  || fail "carteira do município: C esperado com a carteira do bairro (${pf_hood}, posto 3) em competitors: $(cat "$body")"
+ok "bairro x município: C assigned (posto 3) no bairro e lost (posto 2) no município, com concorrente"
+
+make_portfolio "Conflito empate ${epoch}" "[${hood_region}]"
+pf_tie=$new_pid
+tie_version=$new_version
+expect_c "$pf_hood" blocked 3
+expect_c "$pf_tie" blocked 3
+# As contagens de conflito só vêm sob demanda (?include=conflicts): resolver a disputa inteira custa caro.
+code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/portfolios/${pf_hood}?include=conflicts" || true)
+[ "$code" = "200" ] || fail "GET /v1/portfolios/${pf_hood}?include=conflicts esperado 200, recebido ${code}"
+[ "$(json_get 'j.conflictsBlocked >= 1')" = "true" ] || fail "agregado esperava conflictsBlocked >= 1: $(cat "$body")"
+code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" -G "${API_URL}/v1/portfolios/${pf_hood}/preview" \
+  --data-urlencode "q=$name_c" --data-urlencode "resolution=blocked" || true)
+[ "$code" = "200" ] || fail "GET preview?resolution=blocked esperado 200, recebido ${code}: $(cat "$body")"
+[ "$(json_get 'j.total')" = "1" ] || fail "preview?resolution=blocked esperava total 1 para C: $(cat "$body")"
+code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/portfolios/${pf_hood}/preview?resolution=foo" || true)
+[ "$code" = "400" ] || fail "preview?resolution=foo esperado 400, recebido ${code}"
+ok "empate de posto 3: C blocked nas duas carteiras, conflictsBlocked >= 1 e filtro resolution (foo -> 400)"
+
+deactivate_portfolio "$pf_tie" "$tie_version"
+expect_c "$pf_hood" assigned 3
+ok "carteira do empate inativada: C volta a assigned na carteira do bairro"
+
+deactivate_portfolio "$pf_hood" "$hood_version"
+deactivate_portfolio "$pf_city" "$city_version"
+ok "carteiras do teste de conflito inativadas ao final"
+
 echo "Smoke concluído com sucesso."

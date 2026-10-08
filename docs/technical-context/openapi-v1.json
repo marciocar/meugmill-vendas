@@ -7507,6 +7507,14 @@
                       ],
                       "type": "object"
                     },
+                    "conflictsBlocked": {
+                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados). Só com `include=conflicts`.",
+                      "type": "integer"
+                    },
+                    "conflictsLost": {
+                      "description": "Clientes desta carteira em que outra da filial tem posto maior. Só com `include=conflicts`.",
+                      "type": "integer"
+                    },
                     "createdAt": {
                       "type": "integer"
                     },
@@ -7908,6 +7916,18 @@
       "get": {
         "parameters": [
           {
+            "description": "Acrescenta `conflictsBlocked` e `conflictsLost` (mais lento: resolve a disputa).",
+            "in": "query",
+            "name": "include",
+            "required": false,
+            "schema": {
+              "enum": [
+                "conflicts"
+              ],
+              "type": "string"
+            }
+          },
+          {
             "in": "path",
             "name": "id",
             "required": true,
@@ -7944,6 +7964,14 @@
                         "name"
                       ],
                       "type": "object"
+                    },
+                    "conflictsBlocked": {
+                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados). Só com `include=conflicts`.",
+                      "type": "integer"
+                    },
+                    "conflictsLost": {
+                      "description": "Clientes desta carteira em que outra da filial tem posto maior. Só com `include=conflicts`.",
+                      "type": "integer"
                     },
                     "createdAt": {
                       "type": "integer"
@@ -8427,6 +8455,14 @@
                       ],
                       "type": "object"
                     },
+                    "conflictsBlocked": {
+                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados). Só com `include=conflicts`.",
+                      "type": "integer"
+                    },
+                    "conflictsLost": {
+                      "description": "Clientes desta carteira em que outra da filial tem posto maior. Só com `include=conflicts`.",
+                      "type": "integer"
+                    },
                     "createdAt": {
                       "type": "integer"
                     },
@@ -8873,6 +8909,14 @@
                         "name"
                       ],
                       "type": "object"
+                    },
+                    "conflictsBlocked": {
+                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados). Só com `include=conflicts`.",
+                      "type": "integer"
+                    },
+                    "conflictsLost": {
+                      "description": "Clientes desta carteira em que outra da filial tem posto maior. Só com `include=conflicts`.",
+                      "type": "integer"
                     },
                     "createdAt": {
                       "type": "integer"
@@ -9403,6 +9447,14 @@
                         "name"
                       ],
                       "type": "object"
+                    },
+                    "conflictsBlocked": {
+                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados). Só com `include=conflicts`.",
+                      "type": "integer"
+                    },
+                    "conflictsLost": {
+                      "description": "Clientes desta carteira em que outra da filial tem posto maior. Só com `include=conflicts`.",
+                      "type": "integer"
                     },
                     "createdAt": {
                       "type": "integer"
@@ -10162,6 +10214,14 @@
                       ],
                       "type": "object"
                     },
+                    "conflictsBlocked": {
+                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados). Só com `include=conflicts`.",
+                      "type": "integer"
+                    },
+                    "conflictsLost": {
+                      "description": "Clientes desta carteira em que outra da filial tem posto maior. Só com `include=conflicts`.",
+                      "type": "integer"
+                    },
                     "createdAt": {
                       "type": "integer"
                     },
@@ -10593,6 +10653,34 @@
             }
           },
           {
+            "description": "assigned: sem disputa ou posto maior; lost: outra carteira tem posto maior; blocked: empate no maior posto (revisão).",
+            "in": "query",
+            "name": "resolution",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "assigned"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "lost"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "blocked"
+                  ],
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          {
             "in": "query",
             "name": "cursor",
             "required": false,
@@ -10630,6 +10718,30 @@
                     "items": {
                       "items": {
                         "properties": {
+                          "competitors": {
+                            "description": "Carteiras não inativas da mesma filial em que o cliente também tem posto.",
+                            "items": {
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "portfolioId": {
+                                  "type": "integer"
+                                },
+                                "rank": {
+                                  "description": "1 UF, 2 município, 3 bairro, 4 rede, 5 grupo econômico, 6 inclusão manual.",
+                                  "type": "integer"
+                                }
+                              },
+                              "required": [
+                                "portfolioId",
+                                "name",
+                                "rank"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
                           "customer": {
                             "properties": {
                               "cnpj": {
@@ -10718,6 +10830,33 @@
                               }
                             ]
                           },
+                          "rank": {
+                            "description": "Posto desta carteira para o cliente (6 = inclusão manual).",
+                            "type": "integer"
+                          },
+                          "resolution": {
+                            "anyOf": [
+                              {
+                                "enum": [
+                                  "assigned"
+                                ],
+                                "type": "string"
+                              },
+                              {
+                                "enum": [
+                                  "lost"
+                                ],
+                                "type": "string"
+                              },
+                              {
+                                "enum": [
+                                  "blocked"
+                                ],
+                                "type": "string"
+                              }
+                            ],
+                            "description": "assigned: sem disputa ou posto maior; lost: outra carteira tem posto maior; blocked: empate no maior posto (revisão)."
+                          },
                           "source": {
                             "anyOf": [
                               {
@@ -10739,7 +10878,10 @@
                           "customer",
                           "source",
                           "matchedRegionLevel",
-                          "matchedBy"
+                          "matchedBy",
+                          "rank",
+                          "resolution",
+                          "competitors"
                         ],
                         "type": "object"
                       },
@@ -10951,6 +11093,14 @@
                         "name"
                       ],
                       "type": "object"
+                    },
+                    "conflictsBlocked": {
+                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados). Só com `include=conflicts`.",
+                      "type": "integer"
+                    },
+                    "conflictsLost": {
+                      "description": "Clientes desta carteira em que outra da filial tem posto maior. Só com `include=conflicts`.",
+                      "type": "integer"
                     },
                     "createdAt": {
                       "type": "integer"
@@ -11436,6 +11586,14 @@
                         "name"
                       ],
                       "type": "object"
+                    },
+                    "conflictsBlocked": {
+                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados). Só com `include=conflicts`.",
+                      "type": "integer"
+                    },
+                    "conflictsLost": {
+                      "description": "Clientes desta carteira em que outra da filial tem posto maior. Só com `include=conflicts`.",
+                      "type": "integer"
                     },
                     "createdAt": {
                       "type": "integer"

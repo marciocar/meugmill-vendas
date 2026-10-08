@@ -6,10 +6,28 @@ export const MAX_OVERRIDES = 5000;
 
 const Id = Type.Integer({ minimum: 1 });
 
+/** Resultado da disputa do cliente entre carteiras da mesma filial. */
+export const ResolutionSchema = Type.Union(
+  [Type.Literal('assigned'), Type.Literal('lost'), Type.Literal('blocked')],
+  {
+    description:
+      'assigned: sem disputa ou posto maior; lost: outra carteira tem posto maior; blocked: empate no maior posto (revisão).',
+  },
+);
+
+export const CompetitorSchema = Type.Object({
+  portfolioId: Type.Integer(),
+  name: Type.String(),
+  rank: Type.Integer({
+    description: '1 UF, 2 município, 3 bairro, 4 rede, 5 grupo econômico, 6 inclusão manual.',
+  }),
+});
+
 export const PreviewQuerySchema = Type.Object(
   {
     q: Type.Optional(Type.String({ maxLength: 100 })),
     source: Type.Optional(Type.Union([Type.Literal('filter'), Type.Literal('manual')])),
+    resolution: Type.Optional(ResolutionSchema),
     cursor: Type.Optional(Type.String({ maxLength: 64 })),
     limit: Type.Optional(Type.Integer({ minimum: 1, maximum: MAX_LIMIT })),
   },
@@ -53,6 +71,11 @@ export const PreviewItemSchema = Type.Object({
     region: Type.Boolean(),
     retailNetwork: Type.Boolean(),
     economicGroup: Type.Boolean(),
+  }),
+  rank: Type.Integer({ description: 'Posto desta carteira para o cliente (6 = inclusão manual).' }),
+  resolution: ResolutionSchema,
+  competitors: Type.Array(CompetitorSchema, {
+    description: 'Carteiras não inativas da mesma filial em que o cliente também tem posto.',
   }),
 });
 

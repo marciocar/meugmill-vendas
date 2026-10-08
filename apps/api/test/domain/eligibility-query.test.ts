@@ -195,6 +195,9 @@ describe('motor de elegibilidade: critérios', () => {
         source: 'filter',
         matchedRegionLevel: null,
         matchedBy: { region: false, retailNetwork: true, economicGroup: true },
+        rank: 5,
+        resolution: 'assigned',
+        competitors: [],
       },
     ]);
   });
@@ -257,6 +260,9 @@ describe('motor de elegibilidade: critérios', () => {
         source: 'manual',
         matchedRegionLevel: null,
         matchedBy: { region: false, retailNetwork: false, economicGroup: false },
+        rank: 6,
+        resolution: 'assigned',
+        competitors: [],
       },
     ]);
     expect(p.total).toBe(1);
@@ -338,6 +344,9 @@ describe('motor de elegibilidade: combinações de critérios', () => {
         source: 'filter',
         matchedRegionLevel: 'state',
         matchedBy: { region: true, retailNetwork: true, economicGroup: true },
+        rank: 5,
+        resolution: 'assigned',
+        competitors: [],
       },
     ]);
   });

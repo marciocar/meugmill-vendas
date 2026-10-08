@@ -123,9 +123,34 @@ export const PortfolioResponseSchema = Type.Object({
   sellers: Type.Array(Type.Object({ seller: CodeRef, productSubgroup: CodeRef })),
   overridesInclude: Type.Integer({ description: 'Clientes incluídos manualmente na prévia.' }),
   overridesExclude: Type.Integer({ description: 'Clientes excluídos manualmente da prévia.' }),
+  conflictsBlocked: Type.Optional(
+    Type.Integer({
+      description:
+        'Clientes desta carteira em empate de posto com outra da filial (bloqueados). Só com `include=conflicts`.',
+    }),
+  ),
+  conflictsLost: Type.Optional(
+    Type.Integer({
+      description:
+        'Clientes desta carteira em que outra da filial tem posto maior. Só com `include=conflicts`.',
+    }),
+  ),
   ...AuditResponseFields,
 });
 export type PortfolioResponse = Static<typeof PortfolioResponseSchema>;
+
+/** Dados opcionais do agregado, sob demanda (as contagens de conflito resolvem a disputa inteira). */
+export const PortfolioGetQuerySchema = Type.Object(
+  {
+    include: Type.Optional(
+      Type.Literal('conflicts', {
+        description: 'Acrescenta `conflictsBlocked` e `conflictsLost` (mais lento: resolve a disputa).',
+      }),
+    ),
+  },
+  { additionalProperties: false },
+);
+export type PortfolioInclude = NonNullable<Static<typeof PortfolioGetQuerySchema>['include']>;
 
 export const PortfolioListItemSchema = Type.Object({
   id: Type.Integer(),

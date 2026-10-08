@@ -138,6 +138,8 @@ export const customers = sqliteTable(
   },
   (t) => [
     index('customers_municipality_neighborhood_idx').on(t.municipalityCode, t.neighborhoodKey),
+    // Candidatos por UF no motor de elegibilidade/conflitos (E4/E5).
+    index('customers_state_code_idx').on(t.stateCode),
     index('customers_retail_network_id_idx').on(t.retailNetworkId),
     index('customers_economic_group_id_idx').on(t.economicGroupId),
   ],

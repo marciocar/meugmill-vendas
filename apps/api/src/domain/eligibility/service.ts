@@ -1,6 +1,6 @@
 import { eq, inArray, sql } from 'drizzle-orm';
 import { customers, municipalities, portfolioCustomerOverrides } from '../../db/schema.js';
-import { loadAggregate } from '../portfolios/aggregate.js';
+import { loadAggregateBase } from '../portfolios/aggregate.js';
 import { bump, findScoped, openForEdit } from '../portfolios/access.js';
 import { type Actor } from '../shared/authz.js';
 import { writeTx, type Conn, type Db, type ServiceOptions } from '../shared/db.js';
@@ -167,7 +167,7 @@ export function createEligibilityService(db: Db, opts: ServiceOptions = {}): Eli
             .run();
         }
         bump(tx, row, actor, at);
-        return loadAggregate(tx, portfolioId);
+        return loadAggregateBase(tx, portfolioId);
       });
     },
   };

@@ -17,7 +17,7 @@ import { decodeCursor, resolveLimit, toPage, type Page } from '../shared/paginat
 import { likeContains } from '../shared/sql.js';
 import { cleanText, parseInput } from '../shared/validate.js';
 import { findScoped, openForEdit, bump } from './access.js';
-import { loadAggregate } from './aggregate.js';
+import { loadAggregateBase, withConflicts } from './aggregate.js';
 import { requireAdminister } from './authz.js';
 import { portfolioNameKey } from './name-key.js';
 import {
@@ -28,6 +28,7 @@ import {
   UpdatePortfolioSchema,
   type CreatePortfolioInput,
   type PortfolioListItem,
+  type PortfolioInclude,
   type PortfolioListParams,
   type PortfolioResponse,
   type ReplaceFiltersInput,
@@ -48,8 +49,11 @@ import {
 export interface PortfolioService {
   /** Itens resumidos, só das filiais do token. */
   list(actor: Actor, params?: PortfolioListParams): Page<PortfolioListItem>;
-  /** Agregado completo (informações, filtros e vendedores). */
-  get(actor: Actor, id: number): PortfolioResponse;
+  /**
+   * Agregado completo (informações, filtros e vendedores). `include: 'conflicts'` acrescenta as contagens
+   * de conflito (custo de resolver a disputa da carteira inteira; por isso só sob demanda).
+   */
+  get(actor: Actor, id: number, include?: PortfolioInclude): PortfolioResponse;
   /** Cria o rascunho (admin com a filial no token). */
   create(actor: Actor, input: CreatePortfolioInput): PortfolioResponse;
   update(
@@ -123,7 +127,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
       const row = findScoped(tx, actor, id);
       requireAdminister(actor);
       const version = requireVersion(expected);
-      if (row.active === active) return loadAggregate(tx, id); // idempotente
+      if (row.active === active) return loadAggregateBase(tx, id); // idempotente
       assertVersion(row.version, version);
       if (active) {
         // Reativar revalida o que pode ter mudado enquanto estava inativa. Vendedores com vínculo
@@ -132,7 +136,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
         assertActiveType(tx, row.portfolioTypeId);
       }
       writeActive(tx, portfolios as unknown as AuditedTable, id, active, actor.sub, now());
-      return loadAggregate(tx, id);
+      return loadAggregateBase(tx, id);
     });
   }
 
@@ -188,9 +192,10 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
       return toPage(rows, limit, (r) => r.id);
     },
 
-    get(actor, id) {
+    get(actor, id, include) {
       findScoped(db, actor, id);
-      return loadAggregate(db, id);
+      const base = loadAggregateBase(db, id);
+      return include === 'conflicts' ? withConflicts(db, base) : base;
     },
 
     create(actor, input) {
@@ -222,7 +227,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
             })
             .returning({ id: portfolios.id })
             .get();
-          return loadAggregate(tx, row.id);
+          return loadAggregateBase(tx, row.id);
         } catch (err) {
           if (isUniqueViolation(err)) throw new DomainError('conflict', NAME_TAKEN);
           throw err;
@@ -279,7 +284,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
           if (isUniqueViolation(err)) throw new DomainError('conflict', NAME_TAKEN);
           throw err;
         }
-        return loadAggregate(tx, id);
+        return loadAggregateBase(tx, id);
       });
     },
 
@@ -312,7 +317,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
             .run();
         }
         bump(tx, row, actor, now());
-        return loadAggregate(tx, id);
+        return loadAggregateBase(tx, id);
       });
     },
 
@@ -328,7 +333,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
             .run();
         }
         bump(tx, row, actor, now());
-        return loadAggregate(tx, id);
+        return loadAggregateBase(tx, id);
       });
     },
 
