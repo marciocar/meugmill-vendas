@@ -1,9 +1,11 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, sql, type SQL } from 'drizzle-orm';
 import { portfolios } from '../../db/schema.js';
 import { assertVersion, requireVersion } from '../shared/audit.js';
 import { resolveScopeIds, type Actor } from '../shared/authz.js';
-import type { Conn } from '../shared/db.js';
+import type { Conn, ServiceOptions } from '../shared/db.js';
 import { DomainError, notFound } from '../shared/errors.js';
+import { canReadBroadly } from '../visibility/profiles.js';
+import { portfolioReadableSql } from '../visibility/sql.js';
 import { requireEdit } from './authz.js';
 
 export type PortfolioRow = typeof portfolios.$inferSelect;
@@ -14,6 +16,34 @@ export const INACTIVE = 'Carteira inativa: reative antes de editar';
 export function findScoped(conn: Conn, actor: Actor, id: number): PortfolioRow {
   const row = conn.select().from(portfolios).where(eq(portfolios.id, id)).get();
   if (!row || !resolveScopeIds(conn, actor).includes(row.branchId)) throw notFound();
+  return row;
+}
+
+/**
+ * Leitura da carteira em si (E3, E8): quem não lê amplo (admin, supervisão ou legacy) só enxerga as em que
+ * é responsável ou em que o seu vendedor atua. Sem restrição, devolve `undefined`.
+ */
+export function visiblePortfoliosClause(actor: Actor, opts?: ServiceOptions): SQL | undefined {
+  return canReadBroadly(actor, opts, 'portfolios') ? undefined : portfolioReadableSql(actor);
+}
+
+/** Carteira visível ao ator (escopo de filial + `visiblePortfoliosClause`); senão, not_found. */
+export function findVisible(conn: Conn, actor: Actor, id: number, opts?: ServiceOptions): PortfolioRow {
+  const row = findScoped(conn, actor, id);
+  const clause = visiblePortfoliosClause(actor, opts);
+  if (clause && !conn.get(sql`select 1 from portfolios where ${and(sql`id = ${id}`, clause)}`)) {
+    throw notFound();
+  }
+  return row;
+}
+
+/**
+ * Leitura dos dados DENTRO da carteira (prévia, ajustes, atribuições, vínculos): leitura ampla ou ser o
+ * responsável; os demais recebem not_found, como fora do escopo. A edição segue em `openForEdit`.
+ */
+export function findReadable(conn: Conn, actor: Actor, id: number, opts?: ServiceOptions): PortfolioRow {
+  const row = findScoped(conn, actor, id);
+  if (row.responsibleSub !== actor.sub && !canReadBroadly(actor, opts, 'portfolio-data')) throw notFound();
   return row;
 }
 

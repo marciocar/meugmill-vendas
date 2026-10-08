@@ -1,13 +1,18 @@
 import { isAdmin, type Actor } from '../shared/authz.js';
 import { forbidden } from '../shared/errors.js';
+import { isReadOnly } from '../visibility/profiles.js';
 
 /**
  * Regras por dono. A leitura/escopo por filial é checada antes (fora do escopo vira `not_found`);
  * aqui o ator já enxerga a filial da carteira no token.
  */
 
-/** Admin da filial ou o responsável editam informações, filtros e vendedores. */
+/**
+ * Admin da filial ou o responsável editam informações, filtros e vendedores.
+ * Supervisão (sem admin) é só leitura: nunca edita, nem sendo o responsável (E8).
+ */
 export function canEdit(actor: Actor, portfolio: { responsibleSub: string }): boolean {
+  if (isReadOnly(actor)) return false;
   return isAdmin(actor) || actor.sub === portfolio.responsibleSub;
 }
 

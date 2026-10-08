@@ -50,8 +50,9 @@ export function actor(opts: { sub?: string; roles?: string[]; branches?: string[
 
 export const adminOf = (...branchCodes: string[]): Actor =>
   actor({ roles: ['admin'], branches: branchCodes });
+/** Leitor da filial: perfil de leitura ampla e só leitura (E8: vendedor sem vínculos já não lê a filial toda). */
 export const readerOf = (...branchCodes: string[]): Actor =>
-  actor({ roles: ['vendedor'], branches: branchCodes });
+  actor({ roles: ['supervisao'], branches: branchCodes });
 
 /** Insere uma filial direto no banco (fixture, sem passar pelas regras). Retorna o id. */
 export function seedBranch(db: Db, code: string, opts: { active?: boolean; name?: string } = {}): number {

@@ -1,7 +1,7 @@
 import { eq, inArray, sql } from 'drizzle-orm';
 import { customers, municipalities, portfolioCustomerOverrides } from '../../db/schema.js';
 import { loadAggregateBase } from '../portfolios/aggregate.js';
-import { bump, findScoped, openForEdit } from '../portfolios/access.js';
+import { bump, findReadable, openForEdit } from '../portfolios/access.js';
 import { type Actor } from '../shared/authz.js';
 import { writeTx, type Conn, type Db, type ServiceOptions } from '../shared/db.js';
 import { invalid } from '../shared/errors.js';
@@ -89,7 +89,7 @@ export function createEligibilityService(db: Db, opts: ServiceOptions = {}): Eli
   return {
     preview(actor, portfolioId, params = {}) {
       const p = parseInput(PreviewQuerySchema, params);
-      findScoped(db, actor, portfolioId);
+      findReadable(db, actor, portfolioId, opts);
       const page = previewPage(db, loadPortfolioCriteria(db, portfolioId), { portfolioId, ...p });
       const data = customersById(
         db,
@@ -106,7 +106,7 @@ export function createEligibilityService(db: Db, opts: ServiceOptions = {}): Eli
     },
 
     getOverrides(actor, portfolioId) {
-      const portfolio = findScoped(db, actor, portfolioId);
+      const portfolio = findReadable(db, actor, portfolioId, opts);
       const rows = db
         .select({ customerId: portfolioCustomerOverrides.customerId, kind: portfolioCustomerOverrides.kind })
         .from(portfolioCustomerOverrides)

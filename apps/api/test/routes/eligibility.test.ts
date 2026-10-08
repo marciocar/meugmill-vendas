@@ -7,7 +7,7 @@ import { ES, SAO_PAULO, SERRA, SP, adminOf, seedBranch } from '../helpers/seed.j
 
 const ADMIN: TokenOptions = { sub: 'adm-1', roles: ['admin'], branches: ['SER'] };
 const OWNER: TokenOptions = { sub: 'resp-1', roles: ['vendedor'], branches: ['SER'] };
-const READER: TokenOptions = { sub: 'leitor-1', roles: ['vendedor'], branches: ['SER'] };
+const READER: TokenOptions = { sub: 'leitor-1', roles: ['supervisao'], branches: ['SER'] };
 const OTHER: TokenOptions = { sub: 'adm-2', roles: ['admin'], branches: ['CAR'] };
 
 const SECRET_NAME = 'Drogaria Segredo Sigilosa Ltda';

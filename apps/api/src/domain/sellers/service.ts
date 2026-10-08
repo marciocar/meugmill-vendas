@@ -2,7 +2,14 @@ import { and, asc, eq, gt, or, sql } from 'drizzle-orm';
 import { sellers } from '../../db/schema.js';
 import { endLinksWhere } from '../links/write.js';
 import { assertVersion, requireVersion, type AuditedTable } from '../shared/audit.js';
-import { assertAllInScope, intersects, requireAdmin, resolveScopeIds, type Actor } from '../shared/authz.js';
+import {
+  assertAllInScope,
+  intersects,
+  isAdmin,
+  requireAdmin,
+  resolveScopeIds,
+  type Actor,
+} from '../shared/authz.js';
 import { isUniqueViolation, writeTx, type Conn, type Db, type ServiceOptions } from '../shared/db.js';
 import { DomainError, forbidden, notFound } from '../shared/errors.js';
 import {
@@ -50,6 +57,19 @@ export interface SellerService
 }
 
 const SELLER_EXISTS = 'Já existe vendedor com este código';
+const USER_SUB_TAKEN = 'Este login já está ligado a outro vendedor';
+
+/** `sub` é opaco e sensível a caixa: só trim; vazio ou null viram null (sem ligação). */
+function cleanUserSub(value: string | null | undefined): string | null {
+  const out = value?.trim() ?? '';
+  return out === '' ? null : out;
+}
+
+/** Outro vendedor já usa este `sub`? (rede de segurança: o índice único parcial também barra.) */
+function userSubTaken(conn: Conn, userSub: string, exceptId?: number): boolean {
+  const row = conn.select({ id: sellers.id }).from(sellers).where(eq(sellers.userSub, userSub)).get();
+  return row !== undefined && row.id !== exceptId;
+}
 
 /**
  * Vendedores (só código e nome + filiais). Visível ao ator se ligado a >= 1 filial do token.
@@ -58,7 +78,8 @@ const SELLER_EXISTS = 'Já existe vendedor com este código';
 export function createSellerService(db: Db, opts: ServiceOptions = {}): SellerService {
   const now = opts.now ?? Date.now;
 
-  const toResponses = (conn: Conn, rows: SellerRow[], scopeIds: number[]): SellerResponse[] => {
+  const toResponses = (conn: Conn, actor: Actor, rows: SellerRow[], scopeIds: number[]): SellerResponse[] => {
+    const exposeSub = isAdmin(actor);
     const links = sellerLinks.scopedBranches(
       conn,
       rows.map((r) => r.id),
@@ -71,6 +92,7 @@ export function createSellerService(db: Db, opts: ServiceOptions = {}): SellerSe
         code: r.code,
         name: r.name,
         branches: publicBranches(scoped),
+        ...(exposeSub ? { userSub: r.userSub } : {}),
         // `active`/`deactivatedAt` refletem o estado visto pelo ator (registro global + vínculos do escopo).
         ...effectiveState(r, scoped),
         version: r.version,
@@ -126,7 +148,7 @@ export function createSellerService(db: Db, opts: ServiceOptions = {}): SellerSe
           endLinksWhere(tx, { sellerId: id, branchIds: off }, actor.sub, at);
         }
       }
-      return toResponses(tx, [findRaw(tx, id)], scopeIds)[0] as SellerResponse;
+      return toResponses(tx, actor, [findRaw(tx, id)], scopeIds)[0] as SellerResponse;
     });
   }
 
@@ -159,13 +181,13 @@ export function createSellerService(db: Db, opts: ServiceOptions = {}): SellerSe
         .orderBy(asc(sellers.id))
         .limit(limit + 1)
         .all();
-      return toPage(toResponses(db, rows, scopeIds), limit, (r) => r.id);
+      return toPage(toResponses(db, actor, rows, scopeIds), limit, (r) => r.id);
     },
 
     get(actor, id) {
       const scopeIds = resolveScopeIds(db, actor);
       const row = findVisible(db, id, scopeIds);
-      return toResponses(db, [row], scopeIds)[0] as SellerResponse;
+      return toResponses(db, actor, [row], scopeIds)[0] as SellerResponse;
     },
 
     create(actor, input) {
@@ -173,9 +195,11 @@ export function createSellerService(db: Db, opts: ServiceOptions = {}): SellerSe
       const data = parseInput(CreateSellerSchema, input);
       const code = cleanCode(data.code);
       const name = cleanText(data.name, 'name');
+      const userSub = cleanUserSub(data.userSub);
       return writeTx(db, (tx) => {
         const scopeIds = resolveScopeIds(tx, actor);
         assertAllInScope(data.branchIds, scopeIds);
+        if (userSub !== null && userSubTaken(tx, userSub)) throw new DomainError('conflict', USER_SUB_TAKEN);
         if (tx.select({ id: sellers.id }).from(sellers).where(eq(sellers.code, code)).get()) {
           throw new DomainError('seller_exists', SELLER_EXISTS);
         }
@@ -188,6 +212,7 @@ export function createSellerService(db: Db, opts: ServiceOptions = {}): SellerSe
               code,
               name,
               nameKey: searchKey(name),
+              userSub,
               createdAt: at,
               updatedAt: at,
               createdBy: actor.sub,
@@ -196,9 +221,14 @@ export function createSellerService(db: Db, opts: ServiceOptions = {}): SellerSe
             .returning()
             .get();
           sellerLinks.add(tx, row.id, data.branchIds, actor.sub, at);
-          return toResponses(tx, [row], scopeIds)[0] as SellerResponse;
+          return toResponses(tx, actor, [row], scopeIds)[0] as SellerResponse;
         } catch (err) {
-          if (isUniqueViolation(err)) throw new DomainError('seller_exists', SELLER_EXISTS);
+          if (isUniqueViolation(err)) {
+            const taken = userSub !== null && userSubTaken(tx, userSub);
+            throw taken
+              ? new DomainError('conflict', USER_SUB_TAKEN)
+              : new DomainError('seller_exists', SELLER_EXISTS);
+          }
           throw err;
         }
       });
@@ -214,8 +244,14 @@ export function createSellerService(db: Db, opts: ServiceOptions = {}): SellerSe
         assertVersion(row.version, version);
         // O nome vale para todas as filiais: só quem cobre todas as filiais do vendedor o altera.
         const name = data.name === undefined ? row.name : cleanText(data.name, 'name');
-        if (name !== row.name && !coversAllBranches(sellerLinks.branchIdsOf(tx, id), scopeIds)) {
+        // Idem para o `sub` do login: vale para o cadastro inteiro, não só para a filial do ator.
+        const userSub = data.userSub === undefined ? row.userSub : cleanUserSub(data.userSub);
+        const sharedChanged = name !== row.name || userSub !== row.userSub;
+        if (sharedChanged && !coversAllBranches(sellerLinks.branchIdsOf(tx, id), scopeIds)) {
           throw forbidden('Alterar dados compartilhados exige todas as filiais do cadastro no token');
+        }
+        if (userSub !== null && userSub !== row.userSub && userSubTaken(tx, userSub, id)) {
+          throw new DomainError('conflict', USER_SUB_TAKEN);
         }
         const at = now();
         if (data.branchIds !== undefined) {
@@ -228,13 +264,14 @@ export function createSellerService(db: Db, opts: ServiceOptions = {}): SellerSe
           .set({
             name,
             nameKey: searchKey(name),
+            userSub,
             version: row.version + 1,
             updatedAt: at,
             updatedBy: actor.sub,
           })
           .where(eq(sellers.id, id))
           .run();
-        return toResponses(tx, [findRaw(tx, id)], scopeIds)[0] as SellerResponse;
+        return toResponses(tx, actor, [findRaw(tx, id)], scopeIds)[0] as SellerResponse;
       });
     },
 

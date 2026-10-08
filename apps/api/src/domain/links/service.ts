@@ -1,12 +1,13 @@
 import { sql } from 'drizzle-orm';
 import { loadAssignmentGrid } from '../distribution/grid.js';
 import { conflictTotals, effectiveMembers } from '../conflicts/members.js';
-import { bump, findScoped, openForEdit } from '../portfolios/access.js';
+import { bump, findReadable, openForEdit } from '../portfolios/access.js';
 import { loadAggregateBase } from '../portfolios/aggregate.js';
 import { resolveScopeIds, type Actor } from '../shared/authz.js';
 import { writeTx, type Conn, type Db, type ServiceOptions } from '../shared/db.js';
-import { DomainError, invalid, notFound } from '../shared/errors.js';
+import { DomainError, forbidden, invalid, notFound } from '../shared/errors.js';
 import { decodeCursor, encodeCursor, resolveLimit } from '../shared/pagination.js';
+import { canReadBroadly } from '../visibility/profiles.js';
 import { parseInput } from '../shared/validate.js';
 import {
   DEFAULT_EVENTS_LIMIT,
@@ -262,7 +263,7 @@ export function createLinkService(db: Db, opts: ServiceOptions = {}): LinkServic
       const limit = resolveLimit(p.limit);
       const after = decodeCursor(p.cursor);
       return db.transaction((tx) => {
-        findScoped(tx, actor, portfolioId);
+        findReadable(tx, actor, portfolioId, opts);
         const filters = sql`${p.productSubgroupId === undefined ? sql`` : sql` and l.product_subgroup_id = ${p.productSubgroupId}`}${
           p.sellerId === undefined ? sql`` : sql` and l.seller_id = ${p.sellerId}`
         }`;
@@ -283,7 +284,7 @@ export function createLinkService(db: Db, opts: ServiceOptions = {}): LinkServic
       const limit = resolveLimit(p.limit);
       const after = decodeCursor(p.cursor);
       return db.transaction((tx) => {
-        findScoped(tx, actor, portfolioId);
+        findReadable(tx, actor, portfolioId, opts);
         const rows = tx.all<LinkRowRaw>(
           sql`${LINK_SELECT} where l.portfolio_id = ${portfolioId}${
             p.customerId === undefined ? sql`` : sql` and l.customer_id = ${p.customerId}`
@@ -296,6 +297,8 @@ export function createLinkService(db: Db, opts: ServiceOptions = {}): LinkServic
     listLinkEvents(actor, params = {}) {
       const p = parseInput(LinkEventsQuerySchema, params);
       const limit = p.limit ?? DEFAULT_EVENTS_LIMIT;
+      // A outbox é da filial inteira (integração): só leitura ampla, não a visão de vendedor/gestor (E8).
+      if (!canReadBroadly(actor, opts, 'link-events')) throw forbidden('Requer leitura ampla da filial');
       return db.transaction((tx) => {
         const scope = resolveScopeIds(tx, actor);
         if (p.branchId !== undefined && !scope.includes(p.branchId)) throw notFound();

@@ -6,7 +6,7 @@ import { makeRoutesFixture, type RoutesFixture, type TokenOptions } from '../hel
 import { ES, SAO_PAULO, SERRA, SP, VITORIA, adminOf, seedBranch } from '../helpers/seed.js';
 
 const ADMIN: TokenOptions = { sub: 'adm-1', roles: ['admin'], branches: ['SER'] };
-const READER: TokenOptions = { sub: 'leitor-1', roles: ['vendedor'], branches: ['SER'] };
+const READER: TokenOptions = { sub: 'leitor-1', roles: ['supervisao'], branches: ['SER'] };
 const OTHER: TokenOptions = { sub: 'adm-2', roles: ['admin'], branches: ['CAR'] };
 
 let fx: RoutesFixture;

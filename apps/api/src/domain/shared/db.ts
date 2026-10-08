@@ -9,6 +9,11 @@ export type Conn = Db | Tx;
 export interface ServiceOptions {
   /** Relógio injetável (epoch ms); default `Date.now`. */
   now?: () => number;
+  /**
+   * Aviso de acesso em modo `legacy` (E8): o ator não tem nenhum perfil conhecido e lê como antes.
+   * Recebe só o nome do recurso lido; nunca `sub`, papéis, filiais nem dado de negócio.
+   */
+  onLegacyAccess?: (resource: string) => void;
 }
 
 /** Violação de UNIQUE/PK do better-sqlite3 (rede de segurança além do pré-check). */

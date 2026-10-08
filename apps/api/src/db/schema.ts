@@ -83,13 +83,23 @@ export const economicGroups = sqliteTable('economic_groups', {
   ...auditColumns(),
 });
 
-export const sellers = sqliteTable('sellers', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  code: text('code').notNull().unique(),
-  name: text('name').notNull(),
-  nameKey: text('name_key').notNull().default(''),
-  ...auditColumns(),
-});
+export const sellers = sqliteTable(
+  'sellers',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    code: text('code').notNull().unique(),
+    name: text('name').notNull(),
+    nameKey: text('name_key').notNull().default(''),
+    // `sub` do login do vendedor (E8): liga o cadastro à identidade. Opcional e único quando presente.
+    userSub: text('user_sub'),
+    ...auditColumns(),
+  },
+  (t) => [
+    uniqueIndex('sellers_user_sub_unique')
+      .on(t.userSub)
+      .where(sql`${t.userSub} is not null`),
+  ],
+);
 
 export const sellerBranches = sqliteTable(
   'seller_branches',

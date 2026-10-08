@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, sql, type SQL } from 'drizzle-orm';
 import { customers, economicGroups, retailNetworks } from '../../db/schema.js';
 import { assertVersion, requireVersion, type AuditedTable } from '../shared/audit.js';
 import { assertAllInScope, intersects, requireAdmin, resolveScopeIds, type Actor } from '../shared/authz.js';
@@ -28,7 +28,9 @@ import {
   type Page,
 } from '../shared/pagination.js';
 import type { CrudService, SharedActiveService } from '../shared/service.js';
-import { keyContains, likeContains } from '../shared/sql.js';
+import { canReadBroadly } from '../visibility/profiles.js';
+import { visibleCustomersSql } from '../visibility/sql.js';
+import { customerSearchClause } from './search.js';
 import { cleanOptionalText, cleanText, parseInput } from '../shared/validate.js';
 import {
   CreateCustomerSchema,
@@ -121,6 +123,15 @@ export function createCustomerService(db: Db, opts: ServiceOptions = {}): Custom
   const respond = (conn: Conn, id: number, scopeIds: number[]): CustomerResponse =>
     toResponses(conn, [findRaw(conn, id)], scopeIds)[0] as CustomerResponse;
 
+  /**
+   * Restrição de leitura do E8: quem não lê amplo (admin, supervisão ou legacy) só enxerga os clientes
+   * visíveis pelos seus perfis. Sem restrição, devolve `undefined`.
+   */
+  const restrictToVisible = (actor: Actor): SQL | undefined =>
+    canReadBroadly(actor, opts, 'customers')
+      ? undefined
+      : sql`${customers.id} in (select customer_id from (${visibleCustomersSql(actor, false)}))`;
+
   const findRaw = (conn: Conn, id: number): CustomerRow =>
     conn.select().from(customers).where(eq(customers.id, id)).get() as CustomerRow;
   const findVisible = (conn: Conn, id: number, scopeIds: number[]): CustomerRow => {
@@ -184,8 +195,6 @@ export function createCustomerService(db: Db, opts: ServiceOptions = {}): Custom
       const after = decodeCursor(p.cursor);
       const scopeIds = resolveScopeIds(db, actor);
       if (scopeIds.length === 0) return { items: [], nextCursor: null };
-      const q = p.q?.trim();
-      const digits = q ? normalizeCnpj(q) : '';
       const rows = db
         .select()
         .from(customers)
@@ -194,13 +203,8 @@ export function createCustomerService(db: Db, opts: ServiceOptions = {}): Custom
             customerLinks.visibleClause(customers.id, scopeIds),
             after === undefined ? undefined : gt(customers.id, after),
             activeFilter(p.active, scopeIds),
-            q
-              ? or(
-                  keyContains(customers.legalNameKey, q),
-                  keyContains(customers.tradeNameKey, q),
-                  digits ? likeContains(customers.cnpj, digits) : undefined,
-                )
-              : undefined,
+            customerSearchClause(p.q),
+            restrictToVisible(actor),
           ),
         )
         .orderBy(asc(customers.id))
@@ -212,6 +216,18 @@ export function createCustomerService(db: Db, opts: ServiceOptions = {}): Custom
     get(actor, id) {
       const scopeIds = resolveScopeIds(db, actor);
       const row = findVisible(db, id, scopeIds);
+      // Fora dos visíveis é como inexistente (sem distinguir).
+      const restriction = restrictToVisible(actor);
+      if (
+        restriction &&
+        !db
+          .select({ id: customers.id })
+          .from(customers)
+          .where(and(eq(customers.id, id), restriction))
+          .get()
+      ) {
+        throw notFound();
+      }
       return toResponses(db, [row], scopeIds)[0] as CustomerResponse;
     },
 

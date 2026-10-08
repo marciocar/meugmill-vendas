@@ -8,7 +8,7 @@ import { ES, SERRA, adminOf, seedBranch, seedEconomicGroup, seedRetailNetwork } 
 
 const ADMIN: TokenOptions = { sub: 'adm-1', roles: ['admin'], branches: ['SER'] };
 const OWNER: TokenOptions = { sub: 'resp-1', roles: ['vendedor'], branches: ['SER'] };
-const READER: TokenOptions = { sub: 'leitor-1', roles: ['vendedor'], branches: ['SER'] };
+const READER: TokenOptions = { sub: 'leitor-1', roles: ['supervisao'], branches: ['SER'] };
 const OTHER: TokenOptions = { sub: 'adm-2', roles: ['admin'], branches: ['CAR'] };
 
 let fx: RoutesFixture;

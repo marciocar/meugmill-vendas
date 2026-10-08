@@ -23981,6 +23981,11 @@
                           "updatedAt": {
                             "type": "integer"
                           },
+                          "userSub": {
+                            "maxLength": 200,
+                            "nullable": true,
+                            "type": "string"
+                          },
                           "version": {
                             "type": "integer"
                           }
@@ -24280,6 +24285,11 @@
                     "maxLength": 120,
                     "minLength": 1,
                     "type": "string"
+                  },
+                  "userSub": {
+                    "maxLength": 200,
+                    "nullable": true,
+                    "type": "string"
                   }
                 },
                 "required": [
@@ -24347,6 +24357,11 @@
                     },
                     "updatedAt": {
                       "type": "integer"
+                    },
+                    "userSub": {
+                      "maxLength": 200,
+                      "nullable": true,
+                      "type": "string"
                     },
                     "version": {
                       "type": "integer"
@@ -24990,6 +25005,11 @@
                     "updatedAt": {
                       "type": "integer"
                     },
+                    "userSub": {
+                      "maxLength": 200,
+                      "nullable": true,
+                      "type": "string"
+                    },
                     "version": {
                       "type": "integer"
                     }
@@ -25299,6 +25319,11 @@
                     "maxLength": 120,
                     "minLength": 1,
                     "type": "string"
+                  },
+                  "userSub": {
+                    "maxLength": 200,
+                    "nullable": true,
+                    "type": "string"
                   }
                 },
                 "type": "object"
@@ -25361,6 +25386,11 @@
                     },
                     "updatedAt": {
                       "type": "integer"
+                    },
+                    "userSub": {
+                      "maxLength": 200,
+                      "nullable": true,
+                      "type": "string"
                     },
                     "version": {
                       "type": "integer"
@@ -25708,6 +25738,11 @@
                     "updatedAt": {
                       "type": "integer"
                     },
+                    "userSub": {
+                      "maxLength": 200,
+                      "nullable": true,
+                      "type": "string"
+                    },
                     "version": {
                       "type": "integer"
                     }
@@ -26053,6 +26088,11 @@
                     },
                     "updatedAt": {
                       "type": "integer"
+                    },
+                    "userSub": {
+                      "maxLength": 200,
+                      "nullable": true,
+                      "type": "string"
                     },
                     "version": {
                       "type": "integer"
@@ -26400,6 +26440,11 @@
                     "updatedAt": {
                       "type": "integer"
                     },
+                    "userSub": {
+                      "maxLength": 200,
+                      "nullable": true,
+                      "type": "string"
+                    },
                     "version": {
                       "type": "integer"
                     }
@@ -26745,6 +26790,11 @@
                     },
                     "updatedAt": {
                       "type": "integer"
+                    },
+                    "userSub": {
+                      "maxLength": 200,
+                      "nullable": true,
+                      "type": "string"
                     },
                     "version": {
                       "type": "integer"

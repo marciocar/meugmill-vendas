@@ -17,7 +17,7 @@ import { assertBranchesActive } from '../shared/links.js';
 import { decodeCursor, resolveLimit, toPage, type Page } from '../shared/pagination.js';
 import { likeContains } from '../shared/sql.js';
 import { cleanText, parseInput } from '../shared/validate.js';
-import { findScoped, openForEdit, bump } from './access.js';
+import { findScoped, findVisible, openForEdit, bump, visiblePortfoliosClause } from './access.js';
 import { loadAggregateBase, withConflicts } from './aggregate.js';
 import { requireAdminister } from './authz.js';
 import { portfolioNameKey } from './name-key.js';
@@ -194,6 +194,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
             p.active === undefined ? undefined : eq(portfolios.active, p.active),
             responsibleSub === undefined ? undefined : eq(portfolios.responsibleSub, responsibleSub),
             qKey ? likeContains(portfolios.nameKey, qKey) : undefined,
+            visiblePortfoliosClause(actor, opts),
           ),
         )
         .orderBy(asc(portfolios.id))
@@ -203,7 +204,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
     },
 
     get(actor, id, include) {
-      findScoped(db, actor, id);
+      findVisible(db, actor, id, opts);
       const base = loadAggregateBase(db, id);
       return include === 'conflicts' ? withConflicts(db, base) : base;
     },

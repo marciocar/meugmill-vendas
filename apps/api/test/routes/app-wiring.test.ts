@@ -48,7 +48,7 @@ describe('buildApp: rotas v1 registradas', () => {
     });
     app = buildApp(config, { keyGetter: jwks });
     await app.ready();
-    const jwt = await new SignJWT({ roles: ['vendedor'], branch_ids: [] })
+    const jwt = await new SignJWT({ roles: ['supervisao'], branch_ids: [] })
       .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
       .setIssuer(ISSUER)
       .setAudience(AUDIENCE)
@@ -93,6 +93,6 @@ describe('buildApp: rotas v1 registradas', () => {
   it('/v1/me segue respondendo 200', async () => {
     const res = await app.inject({ method: 'GET', url: '/v1/me', headers: auth });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ sub: 'leitor-1', roles: ['vendedor'] });
+    expect(res.json()).toMatchObject({ sub: 'leitor-1', roles: ['supervisao'] });
   });
 });

@@ -1,6 +1,6 @@
 import { inArray, sql } from 'drizzle-orm';
 import { customers, productSubgroups, sellers } from '../../db/schema.js';
-import { findScoped, openForEdit, bump } from '../portfolios/access.js';
+import { findReadable, openForEdit, bump } from '../portfolios/access.js';
 import { loadAggregateBase } from '../portfolios/aggregate.js';
 import type { PortfolioResponse } from '../portfolios/schemas.js';
 import type { Actor } from '../shared/authz.js';
@@ -140,7 +140,7 @@ export function createDistributionService(
       const after = decodeCursor(p.cursor);
       // Retrato único: grade, gravadas e dados de exibição na mesma transação de leitura.
       return db.transaction((db) => {
-        const portfolio = findScoped(db, actor, id);
+        const portfolio = findReadable(db, actor, id, opts);
         const grid = loadGrid(db, portfolio);
         const stored = loadStored(db, id);
 
@@ -198,7 +198,7 @@ export function createDistributionService(
     summary(actor, id) {
       // Retrato único: grade, gravadas e dados de exibição na mesma transação de leitura.
       return db.transaction((db) => {
-        const portfolio = findScoped(db, actor, id);
+        const portfolio = findReadable(db, actor, id, opts);
         const grid = loadGrid(db, portfolio);
         const perSubgroup = new Map(
           grid.subgroupIds.map((g) => [g, { counts: new Map<number, number>(), unassigned: 0, stale: 0 }]),
