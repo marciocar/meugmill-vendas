@@ -38,6 +38,9 @@ const ConfigSchema = Type.Object({
   OIDC_CLOCK_TOLERANCE_SECONDS: Type.Integer({ minimum: 0, maximum: 300, default: 30 }),
   // Vazio = nenhuma origem cruzada liberada. [TO BE COMPLETED] origens de homologação/produção.
   CORS_ORIGINS: Type.String({ default: '' }),
+  // Token sem nenhum perfil de visibilidade conhecido (E8): `allow` lê a filial inteira (como antes do E8);
+  // `deny` não lê nada amplo (vale como vendedor sem vínculos). O padrão de produção é decisão do negócio.
+  VISIBILITY_LEGACY: Type.Union([Type.Literal('allow'), Type.Literal('deny')], { default: 'allow' }),
 });
 
 type RawConfig = Static<typeof ConfigSchema>;

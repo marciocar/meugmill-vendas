@@ -1,3 +1,4 @@
+import { withRoleGuard } from '../visibility/profiles.js';
 import { and, asc, eq, gt, inArray, ne, sql } from 'drizzle-orm';
 import {
   branches,
@@ -17,9 +18,10 @@ import { assertBranchesActive } from '../shared/links.js';
 import { decodeCursor, resolveLimit, toPage, type Page } from '../shared/pagination.js';
 import { likeContains } from '../shared/sql.js';
 import { cleanText, parseInput } from '../shared/validate.js';
-import { findScoped, findVisible, openForEdit, bump, visiblePortfoliosClause } from './access.js';
+import { findVisible, openForEdit, bump, visiblePortfoliosClause } from './access.js';
 import { loadAggregateBase, withConflicts } from './aggregate.js';
 import { requireAdminister } from './authz.js';
+import { canReadBroadly } from '../visibility/profiles.js';
 import { portfolioNameKey } from './name-key.js';
 import {
   CreatePortfolioSchema,
@@ -125,7 +127,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
 
   function transition(actor: Actor, id: number, expected: number | undefined, active: boolean) {
     return writeTx(db, (tx) => {
-      const row = findScoped(tx, actor, id);
+      const row = findVisible(tx, actor, id, opts);
       requireAdminister(actor);
       const version = requireVersion(expected);
       if (row.active === active) return loadAggregateBase(tx, id); // idempotente
@@ -153,207 +155,230 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
   const countOf = (table: string, alias: string) =>
     sql<number>`(select count(*) from ${sql.raw(table)} ${sql.raw(alias)} where ${sql.raw(alias)}.portfolio_id = ${portfolios.id})`;
 
-  return {
-    list(actor, params = {}) {
-      const p = parseInput(PortfolioListQuerySchema, params);
-      const limit = resolveLimit(p.limit);
-      const after = decodeCursor(p.cursor);
-      const scopeIds = resolveScopeIds(db, actor);
-      if (scopeIds.length === 0) return { items: [], nextCursor: null };
-      if (p.branchId !== undefined && !scopeIds.includes(p.branchId)) return { items: [], nextCursor: null };
-      const q = p.q?.trim();
-      const qKey = q ? portfolioNameKey(q) : '';
-      if (q && qKey === '') return { items: [], nextCursor: null }; // só pontuação não casa nome algum
-      const responsibleSub = p.responsibleSub?.trim();
-      if (responsibleSub === '') throw invalid('Campo inválido: responsibleSub');
-      const rows = db
-        .select({
-          id: portfolios.id,
-          name: portfolios.name,
-          branch: { id: branches.id, code: branches.code, name: branches.name },
-          type: { id: portfolioTypes.id, code: portfolioTypes.code, name: portfolioTypes.name },
-          status: portfolios.status,
-          active: portfolios.active,
-          responsibleSub: portfolios.responsibleSub,
-          regionsCount: countOf('portfolio_regions', 'r'),
-          retailNetworksCount: countOf('portfolio_retail_networks', 'n'),
-          economicGroupsCount: countOf('portfolio_economic_groups', 'g'),
-          sellersCount: sql<number>`(select count(distinct s.seller_id) from portfolio_sellers s where s.portfolio_id = ${portfolios.id})`,
-          version: portfolios.version,
-        })
-        .from(portfolios)
-        .innerJoin(branches, eq(branches.id, portfolios.branchId))
-        .innerJoin(portfolioTypes, eq(portfolioTypes.id, portfolios.portfolioTypeId))
-        .where(
-          and(
-            p.branchId === undefined
-              ? inArray(portfolios.branchId, scopeIds)
-              : eq(portfolios.branchId, p.branchId),
-            after === undefined ? undefined : gt(portfolios.id, after),
-            p.status === undefined ? undefined : eq(portfolios.status, p.status),
-            p.active === undefined ? undefined : eq(portfolios.active, p.active),
-            responsibleSub === undefined ? undefined : eq(portfolios.responsibleSub, responsibleSub),
-            qKey ? likeContains(portfolios.nameKey, qKey) : undefined,
-            visiblePortfoliosClause(actor, opts),
-          ),
-        )
-        .orderBy(asc(portfolios.id))
-        .limit(limit + 1)
-        .all();
-      return toPage(rows, limit, (r) => r.id);
-    },
+  return withRoleGuard(
+    {
+      list(actor, params = {}) {
+        const p = parseInput(PortfolioListQuerySchema, params);
+        const limit = resolveLimit(p.limit);
+        const after = decodeCursor(p.cursor);
+        const scopeIds = resolveScopeIds(db, actor);
+        if (scopeIds.length === 0) return { items: [], nextCursor: null };
+        if (p.branchId !== undefined && !scopeIds.includes(p.branchId))
+          return { items: [], nextCursor: null };
+        const q = p.q?.trim();
+        const qKey = q ? portfolioNameKey(q) : '';
+        if (q && qKey === '') return { items: [], nextCursor: null }; // só pontuação não casa nome algum
+        const responsibleSub = p.responsibleSub?.trim();
+        if (responsibleSub === '') throw invalid('Campo inválido: responsibleSub');
+        const rows = db
+          .select({
+            id: portfolios.id,
+            name: portfolios.name,
+            branch: { id: branches.id, code: branches.code, name: branches.name },
+            type: { id: portfolioTypes.id, code: portfolioTypes.code, name: portfolioTypes.name },
+            status: portfolios.status,
+            active: portfolios.active,
+            responsibleSub: portfolios.responsibleSub,
+            regionsCount: countOf('portfolio_regions', 'r'),
+            retailNetworksCount: countOf('portfolio_retail_networks', 'n'),
+            economicGroupsCount: countOf('portfolio_economic_groups', 'g'),
+            sellersCount: sql<number>`(select count(distinct s.seller_id) from portfolio_sellers s where s.portfolio_id = ${portfolios.id})`,
+            version: portfolios.version,
+          })
+          .from(portfolios)
+          .innerJoin(branches, eq(branches.id, portfolios.branchId))
+          .innerJoin(portfolioTypes, eq(portfolioTypes.id, portfolios.portfolioTypeId))
+          .where(
+            and(
+              p.branchId === undefined
+                ? inArray(portfolios.branchId, scopeIds)
+                : eq(portfolios.branchId, p.branchId),
+              after === undefined ? undefined : gt(portfolios.id, after),
+              p.status === undefined ? undefined : eq(portfolios.status, p.status),
+              p.active === undefined ? undefined : eq(portfolios.active, p.active),
+              responsibleSub === undefined ? undefined : eq(portfolios.responsibleSub, responsibleSub),
+              qKey ? likeContains(portfolios.nameKey, qKey) : undefined,
+              visiblePortfoliosClause(actor, opts),
+            ),
+          )
+          .orderBy(asc(portfolios.id))
+          .limit(limit + 1)
+          .all();
+        return toPage(rows, limit, (r) => r.id);
+      },
 
-    get(actor, id, include) {
-      findVisible(db, actor, id, opts);
-      const base = loadAggregateBase(db, id);
-      return include === 'conflicts' ? withConflicts(db, base) : base;
-    },
+      get(actor, id, include) {
+        const row = findVisible(db, actor, id, opts);
+        const base = loadAggregateBase(db, id);
+        // Quem não lê amplo nem é o responsável (ex.: vendedor que atua na carteira) recebe o agregado
+        // reduzido: sem as contagens de ajustes, e `include=conflicts` é ignorado em silêncio.
+        const full =
+          row.responsibleSub === actor.sub ||
+          canReadBroadly(actor, { ...opts, onLegacyAccess: () => undefined }, 'portfolio-data');
+        if (!full) {
+          const reduced = { ...base };
+          delete reduced.overridesInclude;
+          delete reduced.overridesExclude;
+          return reduced;
+        }
+        return include === 'conflicts' ? withConflicts(db, base) : base;
+      },
 
-    create(actor, input) {
-      requireAdmin(actor);
-      const data = parseInput(CreatePortfolioSchema, input);
-      const name = cleanText(data.name, 'name');
-      const responsibleSub = cleanSub(data.responsibleSub);
-      return writeTx(db, (tx) => {
-        assertAllInScope([data.branchId], resolveScopeIds(tx, actor));
-        assertBranchesActive(tx, [data.branchId]);
-        assertActiveType(tx, data.portfolioTypeId);
-        const key = nameKeyOf(name);
-        if (nameTaken(tx, data.branchId, key)) throw new DomainError('conflict', NAME_TAKEN);
-        const at = now();
-        try {
-          const row = tx
-            .insert(portfolios)
-            .values({
-              branchId: data.branchId,
+      create(actor, input) {
+        requireAdmin(actor);
+        const data = parseInput(CreatePortfolioSchema, input);
+        const name = cleanText(data.name, 'name');
+        const responsibleSub = cleanSub(data.responsibleSub);
+        return writeTx(db, (tx) => {
+          assertAllInScope([data.branchId], resolveScopeIds(tx, actor));
+          assertBranchesActive(tx, [data.branchId]);
+          assertActiveType(tx, data.portfolioTypeId);
+          const key = nameKeyOf(name);
+          if (nameTaken(tx, data.branchId, key)) throw new DomainError('conflict', NAME_TAKEN);
+          const at = now();
+          try {
+            const row = tx
+              .insert(portfolios)
+              .values({
+                branchId: data.branchId,
+                name,
+                nameKey: key,
+                description: cleanDescription(data.description),
+                responsibleSub,
+                portfolioTypeId: data.portfolioTypeId,
+                createdAt: at,
+                updatedAt: at,
+                createdBy: actor.sub,
+                updatedBy: actor.sub,
+              })
+              .returning({ id: portfolios.id })
+              .get();
+            return loadAggregateBase(tx, row.id);
+          } catch (err) {
+            if (isUniqueViolation(err)) throw new DomainError('conflict', NAME_TAKEN);
+            throw err;
+          }
+        });
+      },
+
+      update(actor, id, expectedVersion, patch) {
+        return writeTx(db, (tx) => {
+          let data!: UpdatePortfolioInput;
+          const row = openForEdit(
+            tx,
+            actor,
+            id,
+            expectedVersion,
+            (current) => {
+              data = parseInput(UpdatePortfolioSchema, patch);
+              // Só quem é admin transfere a carteira; reenviar o mesmo valor não conta como troca.
+              // Decidido antes da versão: quem não pode trocar recebe 403 mesmo com versão velha.
+              const moves =
+                (data.branchId !== undefined && data.branchId !== current.branchId) ||
+                (data.responsibleSub !== undefined &&
+                  cleanSub(data.responsibleSub) !== current.responsibleSub);
+              if (moves) requireAdminister(actor);
+            },
+            opts,
+          );
+          const branchId = data.branchId ?? row.branchId;
+          const responsibleSub =
+            data.responsibleSub === undefined ? row.responsibleSub : cleanSub(data.responsibleSub);
+          const changesBranch = branchId !== row.branchId;
+          const at = now();
+          if (changesBranch) {
+            assertAllInScope([branchId], resolveScopeIds(tx, actor));
+            assertBranchesActive(tx, [branchId]);
+            const sellerIds = tx
+              .selectDistinct({ id: portfolioSellers.sellerId })
+              .from(portfolioSellers)
+              .where(eq(portfolioSellers.portfolioId, id))
+              .all()
+              .map((r) => r.id);
+            assertSellersUsable(tx, branchId, sellerIds);
+            replaceOverridesOnBranchChange(tx, id, row.branchId, branchId);
+            // Os vínculos pertencem à filial de origem: encerra todos (com eventos, na outbox da origem) e
+            // volta a rascunho; é preciso finalizar de novo na nova filial.
+            endAllActiveLinks(tx, id, actor.sub, at);
+          }
+          const typeId = data.portfolioTypeId ?? row.portfolioTypeId;
+          if (typeId !== row.portfolioTypeId) assertActiveType(tx, typeId);
+          const name = data.name === undefined ? row.name : cleanText(data.name, 'name');
+          const key = data.name === undefined ? row.nameKey : nameKeyOf(name);
+          if ((changesBranch || key !== row.nameKey) && nameTaken(tx, branchId, key, id)) {
+            throw new DomainError('conflict', NAME_TAKEN);
+          }
+          try {
+            bump(tx, row, actor, at, {
+              ...(changesBranch ? { status: 'draft' as const } : {}),
               name,
               nameKey: key,
-              description: cleanDescription(data.description),
+              branchId,
               responsibleSub,
-              portfolioTypeId: data.portfolioTypeId,
-              createdAt: at,
-              updatedAt: at,
-              createdBy: actor.sub,
-              updatedBy: actor.sub,
-            })
-            .returning({ id: portfolios.id })
-            .get();
-          return loadAggregateBase(tx, row.id);
-        } catch (err) {
-          if (isUniqueViolation(err)) throw new DomainError('conflict', NAME_TAKEN);
-          throw err;
-        }
-      });
-    },
-
-    update(actor, id, expectedVersion, patch) {
-      return writeTx(db, (tx) => {
-        let data!: UpdatePortfolioInput;
-        const row = openForEdit(tx, actor, id, expectedVersion, (current) => {
-          data = parseInput(UpdatePortfolioSchema, patch);
-          // Só quem é admin transfere a carteira; reenviar o mesmo valor não conta como troca.
-          // Decidido antes da versão: quem não pode trocar recebe 403 mesmo com versão velha.
-          const moves =
-            (data.branchId !== undefined && data.branchId !== current.branchId) ||
-            (data.responsibleSub !== undefined && cleanSub(data.responsibleSub) !== current.responsibleSub);
-          if (moves) requireAdminister(actor);
+              portfolioTypeId: typeId,
+              description:
+                data.description === undefined ? row.description : cleanDescription(data.description),
+            });
+          } catch (err) {
+            if (isUniqueViolation(err)) throw new DomainError('conflict', NAME_TAKEN);
+            throw err;
+          }
+          return loadAggregateBase(tx, id);
         });
-        const branchId = data.branchId ?? row.branchId;
-        const responsibleSub =
-          data.responsibleSub === undefined ? row.responsibleSub : cleanSub(data.responsibleSub);
-        const changesBranch = branchId !== row.branchId;
-        const at = now();
-        if (changesBranch) {
-          assertAllInScope([branchId], resolveScopeIds(tx, actor));
-          assertBranchesActive(tx, [branchId]);
-          const sellerIds = tx
-            .selectDistinct({ id: portfolioSellers.sellerId })
-            .from(portfolioSellers)
-            .where(eq(portfolioSellers.portfolioId, id))
-            .all()
-            .map((r) => r.id);
-          assertSellersUsable(tx, branchId, sellerIds);
-          replaceOverridesOnBranchChange(tx, id, row.branchId, branchId);
-          // Os vínculos pertencem à filial de origem: encerra todos (com eventos, na outbox da origem) e
-          // volta a rascunho; é preciso finalizar de novo na nova filial.
-          endAllActiveLinks(tx, id, actor.sub, at);
-        }
-        const typeId = data.portfolioTypeId ?? row.portfolioTypeId;
-        if (typeId !== row.portfolioTypeId) assertActiveType(tx, typeId);
-        const name = data.name === undefined ? row.name : cleanText(data.name, 'name');
-        const key = data.name === undefined ? row.nameKey : nameKeyOf(name);
-        if ((changesBranch || key !== row.nameKey) && nameTaken(tx, branchId, key, id)) {
-          throw new DomainError('conflict', NAME_TAKEN);
-        }
-        try {
-          bump(tx, row, actor, at, {
-            ...(changesBranch ? { status: 'draft' as const } : {}),
-            name,
-            nameKey: key,
-            branchId,
-            responsibleSub,
-            portfolioTypeId: typeId,
-            description:
-              data.description === undefined ? row.description : cleanDescription(data.description),
-          });
-        } catch (err) {
-          if (isUniqueViolation(err)) throw new DomainError('conflict', NAME_TAKEN);
-          throw err;
-        }
-        return loadAggregateBase(tx, id);
-      });
+      },
+
+      replaceFilters(actor, id, expectedVersion, input) {
+        return writeTx(db, (tx) => {
+          const row = openForEdit(tx, actor, id, expectedVersion, undefined, opts);
+          const data = parseInput(ReplaceFiltersSchema, input);
+          const regions = validateRegions(tx, data.regions);
+          assertNoDuplicates(data.retailNetworkIds, String, 'Rede de varejo duplicada');
+          assertNoDuplicates(data.economicGroupIds, String, 'Grupo econômico duplicado');
+          assertActiveNetworks(tx, data.retailNetworkIds);
+          assertActiveGroups(tx, data.economicGroupIds);
+
+          tx.delete(portfolioRegions).where(eq(portfolioRegions.portfolioId, id)).run();
+          tx.delete(portfolioRetailNetworks).where(eq(portfolioRetailNetworks.portfolioId, id)).run();
+          tx.delete(portfolioEconomicGroups).where(eq(portfolioEconomicGroups.portfolioId, id)).run();
+          if (regions.length > 0) {
+            tx.insert(portfolioRegions)
+              .values(regions.map((r) => ({ portfolioId: id, ...r })))
+              .run();
+          }
+          if (data.retailNetworkIds.length > 0) {
+            tx.insert(portfolioRetailNetworks)
+              .values(data.retailNetworkIds.map((retailNetworkId) => ({ portfolioId: id, retailNetworkId })))
+              .run();
+          }
+          if (data.economicGroupIds.length > 0) {
+            tx.insert(portfolioEconomicGroups)
+              .values(data.economicGroupIds.map((economicGroupId) => ({ portfolioId: id, economicGroupId })))
+              .run();
+          }
+          bump(tx, row, actor, now());
+          return loadAggregateBase(tx, id);
+        });
+      },
+
+      replaceSellers(actor, id, expectedVersion, input) {
+        return writeTx(db, (tx) => {
+          const row = openForEdit(tx, actor, id, expectedVersion, undefined, opts);
+          const data = parseInput(ReplaceSellersSchema, input);
+          validateAssignments(tx, row.branchId, data.assignments);
+          tx.delete(portfolioSellers).where(eq(portfolioSellers.portfolioId, id)).run();
+          if (data.assignments.length > 0) {
+            tx.insert(portfolioSellers)
+              .values(data.assignments.map((a) => ({ portfolioId: id, ...a })))
+              .run();
+          }
+          bump(tx, row, actor, now());
+          return loadAggregateBase(tx, id);
+        });
+      },
+
+      deactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, false),
+      reactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, true),
     },
-
-    replaceFilters(actor, id, expectedVersion, input) {
-      return writeTx(db, (tx) => {
-        const row = openForEdit(tx, actor, id, expectedVersion);
-        const data = parseInput(ReplaceFiltersSchema, input);
-        const regions = validateRegions(tx, data.regions);
-        assertNoDuplicates(data.retailNetworkIds, String, 'Rede de varejo duplicada');
-        assertNoDuplicates(data.economicGroupIds, String, 'Grupo econômico duplicado');
-        assertActiveNetworks(tx, data.retailNetworkIds);
-        assertActiveGroups(tx, data.economicGroupIds);
-
-        tx.delete(portfolioRegions).where(eq(portfolioRegions.portfolioId, id)).run();
-        tx.delete(portfolioRetailNetworks).where(eq(portfolioRetailNetworks.portfolioId, id)).run();
-        tx.delete(portfolioEconomicGroups).where(eq(portfolioEconomicGroups.portfolioId, id)).run();
-        if (regions.length > 0) {
-          tx.insert(portfolioRegions)
-            .values(regions.map((r) => ({ portfolioId: id, ...r })))
-            .run();
-        }
-        if (data.retailNetworkIds.length > 0) {
-          tx.insert(portfolioRetailNetworks)
-            .values(data.retailNetworkIds.map((retailNetworkId) => ({ portfolioId: id, retailNetworkId })))
-            .run();
-        }
-        if (data.economicGroupIds.length > 0) {
-          tx.insert(portfolioEconomicGroups)
-            .values(data.economicGroupIds.map((economicGroupId) => ({ portfolioId: id, economicGroupId })))
-            .run();
-        }
-        bump(tx, row, actor, now());
-        return loadAggregateBase(tx, id);
-      });
-    },
-
-    replaceSellers(actor, id, expectedVersion, input) {
-      return writeTx(db, (tx) => {
-        const row = openForEdit(tx, actor, id, expectedVersion);
-        const data = parseInput(ReplaceSellersSchema, input);
-        validateAssignments(tx, row.branchId, data.assignments);
-        tx.delete(portfolioSellers).where(eq(portfolioSellers.portfolioId, id)).run();
-        if (data.assignments.length > 0) {
-          tx.insert(portfolioSellers)
-            .values(data.assignments.map((a) => ({ portfolioId: id, ...a })))
-            .run();
-        }
-        bump(tx, row, actor, now());
-        return loadAggregateBase(tx, id);
-      });
-    },
-
-    deactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, false),
-    reactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, true),
-  };
+    opts,
+  );
 }

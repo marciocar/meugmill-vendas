@@ -121,8 +121,18 @@ export const PortfolioResponseSchema = Type.Object({
     economicGroups: Type.Array(CodeRef),
   }),
   sellers: Type.Array(Type.Object({ seller: CodeRef, productSubgroup: CodeRef })),
-  overridesInclude: Type.Integer({ description: 'Clientes incluídos manualmente na prévia.' }),
-  overridesExclude: Type.Integer({ description: 'Clientes excluídos manualmente da prévia.' }),
+  overridesInclude: Type.Optional(
+    Type.Integer({
+      description:
+        'Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.',
+    }),
+  ),
+  overridesExclude: Type.Optional(
+    Type.Integer({
+      description:
+        'Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.',
+    }),
+  ),
   finalizedAt: Type.Union([Type.Integer(), Type.Null()], {
     description: 'Instante (epoch ms) da última finalização que gravou vínculos; null se nunca finalizada.',
   }),

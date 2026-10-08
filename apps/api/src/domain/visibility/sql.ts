@@ -18,7 +18,7 @@ export interface VisibleSource {
 }
 
 /** Filiais do token (códigos em `branches.code`) como subconsulta de ids. Sem códigos, vazia. */
-function scopeSql(actor: Actor): SQL {
+export function scopeSql(actor: Actor): SQL {
   const codes = JSON.stringify([...new Set(actor.branchCodes)]);
   return sql`(select b.id from branches b where b.code in (select value from json_each(${codes})))`;
 }
@@ -35,14 +35,17 @@ function broadProfile(actor: Actor): ViaProfile {
   return 'legacy';
 }
 
-/** Leitura ampla: todos os clientes ligados (ativo) às filiais do token. */
+/**
+ * Leitura ampla: todos os clientes com vínculo (ATIVO OU INATIVO) com as filiais do token. É a mesma regra
+ * do `customers.list/get` do E2 para admin: o cliente que o admin lê pelo GET também aparece aqui.
+ */
 function broadSource(actor: Actor): VisibleSource {
   const profile = broadProfile(actor);
   return {
     profile,
     customers: (among) =>
       sql`select distinct cb.customer_id as customer_id from customer_branches cb
-        where cb.active = 1 and cb.branch_id in ${scopeSql(actor)}${amongSql('cb.customer_id', among)}`,
+        where cb.branch_id in ${scopeSql(actor)}${amongSql('cb.customer_id', among)}`,
     links: (among) =>
       sql`select l.customer_id as customer_id, l.product_subgroup_id as product_subgroup_id,
           l.portfolio_id as portfolio_id, ${profile} as profile
@@ -52,7 +55,9 @@ function broadSource(actor: Actor): VisibleSource {
 }
 
 /**
- * Fonte por vínculo ativo (E7). Aqui fica a regra de cada perfil:
+ * Fonte por vínculo ativo (E7). Defesa em profundidade: além do vínculo ativo, o cliente precisa estar
+ * ativo e com vínculo ativo à filial (`customer_branches`) do próprio vínculo de carteira.
+ * Aqui fica a regra de cada perfil:
  * - gestor: carteiras em que o ator é o responsável;
  * - vendedor: vínculos do vendedor cujo `user_sub` é o `sub` do ator (sem ligação, nada).
  */
@@ -62,7 +67,10 @@ function linkSource(profile: 'gestor' | 'vendedor', actor: Actor): VisibleSource
       ? sql`join portfolios p on p.id = l.portfolio_id where p.responsible_sub = ${actor.sub}`
       : sql`join sellers s on s.id = l.seller_id where s.user_sub = ${actor.sub}`;
   const body = (among: number[] | undefined) =>
-    sql`from portfolio_links l ${owner} and l.active = 1 and l.branch_id in ${scopeSql(actor)}${amongSql('l.customer_id', among)}`;
+    sql`from portfolio_links l ${owner} and l.active = 1 and l.branch_id in ${scopeSql(actor)}
+      and exists (select 1 from customers c where c.id = l.customer_id and c.active = 1)
+      and exists (select 1 from customer_branches cb
+        where cb.customer_id = l.customer_id and cb.branch_id = l.branch_id and cb.active = 1)${amongSql('l.customer_id', among)}`;
   return {
     profile,
     customers: (among) => sql`select distinct l.customer_id as customer_id ${body(among)}`,

@@ -101,6 +101,12 @@ export const IdParamsSchema = Type.Object({ id: Type.Integer({ minimum: 1 }) });
  */
 export function serviceOptions(app: FastifyInstance): ServiceOptions {
   return {
+    visibilityLegacy: app.visibilityLegacy,
+    onRoleMismatch: () => {
+      app.log.warn(
+        'role_case_mismatch: papel parecido com um perfil conhecido, mas com caixa ou espaços diferentes',
+      );
+    },
     onLegacyAccess: (resource) => {
       app.log.warn({ resource }, 'legacy_access: token sem perfil de visibilidade lê toda a filial');
     },

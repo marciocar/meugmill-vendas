@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createCustomerService } from '../../src/domain/customers/service.js';
 import { createVisibilityService } from '../../src/domain/visibility/service.js';
 import { visibleCustomersSql } from '../../src/domain/visibility/sql.js';
 import { neighborhoodKey } from '../../src/domain/shared/normalize.js';
@@ -191,8 +192,18 @@ describe('visibilidade: volume (150 mil vínculos ativos, vendedor com 15 mil cl
     const [summary, , warmSummary] = best(2, () => svc.summary(seller0));
     expect(summary.visibleCustomers).toBe(expected.length);
 
+    // 5) customers.list do E2 com a restrição de vendedor (50 mil clientes na filial): 1ª página e a do meio.
+    const customersSvc = createCustomerService(fx.db, { now: () => NOW });
+    const [listFirst, coldList, warmList] = best(3, () => customersSvc.list(seller0, { limit: 200 }));
+    expect(listFirst.items.map((i) => i.id)).toEqual(expected.slice(0, 200));
+    const [listMid, coldListMid, warmListMid] = best(3, () =>
+      customersSvc.list(seller0, { limit: 200, cursor: listFirst.nextCursor as string }),
+    );
+    expect(listMid.items.map((i) => i.id)).toEqual(expected.slice(200, 400));
+
     console.log(
-      `[volume visibilidade] clientes=${CUSTOMERS} vinculos=${CUSTOMERS * SUBGROUPS} visiveis(V00)=${expected.length}\n` +
+      `  customers.list(vendedor) 1a pagina: fria=${coldList.toFixed(0)}ms quente=${warmList.toFixed(0)}ms | meio: fria=${coldListMid.toFixed(0)}ms quente=${warmListMid.toFixed(0)}ms\n` +
+        `[volume visibilidade] clientes=${CUSTOMERS} vinculos=${CUSTOMERS * SUBGROUPS} visiveis(V00)=${expected.length}\n` +
         `  listMyCustomers 1a pagina: fria=${coldFirst.toFixed(0)}ms quente=${warmFirst.toFixed(0)}ms | pagina do meio: fria=${coldMid.toFixed(0)}ms quente=${warmMid.toFixed(0)}ms\n` +
         `  listMyCustomers subgrupo=${warmSubgroup.toFixed(0)}ms | q=${warmQuery.toFixed(0)}ms | gestor(50k)=${warmGestor.toFixed(0)}ms\n` +
         `  check(1000): frio=${coldCheck.toFixed(0)}ms quente=${warmCheck.toFixed(0)}ms | admin=${warmAdminCheck.toFixed(0)}ms | summary(V00)=${warmSummary.toFixed(0)}ms`,
@@ -213,7 +224,18 @@ describe('visibilidade: volume (150 mil vínculos ativos, vendedor com 15 mil cl
     }
 
     if (!ASSERT_TIMING) return;
-    for (const t of [coldFirst, warmFirst, coldMid, warmMid, coldCheck, warmCheck]) {
+    for (const t of [
+      coldFirst,
+      warmFirst,
+      coldMid,
+      warmMid,
+      coldCheck,
+      warmCheck,
+      coldList,
+      warmList,
+      coldListMid,
+      warmListMid,
+    ]) {
       expect(t).toBeLessThan(CEILING_MS);
     }
   }, 300_000);

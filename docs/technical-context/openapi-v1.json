@@ -8938,8 +8938,15 @@
                             "legacy"
                           ],
                           "type": "string"
+                        },
+                        {
+                          "enum": [
+                            "denied"
+                          ],
+                          "type": "string"
                         }
-                      ]
+                      ],
+                      "description": "`legacy`: sem perfil conhecido, lê a filial (VISIBILITY_LEGACY=allow). `denied`: sem perfil conhecido e VISIBILITY_LEGACY=deny, não lê nada amplo."
                     },
                     "profiles": {
                       "items": {
@@ -11847,11 +11854,11 @@
                       "type": "string"
                     },
                     "overridesExclude": {
-                      "description": "Clientes excluídos manualmente da prévia.",
+                      "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "overridesInclude": {
-                      "description": "Clientes incluídos manualmente na prévia.",
+                      "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "responsibleSub": {
@@ -11959,8 +11966,6 @@
                     "status",
                     "filters",
                     "sellers",
-                    "overridesInclude",
-                    "overridesExclude",
                     "finalizedAt",
                     "active",
                     "deactivatedAt",
@@ -12413,11 +12418,11 @@
                       "type": "string"
                     },
                     "overridesExclude": {
-                      "description": "Clientes excluídos manualmente da prévia.",
+                      "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "overridesInclude": {
-                      "description": "Clientes incluídos manualmente na prévia.",
+                      "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "responsibleSub": {
@@ -12525,8 +12530,6 @@
                     "status",
                     "filters",
                     "sellers",
-                    "overridesInclude",
-                    "overridesExclude",
                     "finalizedAt",
                     "active",
                     "deactivatedAt",
@@ -13011,11 +13014,11 @@
                       "type": "string"
                     },
                     "overridesExclude": {
-                      "description": "Clientes excluídos manualmente da prévia.",
+                      "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "overridesInclude": {
-                      "description": "Clientes incluídos manualmente na prévia.",
+                      "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "responsibleSub": {
@@ -13123,8 +13126,6 @@
                     "status",
                     "filters",
                     "sellers",
-                    "overridesInclude",
-                    "overridesExclude",
                     "finalizedAt",
                     "active",
                     "deactivatedAt",
@@ -14070,11 +14071,11 @@
                       "type": "string"
                     },
                     "overridesExclude": {
-                      "description": "Clientes excluídos manualmente da prévia.",
+                      "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "overridesInclude": {
-                      "description": "Clientes incluídos manualmente na prévia.",
+                      "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "responsibleSub": {
@@ -14182,8 +14183,6 @@
                     "status",
                     "filters",
                     "sellers",
-                    "overridesInclude",
-                    "overridesExclude",
                     "finalizedAt",
                     "active",
                     "deactivatedAt",
@@ -15003,11 +15002,11 @@
                       "type": "string"
                     },
                     "overridesExclude": {
-                      "description": "Clientes excluídos manualmente da prévia.",
+                      "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "overridesInclude": {
-                      "description": "Clientes incluídos manualmente na prévia.",
+                      "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "responsibleSub": {
@@ -15115,8 +15114,6 @@
                     "status",
                     "filters",
                     "sellers",
-                    "overridesInclude",
-                    "overridesExclude",
                     "finalizedAt",
                     "active",
                     "deactivatedAt",
@@ -15620,11 +15617,11 @@
                           "type": "string"
                         },
                         "overridesExclude": {
-                          "description": "Clientes excluídos manualmente da prévia.",
+                          "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                           "type": "integer"
                         },
                         "overridesInclude": {
-                          "description": "Clientes incluídos manualmente na prévia.",
+                          "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                           "type": "integer"
                         },
                         "responsibleSub": {
@@ -15732,8 +15729,6 @@
                         "status",
                         "filters",
                         "sellers",
-                        "overridesInclude",
-                        "overridesExclude",
                         "finalizedAt",
                         "active",
                         "deactivatedAt",
@@ -16282,11 +16277,11 @@
                       "type": "string"
                     },
                     "overridesExclude": {
-                      "description": "Clientes excluídos manualmente da prévia.",
+                      "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "overridesInclude": {
-                      "description": "Clientes incluídos manualmente na prévia.",
+                      "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "responsibleSub": {
@@ -16394,8 +16389,6 @@
                     "status",
                     "filters",
                     "sellers",
-                    "overridesInclude",
-                    "overridesExclude",
                     "finalizedAt",
                     "active",
                     "deactivatedAt",
@@ -16872,11 +16865,11 @@
                           "type": "string"
                         },
                         "overridesExclude": {
-                          "description": "Clientes excluídos manualmente da prévia.",
+                          "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                           "type": "integer"
                         },
                         "overridesInclude": {
-                          "description": "Clientes incluídos manualmente na prévia.",
+                          "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                           "type": "integer"
                         },
                         "responsibleSub": {
@@ -16984,8 +16977,6 @@
                         "status",
                         "filters",
                         "sellers",
-                        "overridesInclude",
-                        "overridesExclude",
                         "finalizedAt",
                         "active",
                         "deactivatedAt",
@@ -18656,11 +18647,11 @@
                       "type": "string"
                     },
                     "overridesExclude": {
-                      "description": "Clientes excluídos manualmente da prévia.",
+                      "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "overridesInclude": {
-                      "description": "Clientes incluídos manualmente na prévia.",
+                      "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "responsibleSub": {
@@ -18768,8 +18759,6 @@
                     "status",
                     "filters",
                     "sellers",
-                    "overridesInclude",
-                    "overridesExclude",
                     "finalizedAt",
                     "active",
                     "deactivatedAt",
@@ -19746,11 +19735,11 @@
                       "type": "string"
                     },
                     "overridesExclude": {
-                      "description": "Clientes excluídos manualmente da prévia.",
+                      "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "overridesInclude": {
-                      "description": "Clientes incluídos manualmente na prévia.",
+                      "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "responsibleSub": {
@@ -19858,8 +19847,6 @@
                     "status",
                     "filters",
                     "sellers",
-                    "overridesInclude",
-                    "overridesExclude",
                     "finalizedAt",
                     "active",
                     "deactivatedAt",
@@ -20347,11 +20334,11 @@
                       "type": "string"
                     },
                     "overridesExclude": {
-                      "description": "Clientes excluídos manualmente da prévia.",
+                      "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "overridesInclude": {
-                      "description": "Clientes incluídos manualmente na prévia.",
+                      "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "responsibleSub": {
@@ -20459,8 +20446,6 @@
                     "status",
                     "filters",
                     "sellers",
-                    "overridesInclude",
-                    "overridesExclude",
                     "finalizedAt",
                     "active",
                     "deactivatedAt",

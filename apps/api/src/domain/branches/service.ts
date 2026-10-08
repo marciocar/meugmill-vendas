@@ -1,3 +1,4 @@
+import { withRoleGuard } from '../visibility/profiles.js';
 import { and, asc, eq, gt, inArray, or } from 'drizzle-orm';
 import { branches } from '../../db/schema.js';
 import { assertVersion, auditFields, requireVersion, writeActive } from '../shared/audit.js';
@@ -72,95 +73,98 @@ export function createBranchService(db: Db, opts: ServiceOptions = {}): BranchSe
     });
   }
 
-  return {
-    list(actor, params: ListParams = {}): Page<BranchResponse> {
-      const p = parseInput(ListQuerySchema, params);
-      const limit = resolveLimit(p.limit);
-      const after = decodeCursor(p.cursor);
-      if (actor.branchCodes.length === 0) return { items: [], nextCursor: null };
-      const q = p.q?.trim();
-      const rows = db
-        .select()
-        .from(branches)
-        .where(
-          and(
-            inArray(branches.code, actor.branchCodes),
-            after === undefined ? undefined : gt(branches.id, after),
-            p.active === undefined ? undefined : eq(branches.active, p.active),
-            q ? or(likeContains(branches.code, q), keyContains(branches.nameKey, q)) : undefined,
-          ),
-        )
-        .orderBy(asc(branches.id))
-        .limit(limit + 1)
-        .all();
-      return toPage(rows.map(toResponse), limit, (r) => r.id);
-    },
+  return withRoleGuard(
+    {
+      list(actor, params: ListParams = {}): Page<BranchResponse> {
+        const p = parseInput(ListQuerySchema, params);
+        const limit = resolveLimit(p.limit);
+        const after = decodeCursor(p.cursor);
+        if (actor.branchCodes.length === 0) return { items: [], nextCursor: null };
+        const q = p.q?.trim();
+        const rows = db
+          .select()
+          .from(branches)
+          .where(
+            and(
+              inArray(branches.code, actor.branchCodes),
+              after === undefined ? undefined : gt(branches.id, after),
+              p.active === undefined ? undefined : eq(branches.active, p.active),
+              q ? or(likeContains(branches.code, q), keyContains(branches.nameKey, q)) : undefined,
+            ),
+          )
+          .orderBy(asc(branches.id))
+          .limit(limit + 1)
+          .all();
+        return toPage(rows.map(toResponse), limit, (r) => r.id);
+      },
 
-    get(actor, id) {
-      return toResponse(visible(actor, find(db, id)));
-    },
+      get(actor, id) {
+        return toResponse(visible(actor, find(db, id)));
+      },
 
-    create(actor, input) {
-      requireAdmin(actor);
-      const data = parseInput(CreateBranchSchema, input);
-      const code = cleanCode(data.code);
-      const name = cleanText(data.name, 'name');
-      if (!actor.branchCodes.includes(code)) throw forbidden('Filial fora do escopo do usuário');
-      return writeTx(db, (tx) => {
-        if (tx.select({ id: branches.id }).from(branches).where(eq(branches.code, code)).get()) {
-          throw new DomainError('conflict', 'Código já cadastrado');
-        }
-        requireMunicipality(tx, data.municipalityCode);
-        const at = now();
-        try {
-          return toResponse(
-            tx
-              .insert(branches)
-              .values({
-                code,
-                name,
-                nameKey: searchKey(name),
-                municipalityCode: data.municipalityCode,
-                createdAt: at,
-                updatedAt: at,
-                createdBy: actor.sub,
-                updatedBy: actor.sub,
-              })
-              .returning()
-              .get(),
-          );
-        } catch (err) {
-          if (isUniqueViolation(err)) throw new DomainError('conflict', 'Código já cadastrado');
-          throw err;
-        }
-      });
-    },
+      create(actor, input) {
+        requireAdmin(actor);
+        const data = parseInput(CreateBranchSchema, input);
+        const code = cleanCode(data.code);
+        const name = cleanText(data.name, 'name');
+        if (!actor.branchCodes.includes(code)) throw forbidden('Filial fora do escopo do usuário');
+        return writeTx(db, (tx) => {
+          if (tx.select({ id: branches.id }).from(branches).where(eq(branches.code, code)).get()) {
+            throw new DomainError('conflict', 'Código já cadastrado');
+          }
+          requireMunicipality(tx, data.municipalityCode);
+          const at = now();
+          try {
+            return toResponse(
+              tx
+                .insert(branches)
+                .values({
+                  code,
+                  name,
+                  nameKey: searchKey(name),
+                  municipalityCode: data.municipalityCode,
+                  createdAt: at,
+                  updatedAt: at,
+                  createdBy: actor.sub,
+                  updatedBy: actor.sub,
+                })
+                .returning()
+                .get(),
+            );
+          } catch (err) {
+            if (isUniqueViolation(err)) throw new DomainError('conflict', 'Código já cadastrado');
+            throw err;
+          }
+        });
+      },
 
-    update(actor, id, expectedVersion, patch) {
-      requireAdmin(actor);
-      const version = requireVersion(expectedVersion);
-      const data = parseInput(UpdateBranchSchema, patch);
-      return writeTx(db, (tx) => {
-        const row = visible(actor, find(tx, id));
-        assertVersion(row.version, version);
-        if (data.municipalityCode !== undefined) requireMunicipality(tx, data.municipalityCode);
-        const name = data.name === undefined ? row.name : cleanText(data.name, 'name');
-        tx.update(branches)
-          .set({
-            name,
-            nameKey: searchKey(name),
-            municipalityCode: data.municipalityCode ?? row.municipalityCode,
-            version: row.version + 1,
-            updatedAt: now(),
-            updatedBy: actor.sub,
-          })
-          .where(eq(branches.id, id))
-          .run();
-        return toResponse(visible(actor, find(tx, id)));
-      });
-    },
+      update(actor, id, expectedVersion, patch) {
+        requireAdmin(actor);
+        const version = requireVersion(expectedVersion);
+        const data = parseInput(UpdateBranchSchema, patch);
+        return writeTx(db, (tx) => {
+          const row = visible(actor, find(tx, id));
+          assertVersion(row.version, version);
+          if (data.municipalityCode !== undefined) requireMunicipality(tx, data.municipalityCode);
+          const name = data.name === undefined ? row.name : cleanText(data.name, 'name');
+          tx.update(branches)
+            .set({
+              name,
+              nameKey: searchKey(name),
+              municipalityCode: data.municipalityCode ?? row.municipalityCode,
+              version: row.version + 1,
+              updatedAt: now(),
+              updatedBy: actor.sub,
+            })
+            .where(eq(branches.id, id))
+            .run();
+          return toResponse(visible(actor, find(tx, id)));
+        });
+      },
 
-    deactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, false),
-    reactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, true),
-  };
+      deactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, false),
+      reactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, true),
+    },
+    opts,
+  );
 }

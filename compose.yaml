@@ -75,6 +75,9 @@ services:
       OIDC_ALLOW_INSECURE_HTTP: "true"
       # Origens autorizadas a chamar a API pelo navegador (lista separada por vírgula).
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:39081}
+      # Token sem nenhum perfil de visibilidade conhecido: allow (lê a filial, padrão) | deny (não lê nada amplo).
+      # O valor de produção deve ser decidido pelo negócio.
+      # VISIBILITY_LEGACY: ${VISIBILITY_LEGACY:-allow}
     restart: unless-stopped
 
   web:

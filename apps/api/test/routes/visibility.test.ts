@@ -154,6 +154,20 @@ describe('HTTP: GET /v1/me/customers e /v1/me/visibility', () => {
     expect(warns.join('')).not.toContain(LEGACY.sub);
   });
 
+  it('papel quase conhecido ("Admin", "VENDEDOR") é 403 forbidden, com aviso sem o sub', async () => {
+    const odd = { sub: 'odd-sub-123', roles: ['Admin'], branches: ['FA'] };
+    for (const roles of [['Admin'], [' admin'], ['VENDEDOR'], ['vendedor', 'Gestor']]) {
+      for (const url of ['/v1/me/customers', '/v1/me/visibility', '/v1/portfolios', '/v1/customers']) {
+        const res = await get(url, { ...odd, roles });
+        expect([url, res.statusCode, res.json()]).toEqual([url, 403, { error: 'forbidden' }]);
+      }
+    }
+    const warns = t.logs.filter((l) => l.includes('role_case_mismatch'));
+    expect(warns.length).toBeGreaterThan(0);
+    expect(warns.join('')).not.toContain(odd.sub);
+    expect(t.logs.join('')).not.toContain('legacy_access');
+  });
+
   it('401 sem token', async () => {
     for (const url of ['/v1/me/customers', '/v1/me/visibility']) {
       expect((await t.app.inject({ method: 'GET', url })).statusCode).toBe(401);

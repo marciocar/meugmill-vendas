@@ -64,7 +64,10 @@ export type CheckResponse = Static<typeof CheckResponseSchema>;
 
 export const VisibilitySummarySchema = Type.Object({
   profiles: Type.Array(ProfileSchema),
-  mode: Type.Union([Type.Literal('profiles'), Type.Literal('legacy')]),
+  mode: Type.Union([Type.Literal('profiles'), Type.Literal('legacy'), Type.Literal('denied')], {
+    description:
+      '`legacy`: sem perfil conhecido, lê a filial (VISIBILITY_LEGACY=allow). `denied`: sem perfil conhecido e VISIBILITY_LEGACY=deny, não lê nada amplo.',
+  }),
   /** Vendedor ligado ao login (`sellers.user_sub`); null sem o perfil ou sem a ligação. */
   seller: Type.Union([Type.Object({ id: Type.Integer(), code: Type.String() }), Type.Null()]),
   /** Clientes visíveis (união de todos os perfis, sem repetir). */

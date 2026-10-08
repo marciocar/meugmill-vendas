@@ -19,7 +19,14 @@ describe('loadConfig', () => {
       OIDC_CLAIM_BRANCHES: 'branch_ids',
       OIDC_CLOCK_TOLERANCE_SECONDS: 30,
       CORS_ORIGINS: [],
+      VISIBILITY_LEGACY: 'allow',
     });
+  });
+
+  it('VISIBILITY_LEGACY aceita allow e deny; outro valor é inválido', () => {
+    expect(loadConfig({ ...OIDC, VISIBILITY_LEGACY: 'deny' }).VISIBILITY_LEGACY).toBe('deny');
+    expect(loadConfig({ ...OIDC, VISIBILITY_LEGACY: 'allow' }).VISIBILITY_LEGACY).toBe('allow');
+    expect(() => loadConfig({ ...OIDC, VISIBILITY_LEGACY: 'talvez' })).toThrow(/VISIBILITY_LEGACY/);
   });
 
   it('converte PORT numérica', () => {

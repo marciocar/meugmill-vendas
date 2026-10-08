@@ -218,10 +218,10 @@ describe('visibilidade: quem vê o quê', () => {
     expect(mine(who('a', ['supervisao']))).toEqual(all);
     expect(mine(who('a', ['admin'], ['SER', 'CAR']))).toEqual(ids(w, 1, 2, 3, 4, 5, 6, 7, 8));
     expect(mine(who('a', ['admin'], ['CAR']))).toEqual(ids(w, 7));
-    // Cliente sem nenhuma filial e vínculo inativo na filial não entram.
+    // Cliente sem nenhuma filial não entra; vínculo INATIVO na filial entra (regra ampla do E2).
     customer(null);
     sq().prepare('update customer_branches set active = 0 where customer_id = ?').run(w.c[6]);
-    expect(mine(who('a', ['admin']))).toEqual(ids(w, 1, 2, 3, 4, 5, 8));
+    expect(mine(who('a', ['admin']))).toEqual(all);
   });
 
   it('perfis somam (sem repetir cliente) e o resumo conta por perfil', () => {
@@ -612,5 +612,187 @@ describe('sellers.userSub', () => {
     sellersSvc().update(adminOf('SER'), w.s3, 1, { userSub: 'sub-novo' });
     link(w.p1, ser, w.c[6] as number, w.g1, w.s3);
     expect(mine(a)).toEqual(ids(w, 6));
+  });
+});
+
+describe('VISIBILITY_LEGACY=deny', () => {
+  const deny = () => ({ ...opts(), visibilityLegacy: 'deny' as const });
+  const denyVis = () => createVisibilityService(fx.db, deny());
+
+  it('token sem perfil não lê nada amplo e o modo é denied; allow segue como legacy', () => {
+    const w = world();
+    const a = who('quem-quer', ['outro-papel']);
+    expect(denyVis().listMyCustomers(a).items).toEqual([]);
+    expect(denyVis().check(a, [w.c[1] as number])).toEqual({ visible: [] });
+    expect(denyVis().summary(a)).toEqual({
+      profiles: [],
+      mode: 'denied',
+      seller: null,
+      visibleCustomers: 0,
+      byProfile: {},
+    });
+    const cs = createCustomerService(fx.db, deny());
+    expect(cs.list(a, { limit: 200 }).items).toEqual([]);
+    expect(codeOf(() => cs.get(a, w.c[1] as number))).toBe('not_found');
+    const ps = createPortfolioService(fx.db, deny());
+    expect(ps.list(a).items).toEqual([]);
+    expect(codeOf(() => ps.get(a, w.p1))).toBe('not_found');
+    expect(codeOf(() => createEligibilityService(fx.db, deny()).preview(a, w.p1))).toBe('not_found');
+    expect(legacyCalls).toEqual([]); // nenhum acesso legacy foi concedido
+    // allow (default) continua lendo a filial
+    expect(mine(a)).toEqual(ids(w, 1, 2, 3, 4, 5, 6, 8));
+    expect(vis().summary(a).mode).toBe('legacy');
+  });
+
+  it('quem tem perfil conhecido não muda com deny', () => {
+    const w = world();
+    expect(denyVis().listMyCustomers(who('a', ['admin']), { limit: 200 }).items).toHaveLength(7);
+    expect(
+      denyVis()
+        .listMyCustomers(who('sub-s1', ['vendedor']))
+        .items.map((i) => i.id),
+    ).toEqual(ids(w, 1, 2, 4));
+  });
+});
+
+describe('papel quase conhecido', () => {
+  it('Admin, " admin" e VENDEDOR são 403 em toda leitura e escrita, com aviso sem sub', () => {
+    const w = world();
+    let warns = 0;
+    const o = { ...opts(), onRoleMismatch: () => void (warns += 1) };
+    const variants = [
+      'Admin',
+      ' admin',
+      'ADMIN',
+      'admin ',
+      'VENDEDOR',
+      'Gestor',
+      'Supervisao',
+      ' supervisao\n',
+    ];
+    let calls = 0;
+    for (const role of variants) {
+      const a = who('sub-s1', [role]);
+      const mixed = who('sub-s1', ['vendedor', role]); // mesmo com um perfil exato junto
+      for (const x of [a, mixed]) {
+        const attempts: Array<() => unknown> = [
+          () => createVisibilityService(fx.db, o).summary(x),
+          () => createVisibilityService(fx.db, o).listMyCustomers(x),
+          () => createVisibilityService(fx.db, o).check(x, [1]),
+          () => createCustomerService(fx.db, o).list(x),
+          () => createCustomerService(fx.db, o).get(x, w.c[1] as number),
+          () => createPortfolioService(fx.db, o).get(x, w.p1),
+          () => createPortfolioService(fx.db, o).update(x, w.p1, 1, { name: 'Z' }),
+          () => createEligibilityService(fx.db, o).preview(x, w.p1),
+          () => createDistributionService(fx.db, o).distribute(x, w.p1, 1),
+          () => createLinkService(fx.db, o).listLinks(x, w.p1),
+          () => createSellerService(fx.db, o).list(x),
+        ];
+        for (const fn of attempts) {
+          calls += 1;
+          expect(codeOf(fn)).toBe('forbidden');
+        }
+      }
+    }
+    expect(warns).toBe(calls);
+    expect(legacyCalls).toEqual([]);
+    // nomes exatos e papéis alheios continuam como antes
+    expect(codeOf(() => createVisibilityService(fx.db, o).summary(who('a', ['admin'])))).toBe('no_error');
+    expect(codeOf(() => createVisibilityService(fx.db, o).summary(who('a', ['leitor'])))).toBe('no_error');
+  });
+});
+
+describe('regras de leitura da correção do E8', () => {
+  it('admin vê no check o cliente com vínculo inativo que lê pelo GET', () => {
+    const w = world();
+    const c6 = w.c[6] as number;
+    sq().prepare('update customer_branches set active = 0 where customer_id = ?').run(c6);
+    const a = who('a', ['admin']);
+    expect(customersSvc().get(a, c6).id).toBe(c6);
+    expect(vis().check(a, [c6, 999_999])).toEqual({ visible: [c6] });
+    expect(vis().check(who('a', ['supervisao']), [c6])).toEqual({ visible: [c6] });
+  });
+
+  it('defesa em profundidade: vendedor e gestor não veem cliente inativo nem sem vínculo ativo na filial do vínculo', () => {
+    const w = world();
+    const seller1 = who('sub-s1', ['vendedor']);
+    const manager1 = who('gest1', ['gestor']);
+    expect(mine(seller1)).toEqual(ids(w, 1, 2, 4));
+    // estado inconsistente: vínculo de carteira ativo, mas cliente inativo
+    sq().prepare('update customers set active = 0 where id = ?').run(w.c[1]);
+    expect(mine(seller1)).toEqual(ids(w, 2, 4));
+    expect(mine(manager1)).toEqual(ids(w, 2));
+    expect(vis().check(seller1, [w.c[1] as number])).toEqual({ visible: [] });
+    // vínculo cliente-filial inativo
+    sq().prepare('update customer_branches set active = 0 where customer_id = ?').run(w.c[2]);
+    expect(mine(seller1)).toEqual(ids(w, 4));
+    expect(mine(manager1)).toEqual([]);
+    expect(vis().summary(seller1).visibleCustomers).toBe(1);
+  });
+
+  it('summary.seller respeita as filiais do token', () => {
+    const w = world();
+    expect(vis().summary(who('sub-s1', ['vendedor'])).seller).toEqual({ id: w.s1, code: 'V1' });
+    expect(vis().summary(who('sub-s1', ['vendedor'], ['CAR'])).seller).toBeNull();
+    expect(vis().summary(who('sub-s1', ['vendedor'], [])).seller).toBeNull();
+  });
+});
+
+describe('escritas em carteira que o ator não lê', () => {
+  it('PATCH, distribute e PUT overrides: carteira alheia existente e inexistente dão o mesmo 404', () => {
+    const w = world();
+    const MISSING = 999_999;
+    for (const a of [
+      who('gest2', ['gestor']), // gestor de outra carteira
+      who('sub-s3', ['vendedor']), // sem vínculo com a carteira
+    ]) {
+      for (const [label, fn] of [
+        ['patch', (id: number) => portfolios().update(a, id, 1, { name: 'Z' })],
+        ['distribute', (id: number) => distribution().distribute(a, id, 1)],
+        ['overrides', (id: number) => eligibility().replaceOverrides(a, id, 1, { include: [], exclude: [] })],
+        [
+          'filters',
+          (id: number) =>
+            portfolios().replaceFilters(a, id, 1, {
+              regions: [],
+              retailNetworkIds: [],
+              economicGroupIds: [],
+            }),
+        ],
+        ['sellers', (id: number) => portfolios().replaceSellers(a, id, 1, { assignments: [] })],
+        ['deactivate', (id: number) => portfolios().deactivate(a, id, 1)],
+        ['finalize', (id: number) => linksSvc().finalize(a, id, 1)],
+      ] as const) {
+        expect([label, codeOf(() => fn(w.p1))]).toEqual([label, 'not_found']);
+        expect([label, codeOf(() => fn(MISSING))]).toEqual([label, 'not_found']);
+      }
+    }
+    // quem LÊ a carteira continua com 403: supervisão e o vendedor que atua nela (lê, mas não edita)
+    expect(codeOf(() => portfolios().update(who('sub-s1', ['vendedor']), w.p1, 1, { name: 'Z' }))).toBe(
+      'forbidden',
+    );
+    expect(codeOf(() => portfolios().update(who('a', ['supervisao']), w.p1, 1, { name: 'Z' }))).toBe(
+      'forbidden',
+    );
+  });
+});
+
+describe('agregado reduzido da carteira', () => {
+  it('quem só atua na carteira não recebe contagens de ajustes e ignora include=conflicts', () => {
+    const w = world();
+    const full = portfolios().get(who('gest1', ['gestor']), w.p1, 'conflicts');
+    expect(full).toHaveProperty('overridesInclude');
+    expect(full).toHaveProperty('conflictsBlocked');
+    const admin = portfolios().get(who('a', ['admin']), w.p1);
+    expect(admin).toHaveProperty('overridesExclude');
+    const actor = who('sub-s1', ['vendedor']); // atua na P1, não é responsável
+    for (const include of [undefined, 'conflicts' as const]) {
+      const reduced = portfolios().get(actor, w.p1, include);
+      expect(reduced.id).toBe(w.p1);
+      expect(reduced).not.toHaveProperty('overridesInclude');
+      expect(reduced).not.toHaveProperty('overridesExclude');
+      expect(reduced).not.toHaveProperty('conflictsBlocked');
+      expect(reduced).not.toHaveProperty('conflictsLost');
+    }
   });
 });

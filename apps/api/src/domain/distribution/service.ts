@@ -1,3 +1,4 @@
+import { withRoleGuard } from '../visibility/profiles.js';
 import { inArray, sql } from 'drizzle-orm';
 import { customers, productSubgroups, sellers } from '../../db/schema.js';
 import { findReadable, openForEdit, bump } from '../portfolios/access.js';
@@ -133,214 +134,217 @@ export function createDistributionService(
             .map((r) => [r.id, r] as const),
     );
 
-  return {
-    listAssignments(actor, id, params = {}) {
-      const p = parseInput(AssignmentListQuerySchema, params);
-      const limit = resolveLimit(p.limit ?? DEFAULT_LIMIT);
-      const after = decodeCursor(p.cursor);
-      // Retrato único: grade, gravadas e dados de exibição na mesma transação de leitura.
-      return db.transaction((db) => {
-        const portfolio = findReadable(db, actor, id, opts);
-        const grid = loadGrid(db, portfolio);
-        const stored = loadStored(db, id);
+  return withRoleGuard(
+    {
+      listAssignments(actor, id, params = {}) {
+        const p = parseInput(AssignmentListQuerySchema, params);
+        const limit = resolveLimit(p.limit ?? DEFAULT_LIMIT);
+        const after = decodeCursor(p.cursor);
+        // Retrato único: grade, gravadas e dados de exibição na mesma transação de leitura.
+        return db.transaction((db) => {
+          const portfolio = findReadable(db, actor, id, opts);
+          const grid = loadGrid(db, portfolio);
+          const stored = loadStored(db, id);
 
-        let total = 0;
-        let more = false;
-        const page: {
-          customerId: number;
-          subgroupId: number;
-          sellerId: number | null;
-          status: CellStatus;
-        }[] = [];
-        for (const c of cells(grid, stored)) {
-          if (p.productSubgroupId !== undefined && c.subgroupId !== p.productSubgroupId) continue;
-          if (p.sellerId !== undefined && c.sellerId !== p.sellerId) continue;
-          if (p.status !== undefined && c.status !== p.status) continue;
-          total++;
-          if (more) continue;
-          if (
-            after !== undefined &&
-            (c.customerId < after[0] || (c.customerId === after[0] && c.subgroupId <= after[1]))
-          ) {
-            continue;
+          let total = 0;
+          let more = false;
+          const page: {
+            customerId: number;
+            subgroupId: number;
+            sellerId: number | null;
+            status: CellStatus;
+          }[] = [];
+          for (const c of cells(grid, stored)) {
+            if (p.productSubgroupId !== undefined && c.subgroupId !== p.productSubgroupId) continue;
+            if (p.sellerId !== undefined && c.sellerId !== p.sellerId) continue;
+            if (p.status !== undefined && c.status !== p.status) continue;
+            total++;
+            if (more) continue;
+            if (
+              after !== undefined &&
+              (c.customerId < after[0] || (c.customerId === after[0] && c.subgroupId <= after[1]))
+            ) {
+              continue;
+            }
+            if (page.length === limit) more = true;
+            else page.push(c);
           }
-          if (page.length === limit) more = true;
-          else page.push(c);
-        }
 
-        const customerRows = page.length
-          ? db
-              .select({ id: customers.id, cnpj: customers.cnpj, legalName: customers.legalName })
-              .from(customers)
-              .where(inArray(customers.id, [...new Set(page.map((c) => c.customerId))]))
-              .all()
-          : [];
-        const customerById = new Map(customerRows.map((r) => [r.id, r]));
-        const subgroupById = subgroupMap(db, [...new Set(page.map((c) => c.subgroupId))]);
-        const sellerById = sellerMap(db, [
-          ...new Set(page.flatMap((c) => (c.sellerId === null ? [] : [c.sellerId]))),
-        ]);
-        const items: AssignmentItem[] = page.map((c) => ({
-          customer: customerById.get(c.customerId) as AssignmentItem['customer'],
-          productSubgroup: subgroupById.get(c.subgroupId) as AssignmentItem['productSubgroup'],
-          seller: c.sellerId === null ? null : (sellerById.get(c.sellerId) ?? null),
-          status: c.status,
-        }));
-        const last = page[page.length - 1];
-        return {
-          items,
-          nextCursor: more && last ? encodeCursor(last.customerId, last.subgroupId) : null,
-          total,
-        };
-      });
-    },
-
-    summary(actor, id) {
-      // Retrato único: grade, gravadas e dados de exibição na mesma transação de leitura.
-      return db.transaction((db) => {
-        const portfolio = findReadable(db, actor, id, opts);
-        const grid = loadGrid(db, portfolio);
-        const perSubgroup = new Map(
-          grid.subgroupIds.map((g) => [g, { counts: new Map<number, number>(), unassigned: 0, stale: 0 }]),
-        );
-        const totals = { members: grid.memberIds.length, cells: 0, assigned: 0, unassigned: 0, stale: 0 };
-        for (const c of cells(grid, loadStored(db, id))) {
-          if (c.inGrid) totals.cells++;
-          totals[c.status]++;
-          const bucket = perSubgroup.get(c.subgroupId);
-          if (!bucket) continue; // gravada em subgrupo que saiu da carteira: só entra nos totais
-          if (c.status === 'assigned') {
-            bucket.counts.set(c.sellerId as number, (bucket.counts.get(c.sellerId as number) ?? 0) + 1);
-          } else bucket[c.status]++;
-        }
-        const sellerById = sellerMap(db, [...new Set(grid.pairs.map((x) => x.sellerId))]);
-        const subgroupById = subgroupMap(db, grid.subgroupIds);
-        const subgroups: SubgroupSummary[] = grid.subgroupIds.map((g) => {
-          const bucket = perSubgroup.get(g) as NonNullable<ReturnType<typeof perSubgroup.get>>;
+          const customerRows = page.length
+            ? db
+                .select({ id: customers.id, cnpj: customers.cnpj, legalName: customers.legalName })
+                .from(customers)
+                .where(inArray(customers.id, [...new Set(page.map((c) => c.customerId))]))
+                .all()
+            : [];
+          const customerById = new Map(customerRows.map((r) => [r.id, r]));
+          const subgroupById = subgroupMap(db, [...new Set(page.map((c) => c.subgroupId))]);
+          const sellerById = sellerMap(db, [
+            ...new Set(page.flatMap((c) => (c.sellerId === null ? [] : [c.sellerId]))),
+          ]);
+          const items: AssignmentItem[] = page.map((c) => ({
+            customer: customerById.get(c.customerId) as AssignmentItem['customer'],
+            productSubgroup: subgroupById.get(c.subgroupId) as AssignmentItem['productSubgroup'],
+            seller: c.sellerId === null ? null : (sellerById.get(c.sellerId) ?? null),
+            status: c.status,
+          }));
+          const last = page[page.length - 1];
           return {
-            productSubgroup: subgroupById.get(g) as SubgroupSummary['productSubgroup'],
-            sellers: grid.pairs
-              .filter((x) => x.subgroupId === g)
-              .sort((a, b) => (a.sellerCode < b.sellerCode ? -1 : 1))
-              .map((x) => ({
-                seller: sellerById.get(x.sellerId) as SubgroupSummary['sellers'][number]['seller'],
-                count: bucket.counts.get(x.sellerId) ?? 0,
-              })),
-            unassigned: bucket.unassigned,
-            stale: bucket.stale,
+            items,
+            nextCursor: more && last ? encodeCursor(last.customerId, last.subgroupId) : null,
+            total,
           };
         });
-        return { subgroups, totals };
-      });
-    },
+      },
 
-    replaceAssignments(actor, id, expectedVersion, input) {
-      return writeTx(db, (tx) => {
-        const row = openForEdit(tx, actor, id, expectedVersion);
-        const data = parseInput(ReplaceAssignmentsSchema, input);
-        const set = data.set ?? [];
-        const clear = data.clear ?? [];
-        if (set.length + clear.length === 0) throw invalid('Informe ao menos um item em set ou clear');
-        if (set.length + clear.length > MAX_ASSIGNMENT_ITEMS) {
-          throw invalid(`Máximo de ${MAX_ASSIGNMENT_ITEMS} itens por chamada`);
-        }
-        const seen = new Set<string>();
-        for (const x of [...set, ...clear]) {
-          const key = `${x.customerId}.${x.productSubgroupId}`;
-          if (seen.has(key)) throw invalid('Célula (cliente, subgrupo) repetida');
-          seen.add(key);
-        }
-        if (set.length > 0) {
-          const grid = loadGrid(tx, row);
-          // O índice localiza o item em lotes de até 5.000; a mensagem não ecoa ids nem valores. Cliente
-          // inexistente, de outra filial ou sem vínculo ativo não são membros efetivos: mesma mensagem.
-          for (const [i, s] of set.entries()) {
-            const reason = invalidReason(grid, s.customerId, s.productSubgroupId, s.sellerId);
-            if (reason !== null) throw invalid(`set[${i}]: ${reason}`);
+      summary(actor, id) {
+        // Retrato único: grade, gravadas e dados de exibição na mesma transação de leitura.
+        return db.transaction((db) => {
+          const portfolio = findReadable(db, actor, id, opts);
+          const grid = loadGrid(db, portfolio);
+          const perSubgroup = new Map(
+            grid.subgroupIds.map((g) => [g, { counts: new Map<number, number>(), unassigned: 0, stale: 0 }]),
+          );
+          const totals = { members: grid.memberIds.length, cells: 0, assigned: 0, unassigned: 0, stale: 0 };
+          for (const c of cells(grid, loadStored(db, id))) {
+            if (c.inGrid) totals.cells++;
+            totals[c.status]++;
+            const bucket = perSubgroup.get(c.subgroupId);
+            if (!bucket) continue; // gravada em subgrupo que saiu da carteira: só entra nos totais
+            if (c.status === 'assigned') {
+              bucket.counts.set(c.sellerId as number, (bucket.counts.get(c.sellerId as number) ?? 0) + 1);
+            } else bucket[c.status]++;
           }
-        }
-        deleteAssignments(
-          tx,
-          id,
-          clear.map((x) => [x.customerId, x.productSubgroupId]),
-        );
-        upsertAssignments(
-          tx,
-          id,
-          set.map((x) => [x.customerId, x.productSubgroupId, x.sellerId]),
-          actor.sub,
-          now(),
-        );
-        bump(tx, row, actor, now());
-        return loadAggregateBase(tx, id);
-      });
-    },
-
-    distribute(actor, id, expectedVersion, input = {}) {
-      return writeTx(db, (tx) => {
-        const row = openForEdit(tx, actor, id, expectedVersion);
-        const data = parseInput(DistributeSchema, input);
-        const grid = loadGrid(tx, row);
-        let targets = grid.subgroupIds;
-        if (data.productSubgroupIds !== undefined) {
-          if (new Set(data.productSubgroupIds).size !== data.productSubgroupIds.length) {
-            throw invalid('Subgrupo repetido');
-          }
-          if (data.productSubgroupIds.some((g) => !grid.usable.has(g))) {
-            throw invalid('Subgrupo não pertence à carteira');
-          }
-          const wanted = new Set(data.productSubgroupIds);
-          targets = grid.subgroupIds.filter((g) => wanted.has(g));
-        }
-        const targetSet = new Set(targets);
-
-        // Uma passada: contagem válida por vendedor e células a preencher, por subgrupo.
-        const validCounts = new Map<number, Map<number, number>>(targets.map((g) => [g, new Map()]));
-        const toFill = new Map<number, number[]>(targets.map((g) => [g, []]));
-        for (const c of cells(grid, loadStored(tx, id))) {
-          if (!targetSet.has(c.subgroupId)) continue;
-          if (c.status === 'assigned') {
-            const m = validCounts.get(c.subgroupId) as Map<number, number>;
-            m.set(c.sellerId as number, (m.get(c.sellerId as number) ?? 0) + 1);
-          } else if (c.inGrid) (toFill.get(c.subgroupId) as number[]).push(c.customerId);
-        }
-
-        const rows: [number, number, number][] = [];
-        const finalCounts: DistributeResult['finalCounts'] = {};
-        const distributed: Record<number, number> = {};
-        const skippedSubgroupIds: number[] = [];
-        for (const g of targets) {
-          const candidates = grid.pairs
-            .filter((x) => x.subgroupId === g && x.usable)
-            .map((x) => ({ id: x.sellerId, code: x.sellerCode }));
-          if (candidates.length === 0) {
-            skippedSubgroupIds.push(g);
-            continue;
-          }
-          const customerIds = toFill.get(g) as number[];
-          const picked = strategy.assign({
-            sellers: candidates,
-            validCounts: validCounts.get(g) as Map<number, number>,
-            customerIds,
+          const sellerById = sellerMap(db, [...new Set(grid.pairs.map((x) => x.sellerId))]);
+          const subgroupById = subgroupMap(db, grid.subgroupIds);
+          const subgroups: SubgroupSummary[] = grid.subgroupIds.map((g) => {
+            const bucket = perSubgroup.get(g) as NonNullable<ReturnType<typeof perSubgroup.get>>;
+            return {
+              productSubgroup: subgroupById.get(g) as SubgroupSummary['productSubgroup'],
+              sellers: grid.pairs
+                .filter((x) => x.subgroupId === g)
+                .sort((a, b) => (a.sellerCode < b.sellerCode ? -1 : 1))
+                .map((x) => ({
+                  seller: sellerById.get(x.sellerId) as SubgroupSummary['sellers'][number]['seller'],
+                  count: bucket.counts.get(x.sellerId) ?? 0,
+                })),
+              unassigned: bucket.unassigned,
+              stale: bucket.stale,
+            };
           });
-          for (let i = 0; i < customerIds.length; i++) {
-            rows.push([customerIds[i] as number, g, picked[i] as number]);
+          return { subgroups, totals };
+        });
+      },
+
+      replaceAssignments(actor, id, expectedVersion, input) {
+        return writeTx(db, (tx) => {
+          const row = openForEdit(tx, actor, id, expectedVersion, undefined, opts);
+          const data = parseInput(ReplaceAssignmentsSchema, input);
+          const set = data.set ?? [];
+          const clear = data.clear ?? [];
+          if (set.length + clear.length === 0) throw invalid('Informe ao menos um item em set ou clear');
+          if (set.length + clear.length > MAX_ASSIGNMENT_ITEMS) {
+            throw invalid(`Máximo de ${MAX_ASSIGNMENT_ITEMS} itens por chamada`);
           }
-          distributed[g] = customerIds.length;
-          // Contagem final = válidas preservadas + gravadas agora.
-          const total = new Map(validCounts.get(g) as Map<number, number>);
-          for (const sellerId of picked) total.set(sellerId, (total.get(sellerId) ?? 0) + 1);
-          finalCounts[g] = [...candidates]
-            .sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0))
-            .map((x) => ({ sellerId: x.id, count: total.get(x.id) ?? 0 }));
-        }
-        // Sem nada a gravar, a versão (e o ETag) não muda.
-        if (rows.length > 0) {
-          upsertAssignments(tx, id, rows, actor.sub, now());
+          const seen = new Set<string>();
+          for (const x of [...set, ...clear]) {
+            const key = `${x.customerId}.${x.productSubgroupId}`;
+            if (seen.has(key)) throw invalid('Célula (cliente, subgrupo) repetida');
+            seen.add(key);
+          }
+          if (set.length > 0) {
+            const grid = loadGrid(tx, row);
+            // O índice localiza o item em lotes de até 5.000; a mensagem não ecoa ids nem valores. Cliente
+            // inexistente, de outra filial ou sem vínculo ativo não são membros efetivos: mesma mensagem.
+            for (const [i, s] of set.entries()) {
+              const reason = invalidReason(grid, s.customerId, s.productSubgroupId, s.sellerId);
+              if (reason !== null) throw invalid(`set[${i}]: ${reason}`);
+            }
+          }
+          deleteAssignments(
+            tx,
+            id,
+            clear.map((x) => [x.customerId, x.productSubgroupId]),
+          );
+          upsertAssignments(
+            tx,
+            id,
+            set.map((x) => [x.customerId, x.productSubgroupId, x.sellerId]),
+            actor.sub,
+            now(),
+          );
           bump(tx, row, actor, now());
-        }
-        return { aggregate: loadAggregateBase(tx, id), distributed, skippedSubgroupIds, finalCounts };
-      });
+          return loadAggregateBase(tx, id);
+        });
+      },
+
+      distribute(actor, id, expectedVersion, input = {}) {
+        return writeTx(db, (tx) => {
+          const row = openForEdit(tx, actor, id, expectedVersion, undefined, opts);
+          const data = parseInput(DistributeSchema, input);
+          const grid = loadGrid(tx, row);
+          let targets = grid.subgroupIds;
+          if (data.productSubgroupIds !== undefined) {
+            if (new Set(data.productSubgroupIds).size !== data.productSubgroupIds.length) {
+              throw invalid('Subgrupo repetido');
+            }
+            if (data.productSubgroupIds.some((g) => !grid.usable.has(g))) {
+              throw invalid('Subgrupo não pertence à carteira');
+            }
+            const wanted = new Set(data.productSubgroupIds);
+            targets = grid.subgroupIds.filter((g) => wanted.has(g));
+          }
+          const targetSet = new Set(targets);
+
+          // Uma passada: contagem válida por vendedor e células a preencher, por subgrupo.
+          const validCounts = new Map<number, Map<number, number>>(targets.map((g) => [g, new Map()]));
+          const toFill = new Map<number, number[]>(targets.map((g) => [g, []]));
+          for (const c of cells(grid, loadStored(tx, id))) {
+            if (!targetSet.has(c.subgroupId)) continue;
+            if (c.status === 'assigned') {
+              const m = validCounts.get(c.subgroupId) as Map<number, number>;
+              m.set(c.sellerId as number, (m.get(c.sellerId as number) ?? 0) + 1);
+            } else if (c.inGrid) (toFill.get(c.subgroupId) as number[]).push(c.customerId);
+          }
+
+          const rows: [number, number, number][] = [];
+          const finalCounts: DistributeResult['finalCounts'] = {};
+          const distributed: Record<number, number> = {};
+          const skippedSubgroupIds: number[] = [];
+          for (const g of targets) {
+            const candidates = grid.pairs
+              .filter((x) => x.subgroupId === g && x.usable)
+              .map((x) => ({ id: x.sellerId, code: x.sellerCode }));
+            if (candidates.length === 0) {
+              skippedSubgroupIds.push(g);
+              continue;
+            }
+            const customerIds = toFill.get(g) as number[];
+            const picked = strategy.assign({
+              sellers: candidates,
+              validCounts: validCounts.get(g) as Map<number, number>,
+              customerIds,
+            });
+            for (let i = 0; i < customerIds.length; i++) {
+              rows.push([customerIds[i] as number, g, picked[i] as number]);
+            }
+            distributed[g] = customerIds.length;
+            // Contagem final = válidas preservadas + gravadas agora.
+            const total = new Map(validCounts.get(g) as Map<number, number>);
+            for (const sellerId of picked) total.set(sellerId, (total.get(sellerId) ?? 0) + 1);
+            finalCounts[g] = [...candidates]
+              .sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0))
+              .map((x) => ({ sellerId: x.id, count: total.get(x.id) ?? 0 }));
+          }
+          // Sem nada a gravar, a versão (e o ETag) não muda.
+          if (rows.length > 0) {
+            upsertAssignments(tx, id, rows, actor.sub, now());
+            bump(tx, row, actor, now());
+          }
+          return { aggregate: loadAggregateBase(tx, id), distributed, skippedSubgroupIds, finalCounts };
+        });
+      },
     },
-  };
+    opts,
+  );
 }

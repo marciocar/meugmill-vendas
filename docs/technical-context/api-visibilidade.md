@@ -37,11 +37,11 @@ recebem **omitido** (nem `null`), para não revelar a existência da ligação.
 
 Todos exigem JWT (`401` sem token).
 
-| Rota                        | O que faz                                                                                           |
-| --------------------------- | --------------------------------------------------------------------------------------------------- |
-| `GET /v1/me/visibility`     | Resumo: `profiles`, `mode` (`profiles` ou `legacy`), `seller` (`{ id, code }` ou `null`), contagens |
-| `GET /v1/me/customers`      | Clientes visíveis, por id crescente. Filtros `q`, `productSubgroupId`; `cursor` e `limit`           |
-| `POST /v1/visibility/check` | Corpo `{ "customerIds": [..] }`, até 1.000 ids distintos; devolve `{ "visible": [..] }`             |
+| Rota                        | O que faz                                                                                                     |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `GET /v1/me/visibility`     | Resumo: `profiles`, `mode` (`profiles`, `legacy` ou `denied`), `seller` (`{ id, code }` ou `null`), contagens |
+| `GET /v1/me/customers`      | Clientes visíveis, por id crescente. Filtros `q`, `productSubgroupId`; `cursor` e `limit`                     |
+| `POST /v1/visibility/check` | Corpo `{ "customerIds": [..] }`, até 1.000 ids distintos; devolve `{ "visible": [..] }`                       |
 
 - `GET /v1/me/customers` devolve `{ items, nextCursor, total }`. Cada item traz os dados de empresa do
   cliente e `via`: a lista de `{ productSubgroupId, portfolioId, profile }` dos vínculos ativos que o
@@ -49,6 +49,12 @@ Todos exigem JWT (`401` sem token).
 - `POST /v1/visibility/check` é **leitura** (POST só pelo tamanho do corpo): qualquer perfil o usa. Mais de
   1.000 ids, id repetido ou id inválido (`< 1`) responde `400`. Cliente inexistente, de outra filial ou sem
   visibilidade **não voltam**, e a resposta não os diferencia.
+- Contrato do `check` na **leitura ampla** (admin, supervisão ou `legacy`): vale a mesma regra do
+  `customers.list/get` do E2 para admin, isto é, todo cliente com vínculo **ativo ou inativo** com as
+  filiais do token. O cliente que o admin lê pelo `GET /v1/customers/:id` também aparece no `check`.
+  Vendedor e gestor, por defesa em profundidade, exigem além do vínculo de carteira ativo: cliente
+  **ativo** (`customers.active = 1`) e vínculo cliente-filial **ativo** na filial do vínculo de carteira.
+- `summary.seller` só devolve o vendedor ligado ao login se ele atua em alguma filial do token.
 
 ### Como o sistema principal filtra pedidos e títulos
 
@@ -72,8 +78,36 @@ Um token **sem nenhum** dos perfis conhecidos mantém a leitura de antes do E8 (
 token) e gera um log de aviso `legacy_access` com **só** o nome do recurso (`resource`): nunca `sub`,
 papéis, filiais nem dado de negócio. `GET /v1/me/visibility` mostra `mode: "legacy"`.
 
-**Risco aberto, decisão do maestro:** fechar isso (negar por padrão) depende de a GMill confirmar os nomes
-dos perfis. Enquanto isso, qualquer token com papel desconhecido lê a filial inteira.
+**Risco aberto, decisão do maestro:** o padrão (`allow`) segue lendo a filial inteira. Para fechar,
+use a variável `VISIBILITY_LEGACY` (abaixo); o valor padrão de produção é decisão do negócio.
+
+### `VISIBILITY_LEGACY` = `allow` | `deny`
+
+- `allow` (padrão): comportamento descrito acima (`mode: "legacy"`).
+- `deny`: o token sem perfil conhecido **não lê nada amplo**: as leituras restritas (clientes, carteiras,
+  prévia, ajustes, atribuições, vínculos, `/me/customers`, `check`) devolvem vazio ou `404 not_found`, como
+  um vendedor sem vínculos, e `GET /v1/me/visibility` informa `mode: "denied"`. Não gera aviso `legacy_access`.
+- A opção chega ao domínio por `ServiceOptions.visibilityLegacy` (via `serviceOptions`), nunca por `process.env`.
+
+## Papel "quase conhecido" é recusado
+
+Se `roles` traz um valor que, após `trim().toLowerCase()`, é igual a um perfil conhecido, mas não é
+idêntico (ex.: `Admin`, ` admin`, `VENDEDOR`), **toda** leitura e escrita dos serviços responde
+`403 forbidden`, mesmo que haja outro perfil exato no token. Assim o erro de configuração do IdP aparece em
+vez de cair em `legacy`. O serviço registra o aviso `role_case_mismatch`, sem `sub` nem papéis.
+
+## Escritas em carteira que o ator não lê
+
+Quem não pode **ler** a carteira (nem responsável, nem vendedor que atua nela, nem leitura ampla) recebe
+`404 not_found` nas escritas (`PATCH`, `distribute`, `PUT overrides`, filtros, vendedores, finalizar,
+inativar), igual à carteira inexistente. O `403` fica para quem lê mas não edita (supervisão, vendedor que
+atua na carteira).
+
+## Agregado reduzido da carteira
+
+Em `GET /v1/portfolios/:id`, quem não tem leitura ampla nem é o responsável (ex.: vendedor que atua na
+carteira) recebe o agregado **sem** `overridesInclude` e `overridesExclude`, e `include=conflicts` é
+**ignorado em silêncio** (sem `conflictsBlocked`/`conflictsLost`, sem 403).
 
 ## Desempenho (medido, volume do E8)
 
@@ -91,7 +125,7 @@ Base de 50 mil clientes e 150 mil vínculos ativos, SQLite em memória (`test:pe
 - Perfis lidos de `roles`; nomes são palpite e ficam em constantes; vários perfis somam.
 - Visibilidade parte dos vínculos ativos do E7 e respeita as filiais do token.
 - `check` em lote, com até 1.000 ids distintos, sem diferenciar inexistente de invisível.
-- Token sem perfil conhecido segue em `legacy`, com aviso no log (risco aberto acima).
+- Token sem perfil conhecido segue em `legacy` por padrão (`VISIBILITY_LEGACY=allow`), com aviso no log (risco aberto acima).
 - O aviso `legacy` é ligado ao logger da app por `serviceOptions` (`routes/v1/http.ts`).
 
 ## IdP de teste e smoke

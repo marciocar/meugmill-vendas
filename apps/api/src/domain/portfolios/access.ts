@@ -63,7 +63,7 @@ export function bump(
 }
 
 /**
- * Passos comuns das escritas, nesta ordem: carteira no escopo (404), permissão de edição (403),
+ * Passos comuns das escritas, nesta ordem: carteira legível ao ator (escopo e leitura; 404), permissão de edição (403),
  * `beforeVersion` (permissões extras que dependem do corpo), versão presente (428), carteira
  * ativa (409 `portfolio_inactive`) e versão igual à atual (409 `version_conflict`).
  * A inativa vem antes da versão: com a versão velha, o 409 de versão mandaria recarregar e
@@ -75,8 +75,11 @@ export function openForEdit(
   id: number,
   expected: number | undefined,
   beforeVersion?: (row: PortfolioRow) => void,
+  opts?: ServiceOptions,
 ): PortfolioRow {
-  const row = findScoped(conn, actor, id);
+  // Quem não pode LER a carteira recebe not_found (igual a inexistente), nunca forbidden: o 403 revelaria
+  // que ela existe.
+  const row = findVisible(conn, actor, id, opts);
   requireEdit(actor, row);
   beforeVersion?.(row);
   const version = requireVersion(expected);
