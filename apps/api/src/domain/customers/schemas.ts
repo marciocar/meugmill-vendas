@@ -6,7 +6,7 @@ const NullableId = Type.Union([Type.Integer({ minimum: 1 }), Type.Null()]);
 const NullableName = Type.Union([Type.String({ maxLength: 200 }), Type.Null()]);
 
 /**
- * `cnpj` aceita máscara (é normalizado para 14 dígitos e validado no service).
+ * `cnpj` aceita máscara e minúsculas (é normalizado para 14 posições e validado no service; numérico ou alfanumérico).
  * `stateCode` é o código IBGE da UF; se omitido, deriva-se do município.
  */
 export const CreateCustomerSchema = Type.Object(

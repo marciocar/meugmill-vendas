@@ -24,19 +24,21 @@
 
 **Concluída 2026-10-08** · 131 testes. Services síncronos; respostas de cliente/vendedor só com filiais do escopo do ator. Risco aberto: CNPJ alfanumérico (Receita, jul/2026).
 
-## Fase 3 — API dos catálogos, filiais e localidades [ACTIVE] (paralela à 4)
+## Fase 3 — API dos catálogos, filiais e localidades [DONE] (paralela à 4)
 
-- [ ] `routes/v1/catalog.ts` (fábrica para subgrupos, redes e grupos econômicos), `branches.ts`, `geo.ts`
-- [ ] `ETag`/`If-Match` (428, 409), paginação, 403 sem admin, 404 fora do escopo
-- [ ] Testes de contrato HTTP com JWT por perfil e filial
+- [x] `routes/v1/catalog.ts` (fábrica para subgrupos, redes e grupos econômicos), `branches.ts`, `geo.ts`
+- [x] `ETag`/`If-Match` (428, 409), paginação, 403 sem admin, 404 fora do escopo
+- [x] Testes de contrato HTTP com JWT por perfil e filial
 
-## Fase 4 — API de clientes e vendedores [TODO] (paralela à 3)
+## Fase 4 — API de clientes e vendedores [DONE] (paralela à 3)
 
-- [ ] `routes/v1/sellers.ts`, `customers.ts` (incluindo `by-cnpj/{cnpj}/branches`)
-- [ ] Vínculos N:N com regra de filiais do token; `customer_exists`
-- [ ] Testes de contrato HTTP; nome do vendedor e CNPJ ausentes dos logs
+- [x] `routes/v1/sellers.ts`, `customers.ts` (incluindo `by-cnpj/{cnpj}/branches`)
+- [x] Vínculos N:N com regra de filiais do token; `customer_exists`
+- [x] Testes de contrato HTTP; nome do vendedor e CNPJ ausentes dos logs
 
-## Fase 5 — OpenAPI, smoke e documentação [TODO]
+**Fases 3 e 4 concluídas 2026-10-08 (em paralelo)** · 225 testes. Integração única: `http.ts` + `crud.ts`, `v1Routes` no `app.ts`; auth em `onRequest` (401 antes de validar); `If-Match` ausente 428, malformado 400; CNPJ alfanumérico (IN RFB 2.229/2024) com DV conferido no exemplo oficial `12ABC34501DE35`; CNPJ mascarado no path dos logs.
+
+## Fase 5 — OpenAPI, smoke e documentação [ACTIVE]
 
 - [ ] `@fastify/swagger` → `GET /v1/openapi.json`
 - [ ] `scripts/smoke.sh`: criar → ler → inativar um subgrupo com token de admin

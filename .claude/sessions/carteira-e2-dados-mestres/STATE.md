@@ -19,14 +19,14 @@ localidades IBGE) com API REST escopada por filial, para E3/E4 consumirem — ve
 - task-manager    → main: OG1-T3 (2723266000000151010) · provider: zoho
 
 ## NEXT
-phase: 3
-phase_title: API dos catálogos, filiais e localidades (Fase 4 em paralelo)
+phase: 5
+phase_title: OpenAPI, smoke e documentação
 status: in_progress
-next_action: "Integrar as rotas das Fases 3 e 4 no app.ts quando os agentes terminarem e validar o contrato HTTP"
+next_action: "Adicionar @fastify/swagger com GET /v1/openapi.json, smoke de criar-ler-inativar e docs/technical-context/api-dados-mestres.md"
 blocked_by: none
-files_in_flight: [apps/api/src/routes/v1/]
-validate_with: "pnpm --filter @meugmill/api test"
-last_checkpoint: 2026-10-08T01:00Z
+files_in_flight: [apps/api/src/routes/v1/openapi.ts, scripts/smoke.sh, docs/technical-context/]
+validate_with: "pnpm test && bash scripts/smoke.sh"
+last_checkpoint: 2026-10-08T01:40Z
 
 ## Native transcript
 resume_command: claude --resume <id>

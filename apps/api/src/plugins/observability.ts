@@ -30,6 +30,11 @@ const REDACT_PATHS = [
   '*.email',
 ];
 
+// O CNPJ de cliente viaja no path (`/by-cnpj/{cnpj}/...`); no log ele vira `:cnpj` (sem query string).
+export function safePath(url: string | undefined): string | undefined {
+  return url?.split('?')[0]?.replace(/\/by-cnpj\/[^/]*/gi, '/by-cnpj/:cnpj');
+}
+
 // Configuração do logger do Fastify: JSON estruturado, serializers enxutos e redact.
 export function buildLoggerOptions(
   config: Pick<AppConfig, 'LOG_LEVEL'>,
@@ -43,7 +48,7 @@ export function buildLoggerOptions(
       // Sem headers, sem corpo e sem query string (pode carregar token/PII).
       req: (req: { method?: string; url?: string }) => ({
         method: req.method,
-        url: req.url?.split('?')[0],
+        url: safePath(req.url),
       }),
       res: (res: { statusCode?: number }) => ({ statusCode: res.statusCode }),
     },
@@ -61,7 +66,7 @@ export const observabilityPlugin = fp(
     // 404 próprio: o log padrão do Fastify ("Route ... not found") traz a URL com query string.
     // Aqui só método e caminho (sem query) vão para o log, e a resposta não ecoa a URL.
     app.setNotFoundHandler((request, reply) => {
-      request.log.info({ method: request.method, path: request.url.split('?')[0] }, 'Rota não encontrada');
+      request.log.info({ method: request.method, path: safePath(request.url) }, 'Rota não encontrada');
       return reply.code(404).send({ error: 'not_found' });
     });
 

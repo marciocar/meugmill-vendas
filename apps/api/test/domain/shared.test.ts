@@ -8,8 +8,9 @@ import { CreateCatalogSchema } from '../../src/domain/catalog/schemas.js';
 import { CNPJ_A, CNPJ_B, CNPJ_C, CNPJ_D, codeOf } from '../helpers/seed.js';
 
 describe('cnpj', () => {
-  it('normaliza para só dígitos', () => {
+  it('normaliza: remove a máscara e põe em maiúsculas', () => {
     expect(normalizeCnpj('11.222.333/0001-81')).toBe('11222333000181');
+    expect(normalizeCnpj(' 12.abc.345/01de-35 ')).toBe('12ABC34501DE35');
   });
 
   it('aceita CNPJs válidos (com e sem máscara)', () => {
@@ -26,7 +27,26 @@ describe('cnpj', () => {
     expect(isValidCnpj('abcdefghijklmn')).toBe(false);
   });
 
+  it('aceita o CNPJ alfanumérico do exemplo oficial da Receita (DV 35)', () => {
+    expect(isValidCnpj('12.ABC.345/01DE-35')).toBe(true);
+    expect(isValidCnpj('12ABC34501DE35')).toBe(true);
+  });
+
+  it('aceita minúsculas (normalizadas) e rejeita alfanumérico com DV errado', () => {
+    expect(isValidCnpj('12.abc.345/01de-35')).toBe(true);
+    expect(isValidCnpj('12ABC34501DE34')).toBe(false);
+    expect(isValidCnpj('12ABC34501DE45')).toBe(false);
+    expect(isValidCnpj('12ABC34501DE3A')).toBe(false); // DV precisa ser numérico
+  });
+
+  it('rejeita caracteres fora de [0-9A-Z]', () => {
+    expect(isValidCnpj('12ABC34501D$35')).toBe(false);
+    expect(isValidCnpj('12ABC34501DÉ35')).toBe(false);
+    expect(isValidCnpj('12ABC345_1DE35')).toBe(false);
+  });
+
   it('rejeita sequências repetidas', () => {
+    expect(isValidCnpj('A'.repeat(14))).toBe(false);
     for (let d = 0; d <= 9; d++) expect(isValidCnpj(String(d).repeat(14))).toBe(false);
   });
 });
