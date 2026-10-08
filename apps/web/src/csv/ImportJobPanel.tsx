@@ -66,13 +66,17 @@ export function ImportJobPanel({ jobId, onClose }: { jobId: number; onClose: () 
   const [busy, setBusy] = useState(false);
   const [lineFilter, setLineFilter] = useState<string | null>(null);
 
+  // Falhas seguidas da consulta: o acompanhamento continua, com espera crescente (até 15 s).
+  const [failures, setFailures] = useState(0);
   const fetchJob = useCallback(async () => {
     try {
       const next = await api.get<ImportJob>(`/v1/imports/${jobId}`);
       setJob(next);
       setError(null);
+      setFailures(0);
     } catch (err) {
-      setError(describeError(err));
+      setError(`${describeError(err)} Tentando de novo…`);
+      setFailures((n) => n + 1);
     }
   }, [api, jobId]);
 
@@ -83,9 +87,10 @@ export function ImportJobPanel({ jobId, onClose }: { jobId: number; onClose: () 
   const running = job !== null && RUNNING.includes(job.status);
   useEffect(() => {
     if (!running) return;
-    const t = setTimeout(() => void fetchJob(), 1000);
+    const delay = Math.min(1000 * 2 ** Math.max(failures - 1, 0), 15000);
+    const t = setTimeout(() => void fetchJob(), delay);
     return () => clearTimeout(t);
-  }, [running, job, fetchJob]);
+  }, [running, job, failures, fetchJob]);
 
   // O filtro inicial do relatório segue o resultado da fase (erros primeiro).
   useEffect(() => {
@@ -116,6 +121,8 @@ export function ImportJobPanel({ jobId, onClose }: { jobId: number; onClose: () 
     [api, jobId, running, job?.status, filter],
   );
 
+  // A varredura da API marca `expired` a cada 10 min; a tela já trava o confirmar no prazo.
+  const overdue = job?.status === 'validated' && job.expiresAt !== null && job.expiresAt <= Date.now();
   const counts = job ? Object.entries(job.counts).filter(([, n]) => n > 0) : [];
 
   return (
@@ -172,7 +179,10 @@ export function ImportJobPanel({ jobId, onClose }: { jobId: number; onClose: () 
           )}
           {(job.status === 'validated' || job.status === 'invalid') && (
             <div className="gc-actions">
-              {job.status === 'validated' && (
+              {job.status === 'validated' && overdue && (
+                <span className="gc-muted">O prazo da simulação venceu: envie o arquivo de novo.</span>
+              )}
+              {job.status === 'validated' && !overdue && (
                 <button
                   type="button"
                   className="gc-button"

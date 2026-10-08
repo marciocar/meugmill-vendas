@@ -24,7 +24,14 @@ export function canEditPortfolio(
 export const canAdminPortfolio = (me: Me, p: Pick<Portfolio, 'branch'>): boolean =>
   isBranchAdmin(me, p.branch.code);
 
-/** Prévia, ajustes, distribuição e vínculos: leitura ampla (admin, supervisão) ou o responsável. */
+const KNOWN_PROFILES = ['vendedor', 'gestor', 'admin', 'supervisao'];
+
+/**
+ * Prévia, ajustes, distribuição e vínculos: leitura ampla (admin, supervisão), o responsável, ou token sem
+ * perfil conhecido (modo `legacy` da API, que lê a filial; com `VISIBILITY_LEGACY=deny` a API responde 404 e
+ * a tela mostra a mensagem).
+ */
 export function canSeePortfolioDetails(me: Me, p: Pick<Portfolio, 'responsibleSub'>): boolean {
+  if (!me.roles.some((r) => KNOWN_PROFILES.includes(r))) return true;
   return me.roles.includes('admin') || me.roles.includes('supervisao') || p.responsibleSub === me.sub;
 }

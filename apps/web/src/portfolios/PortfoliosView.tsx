@@ -54,6 +54,7 @@ function PortfolioList({ me, onOpen }: { me: Me; onOpen: (id: number | null) => 
         <Field label="Buscar">
           <input
             type="search"
+            maxLength={100}
             value={q}
             placeholder="Nome da carteira"
             onChange={(e) => setQ(e.target.value)}

@@ -5,7 +5,7 @@ import type { Branch, Catalog, Portfolio } from '../api/types';
 import { canAdminPortfolio } from '../roles';
 import { Field, Notice, useAsync } from '../ui';
 import type { Me } from '../use-me';
-import type { WriteFn } from './step';
+import { useReportDirty, type WriteFn } from './step';
 
 interface StepInfoProps {
   me: Me;
@@ -15,10 +15,11 @@ interface StepInfoProps {
   write: WriteFn;
   onCreated: (p: Portfolio) => void;
   next: () => void;
+  onDirty: (dirty: boolean) => void;
 }
 
 /** Etapa 1: nome, descrição, filial, tipo e responsável. Cria o rascunho ou altera só o que mudou. */
-export function StepInfo({ me, portfolio, editable, busy, write, onCreated, next }: StepInfoProps) {
+export function StepInfo({ me, portfolio, editable, busy, write, onCreated, next, onDirty }: StepInfoProps) {
   const api = useApi();
   const [name, setName] = useState(portfolio?.name ?? '');
   const [description, setDescription] = useState(portfolio?.description ?? '');
@@ -27,6 +28,8 @@ export function StepInfo({ me, portfolio, editable, busy, write, onCreated, next
   const [responsibleSub, setResponsibleSub] = useState(portfolio?.responsibleSub ?? me.sub);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  // Trocar a filial encerra os vínculos: o 1º clique só pede confirmação.
+  const [confirmBranch, setConfirmBranch] = useState(false);
 
   const options = useAsync(async () => {
     const [branches, types] = await Promise.all([
@@ -40,6 +43,21 @@ export function StepInfo({ me, portfolio, editable, busy, write, onCreated, next
   // Responsável que não é admin edita o resto, mas não troca filial nem responsável.
   const canChangeOwner = portfolio ? canAdminPortfolio(me, portfolio) : true;
   const readOnly = !editable;
+
+  const patch: Record<string, unknown> = {};
+  if (portfolio) {
+    if (name.trim() !== portfolio.name) patch.name = name.trim();
+    if (description.trim() !== (portfolio.description ?? '')) patch.description = description.trim();
+    if (Number(typeId) !== portfolio.type.id) patch.portfolioTypeId = Number(typeId);
+    if (canChangeOwner && Number(branchId) !== portfolio.branch.id) patch.branchId = Number(branchId);
+    if (canChangeOwner && responsibleSub.trim() !== portfolio.responsibleSub) {
+      patch.responsibleSub = responsibleSub.trim();
+    }
+  }
+  const dirty =
+    !readOnly &&
+    (portfolio ? Object.keys(patch).length > 0 : name.trim() !== '' || description.trim() !== '');
+  useReportDirty(dirty, onDirty);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -69,14 +87,11 @@ export function StepInfo({ me, portfolio, editable, busy, write, onCreated, next
       }
       return;
     }
-    const patch: Record<string, unknown> = {};
-    if (name.trim() !== portfolio.name) patch.name = name.trim();
-    if (description.trim() !== (portfolio.description ?? '')) patch.description = description.trim();
-    if (Number(typeId) !== portfolio.type.id) patch.portfolioTypeId = Number(typeId);
-    if (canChangeOwner && Number(branchId) !== portfolio.branch.id) patch.branchId = Number(branchId);
-    if (canChangeOwner && responsibleSub.trim() !== portfolio.responsibleSub)
-      patch.responsibleSub = responsibleSub.trim();
     if (Object.keys(patch).length === 0) return next();
+    if (patch.branchId !== undefined && !confirmBranch) {
+      setConfirmBranch(true);
+      return;
+    }
     const ok = await write(
       () =>
         api.send<Portfolio>('PATCH', `/v1/portfolios/${portfolio.id}`, {
@@ -126,7 +141,10 @@ export function StepInfo({ me, portfolio, editable, busy, write, onCreated, next
         <select
           value={branchId}
           disabled={readOnly || !canChangeOwner}
-          onChange={(e) => setBranchId(e.target.value)}
+          onChange={(e) => {
+            setBranchId(e.target.value);
+            setConfirmBranch(false);
+          }}
         >
           <option value="">Selecione</option>
           {branchOptions.map((b) => (
@@ -155,9 +173,21 @@ export function StepInfo({ me, portfolio, editable, busy, write, onCreated, next
         />
       </Field>
       <Notice kind="error">{error}</Notice>
+      {confirmBranch && (
+        <Notice kind="info">
+          Trocar a filial encerra todos os vínculos desta carteira e a volta para rascunho. Clique de novo
+          para confirmar.
+        </Notice>
+      )}
       <div className="gc-actions">
         <button type="submit" className="gc-button" disabled={busy || creating}>
-          {readOnly ? 'Próxima etapa' : portfolio ? 'Salvar e continuar' : 'Criar rascunho'}
+          {readOnly
+            ? 'Próxima etapa'
+            : !portfolio
+              ? 'Criar rascunho'
+              : confirmBranch
+                ? 'Confirmar troca de filial'
+                : 'Salvar e continuar'}
         </button>
       </div>
     </form>

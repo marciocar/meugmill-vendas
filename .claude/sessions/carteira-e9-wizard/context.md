@@ -27,6 +27,26 @@
 | Demo | A demo ganha a escolha do perfil do token de teste (admin, gestor, vendedor, supervisão). | Para testar cada perfil sem colar token. |
 | LGPD | Nada é guardado em storage; o token só vive na propriedade. A tela mostra só dado de empresa do cliente e o `sub` opaco do responsável. | Contrato do E1 e do E8. |
 
+### Revisão adversarial (REPROVADO, depois corrigido) — decisões [auto] revistas, 2026-10-08
+
+| Tema | Antes | Agora | Achado |
+|---|---|---|---|
+| Ajustes manuais | Escrevia a partir da lista anterior enquanto ela relia | Só escreve com a lista lida na versão atual; os botões somem durante a releitura | 1 (ALTA) |
+| Etapa 1 depois de 409 | O formulário mantinha os valores antigos e regravava por cima | A etapa recomeça da versão nova (`key` pela versão), como as etapas 2 e 3 | 2 (ALTA) |
+| Troca de usuário | O `me` anterior ficava se o novo `/me` falhasse | Só vale o `me` confirmado para o token atual; as telas ficam ocultas até confirmar | 3 |
+| Inativar e trocar filial | Um clique | Confirmação explícita | 4 |
+| Edição não salva | Descartada sem aviso ao trocar de etapa | O wizard pergunta antes de sair | 5 |
+| Acompanhamento do job | Parava na primeira falha | Tenta de novo com espera crescente | 6 |
+| Leitura fora de ordem | Podia voltar a uma versão velha | Ignora versão menor que a da tela | 7 |
+| 401 de token antigo | Emitia `token-expired` | Ignorado se o host já trocou o token | 8 |
+| Busca | Sem limite | `maxLength` de 100, o limite da API | 9 |
+| Simulação vencida | Confirmar até a varredura | A tela trava no prazo | 10 |
+| Token `legacy` | Etapa 5 escondida | Visível; com `deny`, a API responde 404 e a tela mostra a mensagem | 11 |
+
+Dívidas registradas (achados 12 a 15, em `front-web.md`): o corte em 2.000 itens nas listas de seleção; a
+inclusão manual pelo gestor; os ajustes órfãos apagados pelo PUT; a cobertura (fake timers no teste do
+job).
+
 ## Fora do escopo
 
 - Telas de cadastro mestre (filiais, vendedores, clientes, catálogos): a carga é por CSV (E10) e a

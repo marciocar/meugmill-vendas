@@ -35,6 +35,7 @@ export function MyCustomersView() {
         <Field label="Buscar">
           <input
             type="search"
+            maxLength={100}
             value={q}
             placeholder="Razão social, fantasia ou CNPJ"
             onChange={(e) => setQ(e.target.value)}

@@ -19,28 +19,52 @@ function list(items: string[]): string {
 
 export function App({ apiBase, token, debug = false }: AppProps) {
   const { emitTokenExpired } = useHost();
-  // Um evento `token-expired` por token, venha o 401 do /v1/me ou de qualquer tela.
+  const tokenRef = useRef(token);
+  tokenRef.current = token;
+  // Um evento `token-expired` por token, venha o 401 do /v1/me ou de qualquer tela. O 401 de uma
+  // requisição feita com um token que o host já trocou é ignorado: o token atual pode estar válido.
   const firedFor = useRef<string | null>(null);
   const [expiredToken, setExpiredToken] = useState<string | null>(null);
-  const notifyExpired = useCallback(() => {
-    setExpiredToken(token);
-    if (firedFor.current !== token) {
-      firedFor.current = token;
-      emitTokenExpired();
-    }
-  }, [token, emitTokenExpired]);
+  const notifyExpired = useCallback(
+    (used: string) => {
+      if (used !== tokenRef.current) return;
+      setExpiredToken(used);
+      if (firedFor.current !== used) {
+        firedFor.current = used;
+        emitTokenExpired();
+      }
+    },
+    [emitTokenExpired],
+  );
+  const onMeExpired = useCallback(() => token && notifyExpired(token), [token, notifyExpired]);
 
-  const { state, retry } = useMe(apiBase, token, notifyExpired);
+  const { state, retry } = useMe(apiBase, token, onMeExpired);
 
-  // Último usuário autenticado: renovar o token (mesmo `sub`) não desmonta as telas nem perde o wizard.
+  // Último usuário confirmado e o token que o confirmou. Renovar o token com o mesmo `sub` não desmonta as
+  // telas nem perde o wizard; enquanto o /v1/me do token novo não responde, as telas ficam ocultas. Se o
+  // token novo falhar sem nunca ter sido confirmado, o usuário anterior sai da tela (outro login pode ter
+  // entrado no mesmo terminal).
   const [me, setMe] = useState<Me | null>(null);
+  const [confirmedFor, setConfirmedFor] = useState<string | null>(null);
   useEffect(() => {
-    if (state.status === 'authenticated') setMe(state.me);
-    if (state.status === 'unconfigured') setMe(null);
-  }, [state]);
+    if (state.status === 'unconfigured') {
+      setMe(null);
+      setConfirmedFor(null);
+    } else if (state.status === 'authenticated' && state.token === token) {
+      setMe(state.me);
+      setConfirmedFor(token);
+    } else if (
+      (state.status === 'expired' || state.status === 'unavailable') &&
+      state.token === token &&
+      confirmedFor !== token
+    ) {
+      setMe(null);
+    }
+  }, [state, token, confirmedFor]);
+  const confirmed = me !== null && token !== null && confirmedFor === token;
 
   const api = useMemo(
-    () => (apiBase && token ? createApi(apiBase, token, notifyExpired) : null),
+    () => (apiBase && token ? createApi(apiBase, token, () => notifyExpired(token)) : null),
     [apiBase, token, notifyExpired],
   );
   const expired = state.status === 'expired' || (token !== null && expiredToken === token);
@@ -61,13 +85,13 @@ export function App({ apiBase, token, debug = false }: AppProps) {
       </header>
       <div aria-live="polite" data-testid="status">
         {state.status === 'unconfigured' && <p>Configure a API e o token para carregar a carteira.</p>}
-        {state.status === 'loading' && !me && <p>Carregando…</p>}
+        {state.status === 'loading' && !confirmed && <p>Carregando…</p>}
         {expired && (
           <p role="alert" className="gc-notice gc-notice-error">
             Sessão expirada
           </p>
         )}
-        {state.status === 'unavailable' && !me && (
+        {state.status === 'unavailable' && !confirmed && (
           <div role="alert">
             <p>Serviço indisponível no momento.</p>
             <button type="button" className="gc-button" onClick={retry}>
@@ -75,7 +99,7 @@ export function App({ apiBase, token, debug = false }: AppProps) {
             </button>
           </div>
         )}
-        {me && state.status !== 'unconfigured' && (
+        {confirmed && (
           <dl className="gc-me">
             <dt>Usuário</dt>
             <dd data-testid="me-sub">{me.sub}</dd>
@@ -87,9 +111,11 @@ export function App({ apiBase, token, debug = false }: AppProps) {
         )}
       </div>
       {me && api && state.status !== 'unconfigured' && (
-        <ApiContext.Provider value={api}>
-          <Shell key={me.sub} me={me} />
-        </ApiContext.Provider>
+        <div hidden={!confirmed}>
+          <ApiContext.Provider value={api}>
+            <Shell key={me.sub} me={me} />
+          </ApiContext.Provider>
+        </div>
       )}
     </section>
   );

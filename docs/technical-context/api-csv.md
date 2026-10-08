@@ -7,7 +7,7 @@ source: apps/api/src/routes/v1/csv.ts, apps/api/src/domain/csv/, apps/api/drizzl
 
 Escopo: `apps/api` (MeuGmill Vendas, carteira de clientes), E10. Cobre a carga inicial e a manutenção em lote
 dos cadastros mestres, das carteiras (cabeçalho e filtros) e dos vínculos, e a exportação no mesmo layout. As
-telas ficam no E9. O contrato completo está em [`openapi-v1.json`](./openapi-v1.json); convenções comuns em
+telas são do E9 ([`front-web.md`](./front-web.md)). O contrato completo está em [`openapi-v1.json`](./openapi-v1.json); convenções comuns em
 [`api-dados-mestres.md`](./api-dados-mestres.md).
 
 ## Formato

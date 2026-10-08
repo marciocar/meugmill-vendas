@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { listAll, useApi } from '../api/client';
 import type { Catalog, Municipality, Page, Portfolio, RegionInput, RegionLevel, State } from '../api/types';
 import { Field, Notice, useAsync, useDebounced } from '../ui';
-import type { StepProps } from './step';
+import { useReportDirty, type StepProps } from './step';
 
 interface DraftRegion extends RegionInput {
   /** Texto exibido (UF, município, bairro). */
@@ -31,7 +31,7 @@ const toInput = (r: DraftRegion): RegionInput => ({
 });
 
 /** Etapa 2: regiões, redes e grupos econômicos. Grava o conjunto inteiro (`PUT /filters`). */
-export function StepFilters({ portfolio, editable, busy, write, next }: StepProps) {
+export function StepFilters({ portfolio, editable, busy, write, next, onDirty }: StepProps) {
   const api = useApi();
   const [regions, setRegions] = useState<DraftRegion[]>(() =>
     portfolio.filters.regions.map((r) => ({
@@ -45,6 +45,7 @@ export function StepFilters({ portfolio, editable, busy, write, next }: StepProp
   const [networkIds, setNetworkIds] = useState<number[]>(portfolio.filters.retailNetworks.map((n) => n.id));
   const [groupIds, setGroupIds] = useState<number[]>(portfolio.filters.economicGroups.map((g) => g.id));
   const [dirty, setDirty] = useState(false);
+  useReportDirty(dirty, onDirty);
 
   const catalogs = useAsync(async () => {
     const [networks, groups] = await Promise.all([

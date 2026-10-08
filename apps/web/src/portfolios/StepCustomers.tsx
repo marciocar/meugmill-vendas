@@ -89,7 +89,12 @@ function PreviewPanel({ portfolio, editable, busy, write }: StepProps) {
   const query = useDebounced(q.trim());
   const base = `/v1/portfolios/${portfolio.id}`;
 
-  const overrides = useAsync(() => api.get<Overrides>(`${base}/overrides`), [api, base, portfolio.version]);
+  // Os ajustes guardam a versão da carteira em que foram lidos: o PUT substitui o conjunto inteiro, então só se
+  // escreve a partir de uma leitura da versão atual (senão um clique rápido apagaria o ajuste anterior).
+  const overrides = useAsync(
+    async () => ({ version: portfolio.version, ...(await api.get<Overrides>(`${base}/overrides`)) }),
+    [api, base, portfolio.version],
+  );
   const preview = usePaged(
     (cursor) =>
       api.get<Page<PreviewItem>>(`${base}/preview`, { q: query, source, resolution, cursor, limit: 50 }),
@@ -98,7 +103,7 @@ function PreviewPanel({ portfolio, editable, busy, write }: StepProps) {
 
   const include = overrides.data?.include.map((o) => o.customer.id) ?? [];
   const exclude = overrides.data?.exclude.map((o) => o.customer.id) ?? [];
-  const canWrite = editable && overrides.data !== null;
+  const canWrite = editable && !busy && !overrides.loading && overrides.data?.version === portfolio.version;
 
   const saveOverrides = (nextInclude: number[], nextExclude: number[], success: string) =>
     write(
@@ -116,6 +121,7 @@ function PreviewPanel({ portfolio, editable, busy, write }: StepProps) {
         <Field label="Buscar">
           <input
             type="search"
+            maxLength={100}
             value={q}
             placeholder="Razão social, fantasia ou CNPJ"
             onChange={(e) => setQ(e.target.value)}
@@ -307,7 +313,7 @@ function IncludeCustomer({
         label="Buscar cliente"
         hint="Pelo menos 3 caracteres. Só clientes ativos com vínculo ativo na filial da carteira."
       >
-        <input type="search" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input type="search" maxLength={100} value={q} onChange={(e) => setQ(e.target.value)} />
       </Field>
       <Notice kind="error">{results.error}</Notice>
       <ul className="gc-list">

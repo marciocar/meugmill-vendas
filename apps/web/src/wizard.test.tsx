@@ -252,3 +252,160 @@ describe('wizard da carteira', () => {
     }
   });
 });
+
+describe('wizard: modos de falha da revisão adversarial', () => {
+  it('etapa 1 depois de um 409 mostra o nome que a outra pessoa gravou (não o reverte)', async () => {
+    let renamedElsewhere = false;
+    const { calls } = routeFetch([
+      ['GET', /\/v1\/me$/, () => json(200, ADMIN)],
+      ['GET', /\/v1\/portfolios$/, () => json(200, page([summaryRow]))],
+      [
+        'GET',
+        /\/v1\/branches$/,
+        () => json(200, page([{ ...BRANCH, active: true, version: 1, municipalityCode: 1 }])),
+      ],
+      ['GET', /\/v1\/portfolio-types$/, () => json(200, page([{ ...TYPE, active: true, version: 1 }]))],
+      [
+        'GET',
+        /\/v1\/portfolios\/7$/,
+        () => json(200, renamedElsewhere ? portfolio({ name: 'Norte B', version: 4 }) : portfolio()),
+      ],
+      [
+        'PATCH',
+        /\/v1\/portfolios\/7$/,
+        () => {
+          renamedElsewhere = true;
+          return json(409, { error: 'version_conflict' });
+        },
+      ],
+    ]);
+    const el = await mountWith();
+    await click(el, 'Abrir');
+    await type(field<HTMLTextAreaElement>(el, 'Descrição'), 'nova descrição');
+    await click(el, 'Salvar e continuar');
+    expect(text(el)).toContain('Outra pessoa alterou esta carteira');
+    expect(field(el, 'Nome').value).toBe('Norte B');
+    expect(calls.filter((c) => c.method === 'PATCH')[0]?.body).toEqual({ description: 'nova descrição' });
+  });
+
+  it('ajustes: enquanto a lista relê depois de uma gravação, não há botão de escrita', async () => {
+    let releaseOverrides: (() => void) | null = null;
+    let writes = 0;
+    routeFetch([
+      ['GET', /\/v1\/me$/, () => json(200, ADMIN)],
+      ['GET', /\/v1\/portfolios$/, () => json(200, page([summaryRow]))],
+      ['GET', /\/v1\/portfolios\/7$/, () => json(200, portfolio({ version: 3 + writes }))],
+      [
+        'GET',
+        /\/overrides$/,
+        () =>
+          writes === 0
+            ? json(200, { include: [], exclude: [] })
+            : new Promise<Response>((r) => {
+                releaseOverrides = () => r(json(200, { include: [], exclude: [] }));
+              }),
+      ],
+      [
+        'GET',
+        /\/preview$/,
+        () =>
+          json(
+            200,
+            page([
+              {
+                customer: { id: 41, cnpj: '90000000000184', legalName: 'Cliente Alfa' },
+                source: 'filter',
+                matchedRegionLevel: 'state',
+                matchedBy: { region: true, retailNetwork: false, economicGroup: false },
+                rank: 1,
+                resolution: 'assigned',
+                competitors: [],
+              },
+            ]),
+          ),
+      ],
+      [
+        'PUT',
+        /\/overrides$/,
+        () => {
+          writes += 1;
+          return json(200, portfolio({ version: 3 + writes }));
+        },
+      ],
+    ]);
+    const el = await mountWith();
+    await click(el, 'Abrir');
+    await click(el, /Clientes/);
+    await click(el, 'Excluir');
+    expect(() => button(el, 'Excluir')).toThrow();
+    await act(async () => releaseOverrides?.());
+    await settle();
+    expect(button(el, 'Excluir')).toBeTruthy();
+  });
+
+  it('inativar pede confirmação antes de gravar', async () => {
+    const { calls } = routeFetch([
+      ['GET', /\/v1\/me$/, () => json(200, ADMIN)],
+      ['GET', /\/v1\/portfolios$/, () => json(200, page([summaryRow]))],
+      ['GET', /\/v1\/portfolios\/7$/, () => json(200, portfolio({ status: 'active' }))],
+      ['POST', /\/deactivate$/, () => json(200, portfolio({ active: false, version: 4 }))],
+    ]);
+    const el = await mountWith();
+    await click(el, 'Abrir');
+    await click(el, 'Inativar');
+    expect(calls.some((c) => c.path.endsWith('/deactivate'))).toBe(false);
+    expect(text(el)).toContain('encerra todos os vínculos');
+    await click(el, 'Sim, inativar');
+    const post = calls.find((c) => c.path.endsWith('/deactivate'));
+    expect(post?.headers['If-Match']).toBe('"3"');
+  });
+
+  it('trocar de etapa com edição não salva pede confirmação', async () => {
+    routeFetch([
+      ['GET', /\/v1\/me$/, () => json(200, ADMIN)],
+      ['GET', /\/v1\/portfolios$/, () => json(200, page([summaryRow]))],
+      ['GET', /\/v1\/portfolios\/7$/, () => json(200, portfolio())],
+      [
+        'GET',
+        /\/v1\/retail-networks$/,
+        () => json(200, page([{ id: 4, code: 'R1', name: 'Rede Um', active: true, version: 1 }])),
+      ],
+    ]);
+    const el = await mountWith();
+    await click(el, 'Abrir');
+    await click(el, /Filtros/);
+    const checkbox = el.shadowRoot?.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    await act(async () => {
+      checkbox.click();
+    });
+    await settle();
+    await click(el, /Vendedores/);
+    expect(text(el)).toContain('Há alterações não salvas nesta etapa.');
+    expect(el.shadowRoot?.querySelector('[aria-current="step"]')?.textContent).toContain('Filtros');
+    await click(el, 'Descartar e sair da etapa');
+    expect(el.shadowRoot?.querySelector('[aria-current="step"]')?.textContent).toContain('Vendedores');
+  });
+
+  it('troca de token para outro usuário cujo /v1/me falha tira o usuário anterior da tela', async () => {
+    routeFetch([
+      [
+        'GET',
+        /\/v1\/me$/,
+        (call) =>
+          call.headers.Authorization === 'Bearer tok-A'
+            ? json(200, ADMIN)
+            : json(503, { error: 'auth_unavailable' }),
+      ],
+      ['GET', /\/v1\/portfolios$/, () => json(200, page([summaryRow]))],
+    ]);
+    const el = await mountWith('tok-A');
+    expect(text(el)).toContain('admin-01');
+    await act(async () => {
+      el.token = 'tok-B';
+    });
+    await settle();
+    expect(text(el)).not.toContain('admin-01');
+    expect(text(el)).not.toContain('Carteira Norte');
+    expect(text(el)).toContain('Serviço indisponível');
+  });
+});

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { listAll, useApi } from '../api/client';
 import type { Catalog, Portfolio, Ref, Seller } from '../api/types';
 import { Field, Notice, useAsync } from '../ui';
-import type { StepProps } from './step';
+import { useReportDirty, type StepProps } from './step';
 
 interface Pair {
   seller: Ref;
@@ -12,10 +12,11 @@ interface Pair {
 const pairKey = (p: Pair) => `${p.seller.id}:${p.productSubgroup.id}`;
 
 /** Etapa 3: pares vendedor x subgrupo. Grava o conjunto inteiro (`PUT /sellers`). */
-export function StepSellers({ portfolio, editable, busy, write, next }: StepProps) {
+export function StepSellers({ portfolio, editable, busy, write, next, onDirty }: StepProps) {
   const api = useApi();
   const [pairs, setPairs] = useState<Pair[]>(portfolio.sellers);
   const [dirty, setDirty] = useState(false);
+  useReportDirty(dirty, onDirty);
   const [sellerId, setSellerId] = useState('');
   const [subgroupId, setSubgroupId] = useState('');
   const [error, setError] = useState<string | null>(null);

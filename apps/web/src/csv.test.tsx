@@ -222,3 +222,50 @@ describe('telas de CSV', () => {
     expect(createObjectURL).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('telas de CSV: modos de falha', () => {
+  it('uma consulta do job que falha não para o acompanhamento', async () => {
+    let reads = 0;
+    routeFetch([
+      ['GET', /\/v1\/me$/, () => json(200, ADMIN)],
+      ['GET', /\/v1\/csv-layouts$/, () => json(200, LAYOUTS)],
+      ['GET', /\/v1\/imports$/, () => json(200, page([job({ status: 'applying' })]))],
+      [
+        'GET',
+        /\/v1\/imports\/11$/,
+        () => {
+          reads += 1;
+          if (reads <= 2) return json(200, job({ status: 'applying' }));
+          if (reads === 3) return json(502, {});
+          return json(200, job({ status: 'applied', processedRows: 2 }));
+        },
+      ],
+    ]);
+    const el = await mountWith();
+    await click(el, 'Importar e exportar');
+    await click(el, 'Ver');
+    await settle(1100);
+    await settle(1100);
+    await settle(1100);
+    expect(reads).toBeGreaterThanOrEqual(4);
+    expect(el.shadowRoot?.querySelector('[data-testid="job-status"]')?.textContent).toBe('Gravada');
+  });
+
+  it('simulação vencida não oferece confirmar mesmo antes da varredura da API', async () => {
+    routeFetch([
+      ['GET', /\/v1\/me$/, () => json(200, ADMIN)],
+      ['GET', /\/v1\/csv-layouts$/, () => json(200, LAYOUTS)],
+      ['GET', /\/v1\/imports$/, () => json(200, page([job({ status: 'validated' })]))],
+      [
+        'GET',
+        /\/v1\/imports\/11$/,
+        () => json(200, job({ status: 'validated', expiresAt: Date.now() - 1000 })),
+      ],
+    ]);
+    const el = await mountWith();
+    await click(el, 'Importar e exportar');
+    await click(el, 'Ver');
+    expect(() => button(el, 'Confirmar e gravar')).toThrow();
+    expect(text(el)).toContain('O prazo da simulação venceu');
+  });
+});

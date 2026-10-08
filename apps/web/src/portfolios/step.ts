@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { Portfolio } from '../api/types';
 import type { Me } from '../use-me';
 
@@ -17,4 +18,14 @@ export interface StepProps {
   write: WriteFn;
   reload: () => Promise<void>;
   next: () => void;
+  /** A etapa avisa se tem edição não salva (o Wizard pergunta antes de sair dela). */
+  onDirty: (dirty: boolean) => void;
+}
+
+/** Repassa ao Wizard se a etapa tem edição não salva; ao sair da etapa, limpa. */
+export function useReportDirty(dirty: boolean, onDirty: (dirty: boolean) => void): void {
+  useEffect(() => {
+    onDirty(dirty);
+  }, [dirty, onDirty]);
+  useEffect(() => () => onDirty(false), [onDirty]);
 }
