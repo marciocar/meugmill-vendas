@@ -96,4 +96,6 @@ export interface FinalizeResult {
   ended: number;
   /** Vínculos ativos preservados (mesmo vendedor). */
   kept: number;
+  /** Vínculos de OUTRAS carteiras da filial encerrados porque esta carteira venceu o cliente. */
+  takenOver: number;
 }

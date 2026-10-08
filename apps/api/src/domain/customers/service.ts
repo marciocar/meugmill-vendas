@@ -5,6 +5,7 @@ import { assertAllInScope, intersects, requireAdmin, resolveScopeIds, type Actor
 import { isUniqueViolation, writeTx, type Conn, type Db, type ServiceOptions } from '../shared/db.js';
 import { DomainError, forbidden, invalid, notFound } from '../shared/errors.js';
 import { findMunicipality } from '../geo/repository.js';
+import { endLinksWhere } from '../links/write.js';
 import {
   applyGlobalActiveTransition,
   applyLinkActiveTransition,
@@ -140,6 +141,7 @@ export function createCustomerService(db: Db, opts: ServiceOptions = {}): Custom
     return writeTx(db, (tx) => {
       const scopeIds = resolveScopeIds(tx, actor);
       const row = findVisible(tx, id, scopeIds);
+      const at = now();
       // Semântica documentada em `applyLinkActiveTransition` / `applyGlobalActiveTransition`.
       (scope === 'link' ? applyLinkActiveTransition : applyGlobalActiveTransition)({
         conn: tx,
@@ -150,8 +152,20 @@ export function createCustomerService(db: Db, opts: ServiceOptions = {}): Custom
         active,
         expectedVersion: version,
         sub: actor.sub,
-        at: now(),
+        at,
       });
+      // Cliente inativo não mantém vínculo de carteira (E7): encerra com eventos, na mesma transação.
+      if (!active) {
+        if (scope === 'global') endLinksWhere(tx, { customerId: id }, actor.sub, at);
+        else {
+          const inScope = new Set(scopeIds);
+          const off = customerLinks
+            .links(tx, id)
+            .filter((l) => inScope.has(l.branchId) && !l.active)
+            .map((l) => l.branchId);
+          endLinksWhere(tx, { customerId: id, branchIds: off }, actor.sub, at);
+        }
+      }
       return respond(tx, id, scopeIds);
     });
   }
@@ -292,6 +306,7 @@ export function createCustomerService(db: Db, opts: ServiceOptions = {}): Custom
         if (data.branchIds !== undefined) {
           const plan = planLinkChange(customerLinks, tx, id, data.branchIds, scopeIds);
           customerLinks.remove(tx, id, plan.toRemove);
+          endLinksWhere(tx, { customerId: id, branchIds: plan.toRemove }, actor.sub, at);
           customerLinks.add(tx, id, plan.toAdd, actor.sub, at);
         }
         tx.update(customers)

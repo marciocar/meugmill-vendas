@@ -132,6 +132,7 @@ export function loadAggregateBase(conn: Conn, id: number): PortfolioResponse {
     sellers: pairs,
     overridesInclude: overrides.include,
     overridesExclude: overrides.exclude,
+    finalizedAt: row.p.finalizedAt,
     ...auditFields(row.p),
   };
 }

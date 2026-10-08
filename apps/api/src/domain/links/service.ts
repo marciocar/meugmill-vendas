@@ -1,11 +1,11 @@
 import { sql } from 'drizzle-orm';
 import { loadAssignmentGrid } from '../distribution/grid.js';
-import { conflictTotals } from '../conflicts/members.js';
+import { conflictTotals, effectiveMembers } from '../conflicts/members.js';
 import { bump, findScoped, openForEdit } from '../portfolios/access.js';
 import { loadAggregateBase } from '../portfolios/aggregate.js';
 import { resolveScopeIds, type Actor } from '../shared/authz.js';
 import { writeTx, type Conn, type Db, type ServiceOptions } from '../shared/db.js';
-import { DomainError, notFound } from '../shared/errors.js';
+import { DomainError, invalid, notFound } from '../shared/errors.js';
 import { decodeCursor, encodeCursor, resolveLimit } from '../shared/pagination.js';
 import { parseInput } from '../shared/validate.js';
 import {
@@ -28,9 +28,14 @@ import { createLinks, endLinks, type NewLinkRow } from './write.js';
 export interface LinkService {
   /**
    * Finaliza a carteira: grava os vínculos a partir da grade de atribuições (E6) e muda o status para
-   * `active`. Mesma permissão, versão e regra de inativa da edição do E3. Erros 409 de regra:
-   * `portfolio_has_conflicts` (clientes bloqueados), `portfolio_incomplete` (células sem vendedor válido)
-   * e `link_conflict` (outra carteira da filial ainda mantém vínculo ativo numa célula a criar).
+   * `active`. Mesma permissão, versão e regra de inativa da edição do E3. Erros de regra:
+   * `portfolio_has_conflicts` (clientes bloqueados), `portfolio_incomplete` (células sem vendedor válido),
+   * `validation_error` (filial da carteira inativa) e `link_conflict` (só fail-closed: outra carteira da
+   * filial mantém vínculo ativo num cliente que ela ainda vence; não deve ocorrer).
+   *
+   * Cliente que esta carteira venceu (`assigned`) é `lost` nas outras da filial: o vínculo ativo da outra
+   * carteira naquela célula é encerrado aqui (evento `ended`, `ended_by` = ator, versão da outra +1) e
+   * contado em `takenOver`. A carteira vazia (sem nenhum cliente) é finalizável: vira `active` sem vínculos.
    *
    * Sem nenhuma mudança nos vínculos e com a carteira já `active`, nada é gravado: a versão e o ETag não
    * mudam e o resultado é `{ created: 0, ended: 0, kept }`.
@@ -49,6 +54,7 @@ export interface LinkService {
 
 interface ActiveLink {
   id: number;
+  b: number;
   c: number;
   g: number;
   s: number;
@@ -56,28 +62,50 @@ interface ActiveLink {
 
 const keyOf = (c: number, g: number): string => `${c}.${g}`;
 
-/** Carteiras da filial (fora a própria) com vínculo ativo em alguma das células a criar. */
-function conflictingPortfolios(
-  conn: Conn,
-  branchId: number,
-  portfolioId: number,
-  rows: NewLinkRow[],
-): number[] {
+interface TakenLink {
+  linkId: number;
+  portfolioId: number;
+  customerId: number;
+}
+
+/** Vínculos ativos de outras carteiras da filial nas células a criar (índice único parcial por célula). */
+function linksInCells(conn: Conn, branchId: number, portfolioId: number, rows: NewLinkRow[]): TakenLink[] {
   if (rows.length === 0) return [];
   // CROSS JOIN fixa a ordem: percorre as linhas a criar e sonda o índice único parcial por célula
   // (sem isso o planejador pode varrer os vínculos ativos da filial para cada linha).
-  return conn
-    .all<{ id: number }>(
-      sql`with cells as materialized (
-          select json_extract(value, '$[0]') as c, json_extract(value, '$[1]') as g from json_each(${JSON.stringify(rows)})
-        )
-        select distinct l.portfolio_id as id
-        from cells cross join portfolio_links l
-          on l.branch_id = ${branchId} and l.customer_id = cells.c and l.product_subgroup_id = cells.g and l.active = 1
-        where l.portfolio_id <> ${portfolioId}
-        order by 1`,
-    )
-    .map((r) => r.id);
+  return conn.all<TakenLink>(
+    sql`with cells as materialized (
+        select json_extract(value, '$[0]') as c, json_extract(value, '$[1]') as g from json_each(${JSON.stringify(rows)})
+      )
+      select l.id as linkId, l.portfolio_id as portfolioId, l.customer_id as customerId
+      from cells cross join portfolio_links l
+        on l.branch_id = ${branchId} and l.customer_id = cells.c and l.product_subgroup_id = cells.g and l.active = 1
+      where l.portfolio_id <> ${portfolioId}
+      order by l.id`,
+  );
+}
+
+/**
+ * Carteiras em que ALGUM dos clientes ainda é `assigned` (não deveria ocorrer: o cliente é `assigned` na
+ * carteira que finaliza). Rede de segurança fail-closed contra encerrar vínculo de quem ainda vence.
+ */
+function stillWinning(conn: Conn, taken: TakenLink[]): number[] {
+  const byPortfolio = new Map<number, Set<number>>();
+  for (const t of taken) {
+    const set = byPortfolio.get(t.portfolioId) ?? new Set<number>();
+    set.add(t.customerId);
+    byPortfolio.set(t.portfolioId, set);
+  }
+  const out: number[] = [];
+  for (const [id, customers] of [...byPortfolio].sort((a, b) => a[0] - b[0])) {
+    for (const m of effectiveMembers(conn, id)) {
+      if (customers.has(m.customerId)) {
+        out.push(id);
+        break;
+      }
+    }
+  }
+  return out;
 }
 
 interface LinkRowRaw {
@@ -133,6 +161,12 @@ export function createLinkService(db: Db, opts: ServiceOptions = {}): LinkServic
       return writeTx(db, (tx) => {
         const row = openForEdit(tx, actor, portfolioId, expectedVersion);
 
+        // Filial inativa não finaliza (os vínculos seriam criados numa filial desativada).
+        const branchActive = tx.get<{ active: number }>(
+          sql`select active from branches where id = ${row.branchId}`,
+        ).active;
+        if (branchActive !== 1) throw invalid('Filial da carteira inativa: não é possível finalizar');
+
         // Retrato único: a grade e a escrita dos vínculos na mesma transação imediata.
         const blocked = conflictTotals(tx, portfolioId).blocked;
         if (blocked > 0) {
@@ -172,13 +206,14 @@ export function createLinkService(db: Db, opts: ServiceOptions = {}): LinkServic
         const matched = new Set<string>();
         let kept = 0;
         const active = tx.all<ActiveLink>(
-          sql`select id, customer_id as c, product_subgroup_id as g, seller_id as s
+          sql`select id, branch_id as b, customer_id as c, product_subgroup_id as g, seller_id as s
             from portfolio_links where portfolio_id = ${portfolioId} and active = 1 order by id`,
         );
         for (const l of active) {
           const key = keyOf(l.c, l.g);
           const want = desired.get(key);
-          if (want && want[2] === l.s) {
+          // Defesa em profundidade: vínculo de outra filial (carteira transferida) nunca é mantido.
+          if (want && want[2] === l.s && l.b === row.branchId) {
             kept++;
             matched.add(key);
           } else toEnd.push(l.id); // saiu da grade ou trocou de vendedor (o novo é criado abaixo)
@@ -187,22 +222,29 @@ export function createLinkService(db: Db, opts: ServiceOptions = {}): LinkServic
 
         const at = now();
         if (toEnd.length === 0 && toCreate.length === 0 && row.status === 'active') {
-          return { aggregate: loadAggregateBase(tx, portfolioId), created: 0, ended: 0, kept };
+          return { aggregate: loadAggregateBase(tx, portfolioId), created: 0, ended: 0, kept, takenOver: 0 };
         }
 
-        // Células a criar que outra carteira da filial ainda mantém ativas: recusa, sem encerrar nada
-        // da outra. Os ids são de carteiras da mesma filial (visíveis ao ator).
-        const others = conflictingPortfolios(tx, row.branchId, portfolioId, toCreate);
-        if (others.length > 0) {
+        // Células a criar em que outra carteira da filial ainda mantém vínculo ativo: o cliente é `assigned`
+        // aqui (regra do E5) e portanto `lost` lá, então o vínculo de lá é encerrado e a versão dela sobe.
+        const taken = linksInCells(tx, row.branchId, portfolioId, toCreate);
+        const still = stillWinning(tx, taken);
+        if (still.length > 0) {
           throw new DomainError(
             'link_conflict',
             'Outra carteira da filial mantém vínculo ativo em clientes desta carteira: finalize-a novamente',
-            { portfolioIds: others },
+            { portfolioIds: still },
           );
         }
+        const takenPortfolios = [...new Set(taken.map((t) => t.portfolioId))];
 
         // Encerrar antes de criar: o índice único parcial só admite um ativo por célula.
-        endLinks(tx, toEnd, actor.sub, at);
+        endLinks(tx, [...toEnd, ...taken.map((t) => t.linkId)], actor.sub, at);
+        for (const id of takenPortfolios) {
+          tx.run(
+            sql`update portfolios set version = version + 1, updated_at = ${at}, updated_by = ${actor.sub} where id = ${id}`,
+          );
+        }
         createLinks(tx, row, toCreate, actor.sub, at);
         bump(tx, row, actor, at, { status: 'active', finalizedAt: at, finalizedBy: actor.sub });
         return {
@@ -210,6 +252,7 @@ export function createLinkService(db: Db, opts: ServiceOptions = {}): LinkServic
           created: toCreate.length,
           ended: toEnd.length,
           kept,
+          takenOver: taken.length,
         };
       });
     },

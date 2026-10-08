@@ -376,6 +376,11 @@ export const portfolioLinks = sqliteTable(
       .where(sql`${t.active} = 1`),
     index('portfolio_links_portfolio_active_idx').on(t.portfolioId, t.active),
     index('portfolio_links_seller_id_idx').on(t.sellerId),
+    // Histórico da carteira por id (sem TEMP B-TREE), com ou sem filtro de cliente.
+    index('portfolio_links_portfolio_id_idx').on(t.portfolioId),
+    index('portfolio_links_portfolio_customer_idx').on(t.portfolioId, t.customerId),
+    // Encerramento por cliente (inativação/saída de filial no cadastro).
+    index('portfolio_links_customer_id_idx').on(t.customerId),
   ],
 );
 

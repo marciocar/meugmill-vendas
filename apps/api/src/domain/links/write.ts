@@ -65,3 +65,34 @@ export function endAllActiveLinks(conn: Conn, portfolioId: number, sub: string, 
   endLinks(conn, ids, sub, at);
   return ids.length;
 }
+
+/**
+ * Encerra os vínculos ativos que casam com TODOS os filtros dados, com eventos e `ended_by`. Única porta
+ * dos serviços de cadastro (E2: vendedor, cliente, filial) para encerrar vínculos fora da carteira.
+ * `branchIds` vazio não casa nada; sem nenhum filtro é erro de programação (encerraria tudo).
+ * Devolve quantos vínculos foram encerrados. Chamar dentro da transação de escrita do chamador.
+ */
+export function endLinksWhere(
+  conn: Conn,
+  filter: { sellerId?: number; customerId?: number; branchIds?: number[] },
+  sub: string,
+  at: number,
+): number {
+  if (filter.sellerId === undefined && filter.customerId === undefined && filter.branchIds === undefined) {
+    throw new Error('endLinksWhere exige ao menos um filtro');
+  }
+  if (filter.branchIds?.length === 0) return 0;
+  const ids = conn
+    .all<{ id: number }>(
+      sql`select id from portfolio_links where active = 1${
+        filter.sellerId === undefined ? sql`` : sql` and seller_id = ${filter.sellerId}`
+      }${filter.customerId === undefined ? sql`` : sql` and customer_id = ${filter.customerId}`}${
+        filter.branchIds === undefined
+          ? sql``
+          : sql` and branch_id in (select value from json_each(${JSON.stringify(filter.branchIds)}))`
+      } order by id`,
+    )
+    .map((r) => r.id);
+  endLinks(conn, ids, sub, at);
+  return ids.length;
+}

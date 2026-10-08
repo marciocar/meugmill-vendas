@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createDistributionService } from '../../src/domain/distribution/service.js';
 import { createLinkService } from '../../src/domain/links/service.js';
+import { createBranchService } from '../../src/domain/branches/service.js';
+import { createCustomerService } from '../../src/domain/customers/service.js';
 import { createPortfolioService } from '../../src/domain/portfolios/service.js';
+import { createSellerService } from '../../src/domain/sellers/service.js';
 import { DomainError } from '../../src/domain/shared/errors.js';
 import { neighborhoodKey, searchKey } from '../../src/domain/shared/normalize.js';
 import {
@@ -48,7 +51,7 @@ afterEach(async () => {
   await fx.app.close();
 });
 
-function customer(o: { municipality?: number; active?: boolean } = {}): number {
+function customer(o: { municipality?: number; active?: boolean; branch?: number } = {}): number {
   seq += 1;
   const name = `Cliente ${seq}`;
   const id = sqlite()
@@ -71,17 +74,17 @@ function customer(o: { municipality?: number; active?: boolean } = {}): number {
     ).lastInsertRowid as number;
   sqlite()
     .prepare('insert into customer_branches (customer_id, branch_id, active) values (?,?,1)')
-    .run(id, ser);
+    .run(id, o.branch ?? ser);
   return id;
 }
 
-function portfolio(name: string): number {
+function portfolio(name: string, branch: number = ser): number {
   return sqlite()
     .prepare(
       `insert into portfolios (branch_id, name, name_key, responsible_sub, portfolio_type_id, status, active,
         created_at, updated_at, created_by, updated_by) values (?,?,?,'resp',?,'draft',1,?,?,'t','t')`,
     )
-    .run(ser, name, searchKey(name), typeId, NOW, NOW).lastInsertRowid as number;
+    .run(branch, name, searchKey(name), typeId, NOW, NOW).lastInsertRowid as number;
 }
 const byState = (p: number) =>
   sqlite()
@@ -102,7 +105,10 @@ function subgroup(code: string): number {
     )
     .run(code, `Subgrupo ${code}`, searchKey(code), NOW, NOW).lastInsertRowid as number;
 }
-function seller(code: string, o: { active?: boolean; linked?: 'active' | 'inactive' | 'none' } = {}): number {
+function seller(
+  code: string,
+  o: { active?: boolean; linked?: 'active' | 'inactive' | 'none'; branch?: number } = {},
+): number {
   const id = sqlite()
     .prepare(
       `insert into sellers (code, name, name_key, active, created_at, updated_at, created_by, updated_by)
@@ -114,7 +120,7 @@ function seller(code: string, o: { active?: boolean; linked?: 'active' | 'inacti
   if (linked !== 'none') {
     sqlite()
       .prepare('insert into seller_branches (seller_id, branch_id, active) values (?,?,?)')
-      .run(id, ser, linked === 'active' ? 1 : 0);
+      .run(id, o.branch ?? ser, linked === 'active' ? 1 : 0);
   }
   return id;
 }
@@ -402,24 +408,39 @@ describe('finalize: vínculos entre carteiras da filial', () => {
     return { q, p, g1, A, cs, x };
   }
 
-  it('link_conflict lista a carteira que ainda mantém o vínculo; re-finalizar a outra libera', () => {
-    const { q, p, x } = setupConflict();
-    const before = counts();
-    const err = errorOf(() => links().finalize(admin(), p, 2));
-    expect(err.code).toBe('link_conflict');
-    expect(err.status).toBe(409);
-    expect(err.detail).toEqual({ portfolioIds: [q] });
-    expect(counts()).toEqual(before);
-    expect(row(p).status).toBe('draft');
+  it('P vence x (manual): finaliza, encerra o vínculo de Q em x, sobe a versão de Q e mantém os demais', () => {
+    const { q, p, x, g1, A } = setupConflict();
+    clock += 10;
+    const qVersion = row(q).version;
+    const r = links().finalize(admin(), p, 2);
+    expect(r).toMatchObject({ created: 1, ended: 0, kept: 0, takenOver: 1 });
+    expect(r.aggregate.status).toBe('active');
+    const qx = linkRows(q).find((l) => l.c === x) as LinkRow;
+    expect(qx).toMatchObject({ active: 0, valid_to: clock, ended_by: 'user-1' });
+    expect(linkRows(q).filter((l) => l.active === 1)).toHaveLength(2);
+    expect(row(q).version).toBe(qVersion + 1);
+    expect(row(q).status).toBe('active');
+    expect(activeCells(p)).toEqual([{ c: x, g: g1, s: A }]);
+    const last = eventRows().slice(-2);
+    expect(last.map((e) => [e.kind, e.portfolio_id, e.c])).toEqual([
+      ['ended', q, x],
+      ['created', p, x],
+    ]);
+    expect(last[0]?.link_id).toBe(qx.id);
+    // Re-finalizar Q depois: nada a encerrar (já foi), os outros 2 são mantidos.
+    expect(links().finalize(admin(), q, qVersion + 1)).toMatchObject({ created: 0, ended: 0, kept: 2 });
+  });
 
-    // Q perdeu x na disputa: re-finalizar Q encerra o vínculo dele (e só ele).
-    const rq = links().finalize(admin(), q, 3);
-    expect(rq).toMatchObject({ created: 0, ended: 1, kept: 2 });
+  it('Q incompleta: finalizar P funciona mesmo assim e encerra o vínculo de Q', () => {
+    const { q, p, cs, g1, x } = setupConflict();
+    dist().replaceAssignments(admin(), q, 3, {
+      clear: [{ customerId: cs[2] as number, productSubgroupId: g1 }],
+    });
+    expect(errorOf(() => links().finalize(admin(), q, 4)).code).toBe('portfolio_incomplete');
+    const r = links().finalize(admin(), p, 2);
+    expect(r).toMatchObject({ created: 1, takenOver: 1 });
     expect(linkRows(q).find((l) => l.c === x)?.active).toBe(0);
-
-    const rp = links().finalize(admin(), p, 2);
-    expect(rp).toMatchObject({ created: 1, ended: 0, kept: 0 });
-    expect(activeCells(p).map((l) => l.c)).toEqual([x]);
+    expect(linkRows(q).filter((l) => l.active === 1)).toHaveLength(2);
   });
 
   it('o índice parcial impede dois ativos na mesma (filial, cliente, subgrupo), mas admite histórico', () => {
@@ -452,6 +473,9 @@ describe('inativar e reativar a carteira', () => {
     const portfolios = createPortfolioService(fx.db, { now: () => clock });
     const agg = portfolios.deactivate(admin(), p, 3);
     expect(agg.active).toBe(false);
+    // Sem vínculos, a carteira volta a rascunho; `finalized_at` fica como histórico.
+    expect(agg.status).toBe('draft');
+    expect(row(p)).toMatchObject({ status: 'draft', finalized_at: NOW, finalized_by: 'user-1' });
     const rows = linkRows(p);
     expect(rows).toHaveLength(8);
     expect(rows.every((l) => l.active === 0 && l.valid_to === clock && l.ended_by === 'user-1')).toBe(true);
@@ -460,11 +484,12 @@ describe('inativar e reativar a carteira', () => {
     expect(ev.slice(8).every((e) => e.kind === 'ended' && e.occurred_at === clock)).toBe(true);
     expect(ev.slice(8).map((e) => e.link_id)).toEqual(rows.map((l) => l.id));
 
-    portfolios.reactivate(admin(), p, 4);
+    expect(portfolios.reactivate(admin(), p, 4).status).toBe('draft');
     expect(counts()).toEqual({ l: 8, e: 16 });
-    // Finalizar de novo recria (o status segue active, mas as células estão sem vínculo).
+    // Finalizar de novo recria e volta a `active`.
     const r = links().finalize(admin(), p, 5);
     expect(r).toMatchObject({ created: 8, ended: 0, kept: 0 });
+    expect(r.aggregate.status).toBe('active');
     expect(linkRows(p).filter((l) => l.active === 1)).toHaveLength(8);
   });
 
@@ -571,5 +596,268 @@ describe('leituras', () => {
     expect(s.listLinkEvents(adminOf('SER', 'OUT')).items).toHaveLength(8);
     expect(codeOf(() => s.listLinkEvents(admin(), { limit: 1001 }))).toBe('validation_error');
     expect(codeOf(() => s.listLinkEvents(admin(), { limit: 0 }))).toBe('validation_error');
+  });
+});
+
+describe('transferência de filial da carteira', () => {
+  it('encerra os vínculos da origem, volta a rascunho e permite finalizar na nova filial', () => {
+    const out = seedBranch(fx.db, 'OUT');
+    const both = adminOf('SER', 'OUT');
+    const p = portfolio('P');
+    byState(p);
+    const g1 = subgroup('G1');
+    const A = seller('A');
+    sqlite().prepare('insert into seller_branches (seller_id, branch_id, active) values (?,?,1)').run(A, out);
+    pair(p, A, g1);
+    const cs = [customer(), customer(), customer()];
+    for (const c of cs) {
+      sqlite()
+        .prepare('insert into customer_branches (customer_id, branch_id, active) values (?,?,1)')
+        .run(c, out);
+    }
+    dist().distribute(both, p, 1);
+    links().finalize(both, p, 2); // v3, 3 vínculos em SER
+
+    clock += 50;
+    const moved = createPortfolioService(fx.db, { now: () => clock }).update(both, p, 3, { branchId: out });
+    expect(moved.status).toBe('draft');
+    expect(moved.version).toBe(4);
+    expect(row(p)).toMatchObject({ status: 'draft', finalized_at: NOW });
+    expect(linkRows(p).every((l) => l.active === 0 && l.valid_to === clock && l.ended_by === 'user-1')).toBe(
+      true,
+    );
+    const ended = eventRows().filter((e) => e.kind === 'ended');
+    expect(ended).toHaveLength(3);
+    expect(ended.every((e) => e.branch_id === ser)).toBe(true);
+
+    // Q de SER finaliza os mesmos clientes sem link_conflict (nada sobrou ativo em SER).
+    const q = portfolio('Q');
+    byState(q);
+    pair(q, A, g1);
+    dist().distribute(both, q, 1);
+    expect(links().finalize(both, q, 2)).toMatchObject({ created: 3, takenOver: 0 });
+
+    // P re-finalizada em OUT (Q em SER não compete): vínculos e eventos da filial OUT.
+    const again = links().finalize(both, p, 4);
+    expect(again).toMatchObject({ created: 3, ended: 0, kept: 0, takenOver: 0 });
+    expect(again.aggregate.status).toBe('active');
+    const fresh = linkRows(p).filter((l) => l.active === 1);
+    expect(fresh).toHaveLength(3);
+    const branchOf = (id: number) =>
+      (sqlite().prepare('select branch_id as b from portfolio_links where id = ?').get(id) as { b: number })
+        .b;
+    expect(fresh.every((l) => branchOf(l.id) === out)).toBe(true);
+    const outEvents = links().listLinkEvents(adminOf('OUT'));
+    expect(outEvents.items.map((e) => [e.kind, e.portfolioId])).toEqual([
+      ['created', p],
+      ['created', p],
+      ['created', p],
+    ]);
+  });
+
+  it('defesa no finalize: vínculo ativo de outra filial entra em toEnd mesmo sem a transferência limpar', () => {
+    const out = seedBranch(fx.db, 'OUT');
+    const { p } = distributed();
+    links().finalize(admin(), p, 2);
+    // Simula legado: carteira trocada de filial na base, vínculos ainda na origem.
+    sqlite().prepare('update portfolios set branch_id = ? where id = ?').run(out, p);
+    sqlite()
+      .prepare('insert into seller_branches (seller_id, branch_id, active) select id, ?, 1 from sellers')
+      .run(out);
+    sqlite()
+      .prepare(
+        'insert into customer_branches (customer_id, branch_id, active) select id, ?, 1 from customers',
+      )
+      .run(out);
+    const r = links().finalize(adminOf('OUT'), p, 3);
+    expect(r).toMatchObject({ created: 8, ended: 8, kept: 0 });
+    expect(linkRows(p).filter((l) => l.active === 1)).toHaveLength(8);
+  });
+});
+
+describe('finalize: filial inativa e carteira vazia', () => {
+  it('filial inativa recusa com validation_error e mensagem fixa; nada é gravado', () => {
+    const { p } = distributed();
+    sqlite().prepare('update branches set active = 0 where id = ?').run(ser);
+    const err = errorOf(() => links().finalize(admin(), p, 2));
+    expect(err.code).toBe('validation_error');
+    expect(err.message).toBe('Filial da carteira inativa: não é possível finalizar');
+    expect(counts()).toEqual({ l: 0, e: 0 });
+    expect(row(p)).toMatchObject({ status: 'draft', version: 2 });
+  });
+});
+
+describe('cadastro (E2) encerra vínculos imediatamente', () => {
+  const sellersSvc = () => createSellerService(fx.db, { now: () => clock });
+  const customersSvc = () => createCustomerService(fx.db, { now: () => clock });
+  const branchesSvc = () => createBranchService(fx.db, { now: () => clock });
+  const versionOf = (table: string, id: number) =>
+    (sqlite().prepare(`select version as v from ${table} where id = ?`).get(id) as { v: number }).v;
+  const activeOf = (p: number) => linkRows(p).filter((l) => l.active === 1);
+  const endedEvents = () => eventRows().filter((e) => e.kind === 'ended');
+
+  /** P finalizada (8 vínculos, v3) com o vendedor A e o cliente cs[0] também ligados à filial OUT. */
+  function finalized() {
+    const out = seedBranch(fx.db, 'OUT');
+    const d = distributed();
+    sqlite()
+      .prepare('insert into seller_branches (seller_id, branch_id, active) values (?,?,1)')
+      .run(d.A, out);
+    sqlite()
+      .prepare('insert into customer_branches (customer_id, branch_id, active) values (?,?,1)')
+      .run(d.cs[0], out);
+    links().finalize(admin(), d.p, 2);
+    clock += 1000;
+    return { ...d, out, both: adminOf('SER', 'OUT') };
+  }
+  const ofSeller = (p: number, s: number) => linkRows(p).filter((l) => l.s === s);
+
+  it('(a) inativação global de vendedor encerra os vínculos dele; carteira segue active e a próxima finalização recalcula', () => {
+    const { p, A, both } = finalized();
+    const mine = ofSeller(p, A).length;
+    expect(mine).toBeGreaterThan(0);
+    sellersSvc().deactivateGlobal(both, A, versionOf('sellers', A));
+    expect(
+      ofSeller(p, A).every((l) => l.active === 0 && l.valid_to === clock && l.ended_by === 'user-1'),
+    ).toBe(true);
+    expect(activeOf(p)).toHaveLength(8 - mine);
+    expect(endedEvents()).toHaveLength(mine);
+    expect(row(p).status).toBe('active');
+    expect(errorOf(() => links().finalize(both, p, 3)).code).toBe('portfolio_incomplete');
+  });
+
+  it('(b) vendedor perde o vínculo com a filial (PATCH branchIds ou inativação por vínculo)', () => {
+    const { p, A, out, both } = finalized();
+    const mine = ofSeller(p, A).length;
+    sellersSvc().update(both, A, versionOf('sellers', A), { branchIds: [out] });
+    expect(ofSeller(p, A).every((l) => l.active === 0 && l.ended_by === 'user-1')).toBe(true);
+    expect(endedEvents()).toHaveLength(mine);
+    expect(row(p).status).toBe('active');
+
+    // Outro vendedor: inativação por vínculo (escopo SER) encerra os dele em SER.
+    const B = (sqlite().prepare("select id from sellers where code = 'B'").get() as { id: number }).id;
+    const minesB = ofSeller(p, B).length;
+    sellersSvc().deactivate(admin(), B, versionOf('sellers', B));
+    expect(ofSeller(p, B).every((l) => l.active === 0)).toBe(true);
+    expect(endedEvents()).toHaveLength(mine + minesB);
+  });
+
+  it('(c) inativação global de cliente encerra os vínculos dele; a próxima finalização recalcula', () => {
+    const { p, cs, both } = finalized();
+    const c = cs[1] as number;
+    customersSvc().deactivateGlobal(both, c, versionOf('customers', c));
+    const rows = linkRows(p).filter((l) => l.c === c);
+    expect(rows).toHaveLength(2);
+    expect(rows.every((l) => l.active === 0 && l.ended_by === 'user-1' && l.valid_to === clock)).toBe(true);
+    expect(endedEvents()).toHaveLength(2);
+    expect(row(p).status).toBe('active');
+    // O cliente inativo sai da grade: finalizar de novo não cria nem encerra mais nada.
+    expect(links().finalize(both, p, 3)).toMatchObject({ created: 0, ended: 0, kept: 6 });
+  });
+
+  it('(d) cliente perde o vínculo com a filial (PATCH removendo ou inativação por filial)', () => {
+    const { p, cs, out, both } = finalized();
+    const c0 = cs[0] as number;
+    customersSvc().update(both, c0, versionOf('customers', c0), { branchIds: [out] });
+    expect(linkRows(p).filter((l) => l.c === c0 && l.active === 1)).toHaveLength(0);
+    expect(endedEvents()).toHaveLength(2);
+
+    const c2 = cs[2] as number;
+    customersSvc().deactivate(admin(), c2, versionOf('customers', c2));
+    expect(linkRows(p).filter((l) => l.c === c2 && l.active === 1)).toHaveLength(0);
+    expect(endedEvents()).toHaveLength(4);
+    expect(activeOf(p)).toHaveLength(4);
+    expect(row(p).status).toBe('active');
+  });
+
+  it('(e) inativação de filial encerra todos os vínculos ativos da filial', () => {
+    const { p, both } = finalized();
+    branchesSvc().deactivate(both, ser, versionOf('branches', ser));
+    expect(activeOf(p)).toHaveLength(0);
+    expect(endedEvents()).toHaveLength(8);
+    expect(linkRows(p).every((l) => l.ended_by === 'user-1' && l.valid_to === clock)).toBe(true);
+    expect(row(p).status).toBe('active');
+    expect(errorOf(() => links().finalize(both, p, 3)).code).toBe('validation_error');
+  });
+
+  it('não encerra vínculos de outra filial nem grava nada em no-ops', () => {
+    const { p, A, out, both } = finalized();
+    const before = counts();
+    sellersSvc().reactivateGlobal(both, A, versionOf('sellers', A)); // já ativo: no-op
+    branchesSvc().deactivate(adminOf('OUT'), out, versionOf('branches', out)); // OUT não tem vínculos
+    expect(counts()).toEqual(before);
+    expect(activeOf(p)).toHaveLength(8);
+  });
+});
+
+describe('outbox com duas filiais intercaladas', () => {
+  it('paginação por after sem buraco, sem repetição e com hasMore correto', () => {
+    const out = seedBranch(fx.db, 'OUT');
+    const both = adminOf('SER', 'OUT');
+    const g1 = subgroup('G1');
+    const mk = (branch: number, name: string, n: number) => {
+      const pid = portfolio(name, branch);
+      byState(pid);
+      const s = seller(`S-${name}`, { branch });
+      pair(pid, s, g1);
+      for (let i = 0; i < n; i++) customer({ branch });
+      dist().distribute(both, pid, 1);
+      return pid;
+    };
+    // Os clientes de cada filial ficam só nela; a ordem das escritas alterna as filiais.
+    const p1 = mk(ser, 'P1', 3);
+    const p2 = mk(out, 'P2', 3);
+    const portfolios = createPortfolioService(fx.db, { now: () => clock });
+    links().finalize(both, p1, 2); // SER: 3 created
+    links().finalize(both, p2, 2); // OUT: 3 created
+    portfolios.deactivate(both, p1, 3); // SER: 3 ended
+    portfolios.deactivate(both, p2, 3); // OUT: 3 ended
+
+    const all = links().listLinkEvents(both, { limit: 1000 });
+    expect(all.items).toHaveLength(12);
+    const branches = all.items.map((e) => e.branch.code);
+    expect(branches).toEqual([...'SSSOOOSSSOOO'].map((c) => (c === 'S' ? 'SER' : 'OUT')));
+
+    for (const limit of [1, 2, 5, 7]) {
+      const seen: number[] = [];
+      let after: number | undefined;
+      for (let guard = 0; guard < 50; guard++) {
+        const page = links().listLinkEvents(both, { limit, ...(after === undefined ? {} : { after }) });
+        seen.push(...page.items.map((e) => e.id));
+        if (!page.hasMore) {
+          expect(page.items.length).toBeLessThanOrEqual(limit);
+          break;
+        }
+        expect(page.items).toHaveLength(limit);
+        after = page.nextAfter as number;
+      }
+      expect(seen).toEqual(all.items.map((e) => e.id));
+    }
+    // Página exatamente no fim: hasMore false.
+    const exact = links().listLinkEvents(both, { limit: 12 });
+    expect(exact.hasMore).toBe(false);
+    expect(links().listLinkEvents(both, { limit: 11 }).hasMore).toBe(true);
+  });
+});
+
+describe('índices do histórico', () => {
+  it('listLinkHistory (com e sem cliente) ordena pelo índice, sem TEMP B-TREE', () => {
+    const plan = (extra: string) =>
+      (
+        sqlite()
+          .prepare(
+            `explain query plan select l.id from portfolio_links l join customers c on c.id = l.customer_id
+             join product_subgroups g on g.id = l.product_subgroup_id join sellers s on s.id = l.seller_id
+             where l.portfolio_id = 1${extra} and l.id > 0 order by l.id limit 51`,
+          )
+          .all() as { detail: string }[]
+      ).map((r) => r.detail);
+    for (const extra of ['', ' and l.customer_id = 5']) {
+      const lines = plan(extra);
+      expect(
+        lines.some((d) => /TEMP B-TREE/i.test(d)),
+        lines.join(' | '),
+      ).toBe(false);
+    }
   });
 });
