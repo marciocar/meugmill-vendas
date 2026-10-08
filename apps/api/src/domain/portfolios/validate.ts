@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
   economicGroups,
   municipalities,
@@ -175,6 +175,35 @@ export function assertSellersLinkedToBranch(conn: Conn, branchId: number, seller
     )
     .all().length;
   if (n !== sellerIds.length) throw invalid('Vendedor sem vínculo ativo com a filial da carteira');
+}
+
+/**
+ * Troca de filial. Primeiro descarta os ajustes órfãos em relação à filial ATUAL (cliente que perdeu
+ * o vínculo com ela: sem efeito e invisíveis). Depois exige que todo cliente com ajuste restante
+ * tenha vínculo (ativo ou não) com a filial nova; senão lança 400 e a transação desfaz tudo,
+ * inclusive a limpeza.
+ */
+export function replaceOverridesOnBranchChange(
+  conn: Conn,
+  portfolioId: number,
+  currentBranchId: number,
+  newBranchId: number,
+): void {
+  conn.run(
+    sql`delete from portfolio_customer_overrides
+         where portfolio_id = ${portfolioId}
+           and not exists (select 1 from customer_branches cb
+                            where cb.customer_id = portfolio_customer_overrides.customer_id
+                              and cb.branch_id = ${currentBranchId})`,
+  );
+  const unlinked = conn.get<{ n: number }>(
+    sql`select 1 as n from portfolio_customer_overrides ov
+         where ov.portfolio_id = ${portfolioId}
+           and not exists (select 1 from customer_branches cb
+                            where cb.customer_id = ov.customer_id and cb.branch_id = ${newBranchId})
+         limit 1`,
+  );
+  if (unlinked) throw invalid('Há ajustes de clientes sem vínculo com a filial da carteira');
 }
 
 function assertActiveSubgroups(conn: Conn, ids: number[]): void {

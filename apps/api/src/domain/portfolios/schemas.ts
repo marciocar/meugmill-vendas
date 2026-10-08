@@ -121,6 +121,8 @@ export const PortfolioResponseSchema = Type.Object({
     economicGroups: Type.Array(CodeRef),
   }),
   sellers: Type.Array(Type.Object({ seller: CodeRef, productSubgroup: CodeRef })),
+  overridesInclude: Type.Integer({ description: 'Clientes incluídos manualmente na prévia.' }),
+  overridesExclude: Type.Integer({ description: 'Clientes excluídos manualmente da prévia.' }),
   ...AuditResponseFields,
 });
 export type PortfolioResponse = Static<typeof PortfolioResponseSchema>;

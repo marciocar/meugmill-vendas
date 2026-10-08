@@ -1,0 +1,7 @@
+# Comandos que validam o E4 (rodar a partir da raiz)
+pnpm install --frozen-lockfile
+pnpm lint && pnpm typecheck
+pnpm test                      # 457 testes na API (inclui volume de 50 mil clientes) + 22 no web
+docker build -f docker/api.Dockerfile -t carteira-api:local .
+docker compose up -d --no-build
+bash scripts/smoke.sh          # inclui prévia, ajustes e proxy da demo

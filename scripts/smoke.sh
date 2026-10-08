@@ -220,4 +220,92 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -H "$auth_admin" "${WEB_URL}/api/v
 [ "$code" = "200" ] || fail "GET ${WEB_URL}/api/v1/portfolios (proxy) esperado 200, recebido ${code}"
 ok "proxy /api da demo -> /v1/portfolios 200 com token de admin"
 
+# Prévia de elegibilidade e ajustes manuais (E4), reaproveitando a carteira do wizard.
+# CNPJ numérico válido e único por execução: 8 dígitos do epoch + filial 000N + 2 DVs (módulo 11).
+make_cnpj() { # make_cnpj <epoch> <ordem 1..9> -> CNPJ de 14 dígitos
+  node -e '
+    const base = String(Number(process.argv[1]) % 1e8).padStart(8, "0") + "000" + process.argv[2];
+    const dv = (d) => {
+      const w = d.length === 12 ? [5,4,3,2,9,8,7,6,5,4,3,2] : [6,5,4,3,2,9,8,7,6,5,4,3,2];
+      const r = d.split("").reduce((a, c, i) => a + Number(c) * w[i], 0) % 11;
+      return r < 2 ? 0 : 11 - r;
+    };
+    const d1 = dv(base);
+    process.stdout.write(base + d1 + dv(base + d1));
+  ' "$1" "$2"
+}
+cnpj_a=$(make_cnpj "$epoch" 1)
+cnpj_b=$(make_cnpj "$epoch" 2)
+[ "${#cnpj_a}" = "14" ] && [ "${#cnpj_b}" = "14" ] || fail "geração de CNPJ falhou (${cnpj_a} / ${cnpj_b})"
+name_a="Cliente Alfa ${epoch}"
+name_b="Cliente Beta ${epoch}"
+
+code=$(json_post /v1/customers \
+  "{\"cnpj\":\"${cnpj_a}\",\"legalName\":\"${name_a}\",\"municipalityCode\":3205002,\"neighborhood\":\"Centro de Serra\",\"branchIds\":[${branch_id}]}")
+[ "$code" = "201" ] || fail "POST /v1/customers (A, casa pelo filtro) esperado 201, recebido ${code}: $(cat "$body")"
+customer_a=$(json_get 'j.id')
+code=$(json_post /v1/customers \
+  "{\"cnpj\":\"${cnpj_b}\",\"legalName\":\"${name_b}\",\"municipalityCode\":3304557,\"neighborhood\":\"Centro\",\"branchIds\":[${branch_id}]}")
+[ "$code" = "201" ] || fail "POST /v1/customers (B, outra UF) esperado 201, recebido ${code}: $(cat "$body")"
+customer_b=$(json_get 'j.id')
+[ -n "$customer_a" ] && [ -n "$customer_b" ] || fail "clientes criados sem id"
+ok "clientes A (${customer_a}, Serra/bairro da carteira) e B (${customer_b}, outra UF) criados na filial-01"
+
+preview() { # preview <base> <q> -> código HTTP (corpo em $body)
+  curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" -G "$1/v1/portfolios/${portfolio_id}/preview" \
+    --data-urlencode "q=$2" || true
+}
+
+code=$(preview "$API_URL" "$name_a")
+[ "$code" = "200" ] || fail "GET preview?q=A esperado 200, recebido ${code}: $(cat "$body")"
+[ "$(json_get "j.items.filter(i=>i.customer.id===${customer_a} && i.source==='filter' && i.matchedRegionLevel==='neighborhood').length")" = "1" ] \
+  || fail "prévia esperava A com source=filter e matchedRegionLevel=neighborhood: $(cat "$body")"
+ok "GET /preview?q=A -> 200 com A (source filter, nível neighborhood)"
+
+code=$(preview "$API_URL" "$name_b")
+[ "$code" = "200" ] || fail "GET preview?q=B esperado 200, recebido ${code}: $(cat "$body")"
+[ "$(json_get 'j.total')" = "0" ] || fail "prévia esperava total 0 para B (fora dos filtros): $(cat "$body")"
+ok "GET /preview?q=B -> total 0 (B não casa os filtros)"
+
+code=$(curl -s -D "$hdrs" -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/portfolios/${portfolio_id}" || true)
+[ "$code" = "200" ] || fail "GET /v1/portfolios/${portfolio_id} esperado 200, recebido ${code}"
+current_version=$(tr -d '\r' < "$hdrs" | sed -n 's/^[Ee][Tt][Aa][Gg]:[[:space:]]*"\([0-9]*\)".*/\1/p' | head -n1)
+[ -n "$current_version" ] || fail "carteira sem ETag: $(cat "$hdrs")"
+
+code=$(json_put "/v1/portfolios/${portfolio_id}/overrides" "$current_version" \
+  "{\"include\":[${customer_b}],\"exclude\":[${customer_a}]}")
+[ "$code" = "200" ] || fail "PUT /overrides esperado 200, recebido ${code}: $(cat "$body")"
+new_version=$(tr -d '\r' < "$hdrs" | sed -n 's/^[Ee][Tt][Aa][Gg]:[[:space:]]*"\([0-9]*\)".*/\1/p' | head -n1)
+[ -n "$new_version" ] && [ "$new_version" != "$current_version" ] \
+  || fail "PUT /overrides sem ETag novo (antes ${current_version}, depois ${new_version}): $(cat "$hdrs")"
+ok "PUT /v1/portfolios/{id}/overrides -> 200 com ETag novo (\"${new_version}\")"
+
+code=$(preview "$API_URL" "$name_b")
+[ "$code" = "200" ] || fail "GET preview?q=B (após ajuste) esperado 200, recebido ${code}"
+[ "$(json_get "j.items.filter(i=>i.customer.id===${customer_b} && i.source==='manual').length")" = "1" ] \
+  || fail "prévia esperava B com source=manual: $(cat "$body")"
+ok "GET /preview?q=B -> B incluído manualmente (source manual)"
+
+code=$(preview "$API_URL" "$name_a")
+[ "$code" = "200" ] || fail "GET preview?q=A (após ajuste) esperado 200, recebido ${code}"
+[ "$(json_get 'j.total')" = "0" ] || fail "prévia esperava total 0 para A (excluído): $(cat "$body")"
+ok "GET /preview?q=A -> total 0 (A excluído manualmente)"
+
+code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/portfolios/${portfolio_id}/overrides" || true)
+[ "$code" = "200" ] || fail "GET /overrides esperado 200, recebido ${code}: $(cat "$body")"
+[ "$(json_get "j.include.filter(e=>e.customer.id===${customer_b} && e.effective===true).length")" = "1" ] \
+  || fail "/overrides esperava B em include com effective=true: $(cat "$body")"
+[ "$(json_get "j.exclude.filter(e=>e.customer.id===${customer_a} && e.effective===true).length")" = "1" ] \
+  || fail "/overrides esperava A em exclude com effective=true: $(cat "$body")"
+ok "GET /overrides -> B em include e A em exclude, ambos effective"
+
+code=$(curl -s -o "$body" -w '%{http_code}' -X PUT "${API_URL}/v1/portfolios/${portfolio_id}/overrides" \
+  -H "$auth_admin" -H 'Content-Type: application/json' -d '{"include":[],"exclude":[]}' || true)
+[ "$code" = "428" ] || fail "PUT /overrides sem If-Match esperado 428, recebido ${code}: $(cat "$body")"
+ok "PUT /overrides sem If-Match -> 428"
+
+code=$(preview "${WEB_URL}/api" "$name_b")
+[ "$code" = "200" ] || fail "GET ${WEB_URL}/api/v1/portfolios/{id}/preview (proxy) esperado 200, recebido ${code}"
+ok "proxy /api da demo -> /v1/portfolios/{id}/preview 200"
+
 echo "Smoke concluído com sucesso."

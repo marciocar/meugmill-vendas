@@ -7631,6 +7631,14 @@
                     "name": {
                       "type": "string"
                     },
+                    "overridesExclude": {
+                      "description": "Clientes excluídos manualmente da prévia.",
+                      "type": "integer"
+                    },
+                    "overridesInclude": {
+                      "description": "Clientes incluídos manualmente na prévia.",
+                      "type": "integer"
+                    },
                     "responsibleSub": {
                       "type": "string"
                     },
@@ -7736,6 +7744,8 @@
                     "status",
                     "filters",
                     "sellers",
+                    "overridesInclude",
+                    "overridesExclude",
                     "active",
                     "deactivatedAt",
                     "version",
@@ -8059,6 +8069,14 @@
                     "name": {
                       "type": "string"
                     },
+                    "overridesExclude": {
+                      "description": "Clientes excluídos manualmente da prévia.",
+                      "type": "integer"
+                    },
+                    "overridesInclude": {
+                      "description": "Clientes incluídos manualmente na prévia.",
+                      "type": "integer"
+                    },
                     "responsibleSub": {
                       "type": "string"
                     },
@@ -8164,6 +8182,8 @@
                     "status",
                     "filters",
                     "sellers",
+                    "overridesInclude",
+                    "overridesExclude",
                     "active",
                     "deactivatedAt",
                     "version",
@@ -8531,6 +8551,14 @@
                     "name": {
                       "type": "string"
                     },
+                    "overridesExclude": {
+                      "description": "Clientes excluídos manualmente da prévia.",
+                      "type": "integer"
+                    },
+                    "overridesInclude": {
+                      "description": "Clientes incluídos manualmente na prévia.",
+                      "type": "integer"
+                    },
                     "responsibleSub": {
                       "type": "string"
                     },
@@ -8636,6 +8664,8 @@
                     "status",
                     "filters",
                     "sellers",
+                    "overridesInclude",
+                    "overridesExclude",
                     "active",
                     "deactivatedAt",
                     "version",
@@ -8968,6 +8998,14 @@
                     "name": {
                       "type": "string"
                     },
+                    "overridesExclude": {
+                      "description": "Clientes excluídos manualmente da prévia.",
+                      "type": "integer"
+                    },
+                    "overridesInclude": {
+                      "description": "Clientes incluídos manualmente na prévia.",
+                      "type": "integer"
+                    },
                     "responsibleSub": {
                       "type": "string"
                     },
@@ -9073,6 +9111,8 @@
                     "status",
                     "filters",
                     "sellers",
+                    "overridesInclude",
+                    "overridesExclude",
                     "active",
                     "deactivatedAt",
                     "version",
@@ -9488,6 +9528,14 @@
                     "name": {
                       "type": "string"
                     },
+                    "overridesExclude": {
+                      "description": "Clientes excluídos manualmente da prévia.",
+                      "type": "integer"
+                    },
+                    "overridesInclude": {
+                      "description": "Clientes incluídos manualmente na prévia.",
+                      "type": "integer"
+                    },
                     "responsibleSub": {
                       "type": "string"
                     },
@@ -9593,6 +9641,8 @@
                     "status",
                     "filters",
                     "sellers",
+                    "overridesInclude",
+                    "overridesExclude",
                     "active",
                     "deactivatedAt",
                     "version",
@@ -9612,6 +9662,1107 @@
                 }
               }
             }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+          },
+          "428": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "portfolios"
+        ]
+      }
+    },
+    "/v1/portfolios/{id}/overrides": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "exclude": {
+                      "items": {
+                        "properties": {
+                          "customer": {
+                            "properties": {
+                              "cnpj": {
+                                "type": "string"
+                              },
+                              "id": {
+                                "type": "integer"
+                              },
+                              "legalName": {
+                                "type": "string"
+                              },
+                              "municipalityCode": {
+                                "type": "integer"
+                              },
+                              "municipalityName": {
+                                "type": "string"
+                              },
+                              "neighborhood": {
+                                "type": "string"
+                              },
+                              "stateCode": {
+                                "type": "integer"
+                              },
+                              "tradeName": {
+                                "nullable": true,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "cnpj",
+                              "legalName",
+                              "tradeName",
+                              "stateCode",
+                              "municipalityCode",
+                              "municipalityName",
+                              "neighborhood"
+                            ],
+                            "type": "object"
+                          },
+                          "effective": {
+                            "description": "Inclusão: cliente ativo com vínculo ativo na filial. Exclusão: o cliente casaria pelos filtros hoje.",
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "customer",
+                          "effective"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "include": {
+                      "items": {
+                        "properties": {
+                          "customer": {
+                            "properties": {
+                              "cnpj": {
+                                "type": "string"
+                              },
+                              "id": {
+                                "type": "integer"
+                              },
+                              "legalName": {
+                                "type": "string"
+                              },
+                              "municipalityCode": {
+                                "type": "integer"
+                              },
+                              "municipalityName": {
+                                "type": "string"
+                              },
+                              "neighborhood": {
+                                "type": "string"
+                              },
+                              "stateCode": {
+                                "type": "integer"
+                              },
+                              "tradeName": {
+                                "nullable": true,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "cnpj",
+                              "legalName",
+                              "tradeName",
+                              "stateCode",
+                              "municipalityCode",
+                              "municipalityName",
+                              "neighborhood"
+                            ],
+                            "type": "object"
+                          },
+                          "effective": {
+                            "description": "Inclusão: cliente ativo com vínculo ativo na filial. Exclusão: o cliente casaria pelos filtros hoje.",
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "customer",
+                          "effective"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "include",
+                    "exclude"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+          },
+          "428": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "portfolios"
+        ]
+      },
+      "put": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "if-match",
+            "required": false,
+            "schema": {
+              "maxLength": 40,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "exclude": {
+                    "items": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "maxItems": 5000,
+                    "type": "array"
+                  },
+                  "include": {
+                    "items": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "maxItems": 5000,
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "include",
+                  "exclude"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "active": {
+                      "type": "boolean"
+                    },
+                    "branch": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "integer"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "code",
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "createdAt": {
+                      "type": "integer"
+                    },
+                    "deactivatedAt": {
+                      "nullable": true,
+                      "type": "integer"
+                    },
+                    "description": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "filters": {
+                      "properties": {
+                        "economicGroups": {
+                          "items": {
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "id": {
+                                "type": "integer"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "code",
+                              "name"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "regions": {
+                          "items": {
+                            "properties": {
+                              "level": {
+                                "anyOf": [
+                                  {
+                                    "enum": [
+                                      "state"
+                                    ],
+                                    "type": "string"
+                                  },
+                                  {
+                                    "enum": [
+                                      "municipality"
+                                    ],
+                                    "type": "string"
+                                  },
+                                  {
+                                    "enum": [
+                                      "neighborhood"
+                                    ],
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "municipalityCode": {
+                                "type": "integer"
+                              },
+                              "municipalityName": {
+                                "type": "string"
+                              },
+                              "neighborhoodKey": {
+                                "type": "string"
+                              },
+                              "neighborhoodLabel": {
+                                "type": "string"
+                              },
+                              "stateCode": {
+                                "type": "integer"
+                              },
+                              "uf": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "level",
+                              "stateCode",
+                              "uf"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "retailNetworks": {
+                          "items": {
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "id": {
+                                "type": "integer"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "code",
+                              "name"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "regions",
+                        "retailNetworks",
+                        "economicGroups"
+                      ],
+                      "type": "object"
+                    },
+                    "id": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "overridesExclude": {
+                      "description": "Clientes excluídos manualmente da prévia.",
+                      "type": "integer"
+                    },
+                    "overridesInclude": {
+                      "description": "Clientes incluídos manualmente na prévia.",
+                      "type": "integer"
+                    },
+                    "responsibleSub": {
+                      "type": "string"
+                    },
+                    "sellers": {
+                      "items": {
+                        "properties": {
+                          "productSubgroup": {
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "id": {
+                                "type": "integer"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "code",
+                              "name"
+                            ],
+                            "type": "object"
+                          },
+                          "seller": {
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "id": {
+                                "type": "integer"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "code",
+                              "name"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "seller",
+                          "productSubgroup"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "enum": [
+                            "draft"
+                          ],
+                          "type": "string"
+                        },
+                        {
+                          "enum": [
+                            "active"
+                          ],
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "type": {
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "integer"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "code",
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "updatedAt": {
+                      "type": "integer"
+                    },
+                    "version": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "description",
+                    "branch",
+                    "type",
+                    "responsibleSub",
+                    "status",
+                    "filters",
+                    "sellers",
+                    "overridesInclude",
+                    "overridesExclude",
+                    "active",
+                    "deactivatedAt",
+                    "version",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response",
+            "headers": {
+              "ETag": {
+                "description": "Versão atual do registro entre aspas (`\"3\"`); use em If-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+          },
+          "428": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "portfolios"
+        ]
+      }
+    },
+    "/v1/portfolios/{id}/preview": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "filter"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "enum": [
+                    "manual"
+                  ],
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "customer": {
+                            "properties": {
+                              "cnpj": {
+                                "type": "string"
+                              },
+                              "id": {
+                                "type": "integer"
+                              },
+                              "legalName": {
+                                "type": "string"
+                              },
+                              "municipalityCode": {
+                                "type": "integer"
+                              },
+                              "municipalityName": {
+                                "type": "string"
+                              },
+                              "neighborhood": {
+                                "type": "string"
+                              },
+                              "stateCode": {
+                                "type": "integer"
+                              },
+                              "tradeName": {
+                                "nullable": true,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "cnpj",
+                              "legalName",
+                              "tradeName",
+                              "stateCode",
+                              "municipalityCode",
+                              "municipalityName",
+                              "neighborhood"
+                            ],
+                            "type": "object"
+                          },
+                          "matchedBy": {
+                            "properties": {
+                              "economicGroup": {
+                                "type": "boolean"
+                              },
+                              "region": {
+                                "type": "boolean"
+                              },
+                              "retailNetwork": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "region",
+                              "retailNetwork",
+                              "economicGroup"
+                            ],
+                            "type": "object"
+                          },
+                          "matchedRegionLevel": {
+                            "anyOf": [
+                              {
+                                "enum": [
+                                  "state"
+                                ],
+                                "type": "string"
+                              },
+                              {
+                                "enum": [
+                                  "municipality"
+                                ],
+                                "type": "string"
+                              },
+                              {
+                                "enum": [
+                                  "neighborhood"
+                                ],
+                                "type": "string"
+                              },
+                              {
+                                "enum": [
+                                  null
+                                ],
+                                "nullable": true,
+                                "type": "object"
+                              }
+                            ]
+                          },
+                          "source": {
+                            "anyOf": [
+                              {
+                                "enum": [
+                                  "filter"
+                                ],
+                                "type": "string"
+                              },
+                              {
+                                "enum": [
+                                  "manual"
+                                ],
+                                "type": "string"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "customer",
+                          "source",
+                          "matchedRegionLevel",
+                          "matchedBy"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "nextCursor": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextCursor",
+                    "total"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
           },
           "400": {
             "content": {
@@ -9925,6 +11076,14 @@
                     "name": {
                       "type": "string"
                     },
+                    "overridesExclude": {
+                      "description": "Clientes excluídos manualmente da prévia.",
+                      "type": "integer"
+                    },
+                    "overridesInclude": {
+                      "description": "Clientes incluídos manualmente na prévia.",
+                      "type": "integer"
+                    },
                     "responsibleSub": {
                       "type": "string"
                     },
@@ -10030,6 +11189,8 @@
                     "status",
                     "filters",
                     "sellers",
+                    "overridesInclude",
+                    "overridesExclude",
                     "active",
                     "deactivatedAt",
                     "version",
@@ -10400,6 +11561,14 @@
                     "name": {
                       "type": "string"
                     },
+                    "overridesExclude": {
+                      "description": "Clientes excluídos manualmente da prévia.",
+                      "type": "integer"
+                    },
+                    "overridesInclude": {
+                      "description": "Clientes incluídos manualmente na prévia.",
+                      "type": "integer"
+                    },
                     "responsibleSub": {
                       "type": "string"
                     },
@@ -10505,6 +11674,8 @@
                     "status",
                     "filters",
                     "sellers",
+                    "overridesInclude",
+                    "overridesExclude",
                     "active",
                     "deactivatedAt",
                     "version",
