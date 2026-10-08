@@ -10,14 +10,14 @@ import {
 } from '../../db/schema.js';
 import { assertVersion, requireVersion, writeActive, type AuditedTable } from '../shared/audit.js';
 import { assertAllInScope, requireAdmin, resolveScopeIds, type Actor } from '../shared/authz.js';
-import { isUniqueViolation, type Conn, type Db, type ServiceOptions } from '../shared/db.js';
+import { isUniqueViolation, writeTx, type Conn, type Db, type ServiceOptions } from '../shared/db.js';
 import { DomainError, invalid } from '../shared/errors.js';
 import { assertBranchesActive } from '../shared/links.js';
 import { decodeCursor, resolveLimit, toPage, type Page } from '../shared/pagination.js';
 import { likeContains } from '../shared/sql.js';
 import { cleanText, parseInput } from '../shared/validate.js';
 import { findScoped, openForEdit, bump } from './access.js';
-import { loadAggregate, loadAggregateBase, writeAggregateTx } from './aggregate.js';
+import { loadAggregateBase, withConflicts } from './aggregate.js';
 import { requireAdminister } from './authz.js';
 import { portfolioNameKey } from './name-key.js';
 import {
@@ -28,6 +28,7 @@ import {
   UpdatePortfolioSchema,
   type CreatePortfolioInput,
   type PortfolioListItem,
+  type PortfolioInclude,
   type PortfolioListParams,
   type PortfolioResponse,
   type ReplaceFiltersInput,
@@ -48,8 +49,11 @@ import {
 export interface PortfolioService {
   /** Itens resumidos, só das filiais do token. */
   list(actor: Actor, params?: PortfolioListParams): Page<PortfolioListItem>;
-  /** Agregado completo (informações, filtros e vendedores). */
-  get(actor: Actor, id: number): PortfolioResponse;
+  /**
+   * Agregado completo (informações, filtros e vendedores). `include: 'conflicts'` acrescenta as contagens
+   * de conflito (custo de resolver a disputa da carteira inteira; por isso só sob demanda).
+   */
+  get(actor: Actor, id: number, include?: PortfolioInclude): PortfolioResponse;
   /** Cria o rascunho (admin com a filial no token). */
   create(actor: Actor, input: CreatePortfolioInput): PortfolioResponse;
   update(
@@ -119,7 +123,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
   }
 
   function transition(actor: Actor, id: number, expected: number | undefined, active: boolean) {
-    return writeAggregateTx(db, (tx) => {
+    return writeTx(db, (tx) => {
       const row = findScoped(tx, actor, id);
       requireAdminister(actor);
       const version = requireVersion(expected);
@@ -188,9 +192,10 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
       return toPage(rows, limit, (r) => r.id);
     },
 
-    get(actor, id) {
+    get(actor, id, include) {
       findScoped(db, actor, id);
-      return loadAggregate(db, id);
+      const base = loadAggregateBase(db, id);
+      return include === 'conflicts' ? withConflicts(db, base) : base;
     },
 
     create(actor, input) {
@@ -198,7 +203,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
       const data = parseInput(CreatePortfolioSchema, input);
       const name = cleanText(data.name, 'name');
       const responsibleSub = cleanSub(data.responsibleSub);
-      return writeAggregateTx(db, (tx) => {
+      return writeTx(db, (tx) => {
         assertAllInScope([data.branchId], resolveScopeIds(tx, actor));
         assertBranchesActive(tx, [data.branchId]);
         assertActiveType(tx, data.portfolioTypeId);
@@ -231,7 +236,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
     },
 
     update(actor, id, expectedVersion, patch) {
-      return writeAggregateTx(db, (tx) => {
+      return writeTx(db, (tx) => {
         let data!: UpdatePortfolioInput;
         const row = openForEdit(tx, actor, id, expectedVersion, (current) => {
           data = parseInput(UpdatePortfolioSchema, patch);
@@ -284,7 +289,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
     },
 
     replaceFilters(actor, id, expectedVersion, input) {
-      return writeAggregateTx(db, (tx) => {
+      return writeTx(db, (tx) => {
         const row = openForEdit(tx, actor, id, expectedVersion);
         const data = parseInput(ReplaceFiltersSchema, input);
         const regions = validateRegions(tx, data.regions);
@@ -317,7 +322,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
     },
 
     replaceSellers(actor, id, expectedVersion, input) {
-      return writeAggregateTx(db, (tx) => {
+      return writeTx(db, (tx) => {
         const row = openForEdit(tx, actor, id, expectedVersion);
         const data = parseInput(ReplaceSellersSchema, input);
         validateAssignments(tx, row.branchId, data.assignments);

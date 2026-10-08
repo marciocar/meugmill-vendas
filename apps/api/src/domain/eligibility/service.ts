@@ -1,9 +1,9 @@
 import { eq, inArray, sql } from 'drizzle-orm';
 import { customers, municipalities, portfolioCustomerOverrides } from '../../db/schema.js';
-import { loadAggregateBase, writeAggregateTx } from '../portfolios/aggregate.js';
+import { loadAggregateBase } from '../portfolios/aggregate.js';
 import { bump, findScoped, openForEdit } from '../portfolios/access.js';
 import { type Actor } from '../shared/authz.js';
-import { type Conn, type Db, type ServiceOptions } from '../shared/db.js';
+import { writeTx, type Conn, type Db, type ServiceOptions } from '../shared/db.js';
 import { invalid } from '../shared/errors.js';
 import { parseInput } from '../shared/validate.js';
 import type { PortfolioResponse } from '../portfolios/schemas.js';
@@ -135,7 +135,7 @@ export function createEligibilityService(db: Db, opts: ServiceOptions = {}): Eli
     },
 
     replaceOverrides(actor, portfolioId, expectedVersion, input) {
-      return writeAggregateTx(db, (tx) => {
+      return writeTx(db, (tx) => {
         const row = openForEdit(tx, actor, portfolioId, expectedVersion);
         const data = parseInput(ReplaceOverridesSchema, input);
         const all = [...data.include, ...data.exclude];

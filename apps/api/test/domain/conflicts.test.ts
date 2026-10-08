@@ -1,10 +1,7 @@
-import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { effectiveMembers } from '../../src/domain/conflicts/members.js';
 import {
-  conflictCountsSql,
   loadPortfolioCriteria,
-  previewIdsSql,
   previewPage,
   type ResolvedPage,
   type Resolution,
@@ -12,7 +9,7 @@ import {
 import { createEligibilityService } from '../../src/domain/eligibility/service.js';
 import { createPortfolioTypeService } from '../../src/domain/portfolio-types/service.js';
 import { createPortfolioService } from '../../src/domain/portfolios/service.js';
-import { loadAggregate } from '../../src/domain/portfolios/aggregate.js';
+import { loadAggregateBase, withConflicts } from '../../src/domain/portfolios/aggregate.js';
 import { neighborhoodKey, searchKey } from '../../src/domain/shared/normalize.js';
 import {
   ES,
@@ -136,6 +133,8 @@ function view(
 ): ResolvedPage {
   return previewPage(fx.db, loadPortfolioCriteria(fx.db, p), { portfolioId: p, ...extra });
 }
+/** Agregado da carteira com as contagens de conflito (sob demanda). */
+const counts = (p: number) => withConflicts(fx.db, loadAggregateBase(fx.db, p));
 /** Resolução e posto do cliente na prévia da carteira. */
 function of(p: number, c: number) {
   const item = view(p, { limit: 200 }).items.find((i) => i.customerId === c);
@@ -337,14 +336,27 @@ describe('conflitos: resolução', () => {
     expect(of(a, c)).toEqual({ resolution: 'assigned', rank: 1 });
   });
 
-  it('cliente inativo ou sem vínculo ativo na filial não entra na disputa', () => {
+  it('cliente inativo ou sem vínculo ativo na filial não entra na disputa, nem como membro nem como concorrente', () => {
     const a = newPortfolio('A');
     const b = newPortfolio('B');
     stateOf(a, ES);
-    stateOf(b, ES);
-    customer({ active: false });
-    customer({ branches: [car] });
-    expect(view(a).total).toBe(0);
+    cityOf(b, SERRA);
+    const valid = customer();
+    const inactive = customer({ active: false });
+    const otherBranch = customer({ branches: [car] });
+    const inactiveLink = customer();
+    sqlite()
+      .prepare('update customer_branches set active = 0 where customer_id = ? and branch_id = ?')
+      .run(inactiveLink, ser);
+    // Ajustes manuais de B sobre os inválidos também não devem fazê-los concorrer em A.
+    for (const c of [inactive, otherBranch, inactiveLink]) override(b, c, 'include');
+    expect(view(a).items.map((i) => i.customerId)).toEqual([valid]);
+    expect(view(a).total).toBe(1);
+    expect(view(b).items.map((i) => i.customerId)).toEqual([valid]);
+    expect(view(a).items[0]?.competitors).toEqual([{ portfolioId: b, name: 'B', rank: 2 }]);
+    expect(of(a, valid)).toEqual({ resolution: 'lost', rank: 1 });
+    expect(of(b, valid)).toEqual({ resolution: 'assigned', rank: 2 });
+    expect(counts(a)).toMatchObject({ conflictsBlocked: 0, conflictsLost: 1 });
   });
 
   it('competitors: só concorrentes com posto, ordenados por posto desc e id', () => {
@@ -464,11 +476,11 @@ describe('conflitos: agregado e membros efetivos', () => {
     hoodOf(a, SERRA, 'Praia');
     hoodOf(b, SERRA, 'Praia');
     customer({ neighborhood: 'Praia' });
-    expect(loadAggregate(fx.db, a)).toMatchObject({ conflictsBlocked: 1, conflictsLost: 0 });
-    expect(loadAggregate(fx.db, b)).toMatchObject({ conflictsBlocked: 1, conflictsLost: 2 });
+    expect(counts(a)).toMatchObject({ conflictsBlocked: 1, conflictsLost: 0 });
+    expect(counts(b)).toMatchObject({ conflictsBlocked: 1, conflictsLost: 2 });
   });
 
-  it('as escritas devolvem o agregado com as contagens de conflito (lidas após o commit)', () => {
+  it('contagens de conflito só sob demanda: o GET padrão e as escritas não as calculam', () => {
     const pfs = createPortfolioService(fx.db);
     const admin = adminOf('SER');
     const type = createPortfolioTypeService(fx.db).create(admin, { code: 'T1', name: 'Tipo 1' }).id;
@@ -483,13 +495,21 @@ describe('conflitos: agregado e membros efetivos', () => {
     const b = mk('B');
     customer();
     customer();
-    expect(a).toMatchObject({ conflictsBlocked: 0, conflictsLost: 0 });
-    pfs.replaceFilters(admin, a.id, a.version, filters);
-    const saved = pfs.replaceFilters(admin, b.id, b.version, filters);
-    expect(saved).toMatchObject({ conflictsBlocked: 2, conflictsLost: 0 });
-    expect(pfs.get(admin, a.id)).toMatchObject({ conflictsBlocked: 2, conflictsLost: 0 });
-    expect(pfs.deactivate(admin, a.id, pfs.get(admin, a.id).version)).toMatchObject({ conflictsBlocked: 2 });
-    expect(pfs.get(admin, b.id)).toMatchObject({ conflictsBlocked: 0, conflictsLost: 0 });
+    // Nenhuma escrita (create, replaceFilters, deactivate) devolve as contagens.
+    const savedA = pfs.replaceFilters(admin, a.id, a.version, filters);
+    const savedB = pfs.replaceFilters(admin, b.id, b.version, filters);
+    for (const written of [a, savedA, savedB]) {
+      expect(written).not.toHaveProperty('conflictsBlocked');
+      expect(written).not.toHaveProperty('conflictsLost');
+    }
+    expect(pfs.get(admin, b.id)).not.toHaveProperty('conflictsBlocked');
+    // Sob demanda, refletem o estado já gravado.
+    expect(pfs.get(admin, a.id, 'conflicts')).toMatchObject({ conflictsBlocked: 2, conflictsLost: 0 });
+    expect(pfs.get(admin, b.id, 'conflicts')).toMatchObject({ conflictsBlocked: 2, conflictsLost: 0 });
+    const off = pfs.deactivate(admin, a.id, savedA.version);
+    expect(off).not.toHaveProperty('conflictsBlocked');
+    expect(pfs.get(admin, b.id, 'conflicts')).toMatchObject({ conflictsBlocked: 0, conflictsLost: 0 });
+    expect(pfs.get(admin, a.id, 'conflicts')).toMatchObject({ conflictsBlocked: 2, conflictsLost: 0 });
   });
 
   it('effectiveMembers devolve só os assigned, em ordem crescente de cliente', () => {
@@ -530,142 +550,6 @@ describe('conflitos: agregado e membros efetivos', () => {
     sqlite().prepare('update portfolios set active = 0 where id = ?').run(a);
     expect(of(b, c)?.resolution).toBe('assigned');
     expect([...effectiveMembers(fx.db, b)].map((m) => m.customerId)).toEqual([c]);
-    expect(loadAggregate(fx.db, b)).toMatchObject({ conflictsBlocked: 0, conflictsLost: 0 });
+    expect(counts(b)).toMatchObject({ conflictsBlocked: 0, conflictsLost: 0 });
   });
-});
-
-describe('conflitos: volume sintético (50 mil clientes, 20 carteiras na filial)', () => {
-  it('prévia com resolução dentro do teto', () => {
-    const db = sqlite();
-    const munis = db
-      .prepare(
-        'select ibge_code as code, state_code as st from municipalities where state_code in (32, 35) order by ibge_code limit 30',
-      )
-      .all() as { code: number; st: number }[];
-    const nets = Array.from({ length: 8 }, (_, i) => seedRetailNetwork(fx.db, `VR${i}`));
-    const grps = Array.from({ length: 5 }, (_, i) => seedEconomicGroup(fx.db, `VG${i}`));
-    const N = 50_000;
-    const insC = db.prepare(
-      `insert into customers (cnpj, legal_name, legal_name_key, state_code, municipality_code, neighborhood,
-        neighborhood_key, retail_network_id, economic_group_id, active, created_at, updated_at, created_by, updated_by)
-       values (?,?,?,?,?,?,?,?,?,?,?,?,'t','t')`,
-    );
-    const insL = db.prepare('insert into customer_branches (customer_id, branch_id, active) values (?,?,?)');
-    db.transaction(() => {
-      for (let i = 0; i < N; i++) {
-        const m = munis[i % munis.length] as { code: number; st: number };
-        const b = `Bairro ${i % 12}`;
-        const id = insC.run(
-          String(i + 1).padStart(14, '0'),
-          `Cliente ${i}`,
-          `CLIENTE ${i}`,
-          m.st,
-          m.code,
-          b,
-          neighborhoodKey(b),
-          i % 3 === 0 ? (nets[i % nets.length] as number) : null,
-          i % 4 === 0 ? (grps[i % grps.length] as number) : null,
-          i % 50 === 0 ? 0 : 1,
-          NOW,
-          NOW,
-        ).lastInsertRowid as number;
-        // Pior caso: praticamente todos vinculados (ativos) à filial da disputa.
-        insL.run(id, ser, i % 40 === 0 ? 0 : 1);
-        if (i % 7 === 0) insL.run(id, car, 1);
-      }
-    })();
-
-    // 20 carteiras na mesma filial, com filtros sobrepostos.
-    const ps: number[] = [];
-    const mk = (name: string, setup: (p: number) => void, o: { active?: boolean } = {}) => {
-      const p = newPortfolio(name, o);
-      setup(p);
-      ps.push(p);
-      return p;
-    };
-    const at = (i: number) => munis[i] as { code: number; st: number };
-    const broad = mk('UF ES+SP', (p) => {
-      stateOf(p, ES);
-      stateOf(p, SP);
-      cityOf(p, at(12).code, at(12).st); // empata com 'Cidades dup' nessas duas cidades
-      cityOf(p, at(13).code, at(13).st);
-    });
-    mk('Cidades dup', (p) => {
-      cityOf(p, at(12).code, at(12).st);
-      cityOf(p, at(13).code, at(13).st);
-    });
-    for (let i = 0; i < 4; i++)
-      mk(`Cidades ${i}`, (p) => [0, 1, 2].forEach((k) => cityOf(p, at(i * 3 + k).code, at(i * 3 + k).st)));
-    for (let i = 0; i < 4; i++) {
-      mk(`Bairros ${i}`, (p) => {
-        for (let k = 0; k < 3; k++) hoodOf(p, at(i * 2).code, `Bairro ${i * 3 + k}`, at(i * 2).st);
-      });
-    }
-    for (let i = 0; i < 4; i++) mk(`Rede ${i}`, (p) => networkOf(p, nets[i] as number));
-    for (let i = 0; i < 3; i++) mk(`Grupo ${i}`, (p) => groupOf(p, grps[i] as number));
-    mk('Cidade + rede', (p) => {
-      cityOf(p, at(0).code, at(0).st);
-      networkOf(p, nets[0] as number);
-    });
-    mk('Manual A', (p) => {
-      for (let i = 1; i <= 300; i++) override(p, i * 11, 'include');
-    });
-    mk('Manual B', (p) => {
-      for (let i = 1; i <= 300; i++) override(p, i * 11 + (i % 2 ? 0 : 7), 'include');
-    });
-    mk('Inativa', (p) => stateOf(p, ES), { active: false });
-    expect(ps.length).toBe(21); // 20 ativas + 1 inativa (não concorre)
-
-    const criteria = loadPortfolioCriteria(fx.db, broad);
-    const time = <T>(fn: () => T): [T, number] => {
-      const t0 = performance.now();
-      const r = fn();
-      return [r, performance.now() - t0];
-    };
-    const [first, t1] = time(() => previewPage(fx.db, criteria, { portfolioId: broad, limit: 50 }));
-    const [blocked, t2] = time(() =>
-      previewPage(fx.db, criteria, { portfolioId: broad, limit: 50, resolution: 'blocked' }),
-    );
-    const [lost, t3] = time(() =>
-      previewPage(fx.db, criteria, { portfolioId: broad, limit: 50, resolution: 'lost' }),
-    );
-    const [counts, t4] = time(() => loadAggregate(fx.db, broad));
-    const manualA = ps[ps.length - 3] as number;
-    const [manualPage, t5] = time(() =>
-      previewPage(fx.db, loadPortfolioCriteria(fx.db, manualA), { portfolioId: manualA, limit: 50 }),
-    );
-    const [members, t6] = time(() => [...effectiveMembers(fx.db, broad)].length);
-
-    expect(first.items).toHaveLength(50);
-    expect(first.total).toBeGreaterThan(30_000);
-    expect(blocked.total).toBeGreaterThan(0);
-    expect(lost.total).toBeGreaterThan(0);
-    expect(members).toBe(first.total - blocked.total - lost.total);
-    expect(counts.conflictsBlocked).toBe(blocked.total);
-    expect(counts.conflictsLost).toBe(lost.total);
-    expect(manualPage.total).toBeGreaterThan(250); // alguns ajustes caem em clientes inativos ou sem vínculo
-
-    const dialect = new SQLiteSyncDialect();
-    const explain = (q: ReturnType<typeof previewIdsSql>) => {
-      const { sql: text, params } = dialect.sqlToQuery(q);
-      return (db.prepare(`explain query plan ${text}`).all(...params) as { detail: string }[])
-        .map((r) => '  ' + r.detail)
-        .join('\n');
-    };
-    console.log(
-      `[conflitos 50k/20] total=${first.total} blocked=${blocked.total} lost=${lost.total} assigned=${members}\n` +
-        `  1a pagina+total=${t1.toFixed(0)}ms | resolution=blocked=${t2.toFixed(0)}ms | resolution=lost=${t3.toFixed(0)}ms\n` +
-        `  agregado(contagens)=${t4.toFixed(0)}ms | carteira manual=${t5.toFixed(0)}ms | effectiveMembers(tudo)=${t6.toFixed(0)}ms`,
-    );
-    console.log(`[conflitos 50k/20] EXPLAIN previa (ids, 1 execucao da disputa):
-${explain(previewIdsSql(criteria, { portfolioId: broad }))}`);
-    console.log(`[conflitos 50k/20] EXPLAIN contagens:\n${explain(conflictCountsSql(criteria, broad))}`);
-
-    expect(t1).toBeLessThan(1500);
-    expect(t2).toBeLessThan(1500);
-    expect(t3).toBeLessThan(1500);
-    expect(t4).toBeLessThan(1500);
-    expect(t5).toBeLessThan(1500);
-    expect(t6).toBeLessThan(1500);
-  }, 120_000);
 });

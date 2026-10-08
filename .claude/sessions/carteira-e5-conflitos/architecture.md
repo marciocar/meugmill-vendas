@@ -40,7 +40,15 @@ inativas, `Q ≠ P`) em que `c` tem posto:
 
 `GET /v1/portfolios/{id}/preview?resolution=assigned|lost|blocked`. O item ganha
 `resolution` e `competitors: [{ portfolioId, name, rank }]`. Um item `manual` também concorre, com
-posto 6. O agregado da carteira ganha `conflictsBlocked` e `conflictsLost` (contagens).
+posto 6. As contagens `conflictsBlocked` e `conflictsLost` vêm **só sob demanda**, com
+`GET /v1/portfolios/{id}?include=conflicts`.
+
+> **Corrigido em 2026-10-08, após a revisão.** A primeira versão punha as contagens em todo agregado,
+> inclusive nas respostas de escrita, e resolvia a disputa inteira de forma síncrona (5,5 a 32 s no pior
+> caso). Depois da otimização (filial nos braços, concorrentes restritas aos membros de P, prévia sem
+> filtro pelo caminho do E4), a meta (20 carteiras + 200 mil clientes de outra filial) fica em
+> 0,75–0,8 s. Com **100 carteiras** sobrepostas, fica em 2,3–2,6 s, acima do teto de 1,5 s.
+> **Aceito pelo maestro como risco registrado**, com cache por filial como melhoria futura.
 
 ## 5. Fases
 

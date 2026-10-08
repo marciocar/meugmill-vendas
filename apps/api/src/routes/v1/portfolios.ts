@@ -2,6 +2,7 @@ import { Type } from '@sinclair/typebox';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
   CreatePortfolioSchema,
+  PortfolioGetQuerySchema,
   PortfolioListQuerySchema,
   PortfolioListItemSchema,
   PortfolioResponseSchema,
@@ -9,6 +10,7 @@ import {
   ReplaceSellersSchema,
   UpdatePortfolioSchema,
   type CreatePortfolioInput,
+  type PortfolioInclude,
   type PortfolioListParams,
   type PortfolioResponse,
   type ReplaceFiltersInput,
@@ -93,8 +95,15 @@ export function registerPortfolioRoutes(
 
   app.get(
     `${prefix}/:id`,
-    { onRequest, schema: { tags, params: IdParamsSchema, response } },
-    (request, reply) => respond(reply, () => service.get(actorOf(request), idOf(request))),
+    { onRequest, schema: { tags, params: IdParamsSchema, querystring: PortfolioGetQuerySchema, response } },
+    (request, reply) =>
+      respond(reply, () =>
+        service.get(
+          actorOf(request),
+          idOf(request),
+          (request.query as { include?: PortfolioInclude }).include,
+        ),
+      ),
   );
 
   app.patch(

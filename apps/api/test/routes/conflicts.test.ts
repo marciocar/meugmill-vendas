@@ -92,10 +92,14 @@ const previewOf = async (id: number, qs = ''): Promise<Preview> => {
   expect(res.statusCode).toBe(200);
   return res.json<Preview>();
 };
-const aggregateOf = async (id: number) =>
+const aggregateOf = async (id: number, qs = '?include=conflicts') =>
   (
-    await fx.app.inject({ method: 'GET', url: `/v1/portfolios/${id}`, headers: await fx.headers(READER) })
-  ).json<{ conflictsBlocked: number; conflictsLost: number }>();
+    await fx.app.inject({
+      method: 'GET',
+      url: `/v1/portfolios/${id}${qs}`,
+      headers: await fx.headers(READER),
+    })
+  ).json<{ conflictsBlocked?: number; conflictsLost?: number }>();
 
 beforeAll(async () => {
   fx = await makeRoutesFixture(v1Routes);
@@ -132,6 +136,9 @@ describe('contrato HTTP: conflitos na prévia', () => {
 
     expect(await aggregateOf(byHood)).toMatchObject({ conflictsBlocked: 0, conflictsLost: 0 });
     expect((await aggregateOf(byCity)).conflictsLost).toBeGreaterThanOrEqual(1);
+    // Sem `include=conflicts` o agregado não traz (nem calcula) as contagens.
+    expect(await aggregateOf(byCity, '')).not.toHaveProperty('conflictsLost');
+    expect(await aggregateOf(byCity, '')).not.toHaveProperty('conflictsBlocked');
   });
 
   it('mesmo posto: blocked nas duas, com contagem no agregado', async () => {
@@ -228,5 +235,17 @@ describe('contrato HTTP: conflitos na prévia', () => {
     for (const qs of ['?resolution=foo', '?resolution=', '?resolution=ASSIGNED']) {
       expect((await preview(id, qs)).statusCode).toBe(400);
     }
+  });
+
+  it('include=conflicts é a única opção aceita; as demais dão 400', async () => {
+    const id = await portfolio('Validação G', [{ level: 'state', stateCode: ES }]);
+    const get = async (qs: string, who = READER) =>
+      fx.app.inject({ method: 'GET', url: `/v1/portfolios/${id}${qs}`, headers: await fx.headers(who) });
+    expect((await get('?include=conflicts')).statusCode).toBe(200);
+    for (const qs of ['?include=foo', '?include=', '?include=CONFLICTS', '?include=conflicts,x']) {
+      expect((await get(qs)).statusCode).toBe(400);
+    }
+    // Leitor de outra filial segue recebendo 404, com ou sem o include.
+    expect((await get('?include=conflicts', OTHER)).statusCode).toBe(404);
   });
 });

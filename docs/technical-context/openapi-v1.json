@@ -7508,11 +7508,11 @@
                       "type": "object"
                     },
                     "conflictsBlocked": {
-                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados).",
+                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados). Só com `include=conflicts`.",
                       "type": "integer"
                     },
                     "conflictsLost": {
-                      "description": "Clientes desta carteira em que outra da filial tem posto maior.",
+                      "description": "Clientes desta carteira em que outra da filial tem posto maior. Só com `include=conflicts`.",
                       "type": "integer"
                     },
                     "createdAt": {
@@ -7754,8 +7754,6 @@
                     "sellers",
                     "overridesInclude",
                     "overridesExclude",
-                    "conflictsBlocked",
-                    "conflictsLost",
                     "active",
                     "deactivatedAt",
                     "version",
@@ -7918,6 +7916,18 @@
       "get": {
         "parameters": [
           {
+            "description": "Acrescenta `conflictsBlocked` e `conflictsLost` (mais lento: resolve a disputa).",
+            "in": "query",
+            "name": "include",
+            "required": false,
+            "schema": {
+              "enum": [
+                "conflicts"
+              ],
+              "type": "string"
+            }
+          },
+          {
             "in": "path",
             "name": "id",
             "required": true,
@@ -7956,11 +7966,11 @@
                       "type": "object"
                     },
                     "conflictsBlocked": {
-                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados).",
+                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados). Só com `include=conflicts`.",
                       "type": "integer"
                     },
                     "conflictsLost": {
-                      "description": "Clientes desta carteira em que outra da filial tem posto maior.",
+                      "description": "Clientes desta carteira em que outra da filial tem posto maior. Só com `include=conflicts`.",
                       "type": "integer"
                     },
                     "createdAt": {
@@ -8202,8 +8212,6 @@
                     "sellers",
                     "overridesInclude",
                     "overridesExclude",
-                    "conflictsBlocked",
-                    "conflictsLost",
                     "active",
                     "deactivatedAt",
                     "version",
@@ -8448,11 +8456,11 @@
                       "type": "object"
                     },
                     "conflictsBlocked": {
-                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados).",
+                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados). Só com `include=conflicts`.",
                       "type": "integer"
                     },
                     "conflictsLost": {
-                      "description": "Clientes desta carteira em que outra da filial tem posto maior.",
+                      "description": "Clientes desta carteira em que outra da filial tem posto maior. Só com `include=conflicts`.",
                       "type": "integer"
                     },
                     "createdAt": {
@@ -8694,8 +8702,6 @@
                     "sellers",
                     "overridesInclude",
                     "overridesExclude",
-                    "conflictsBlocked",
-                    "conflictsLost",
                     "active",
                     "deactivatedAt",
                     "version",
@@ -8905,11 +8911,11 @@
                       "type": "object"
                     },
                     "conflictsBlocked": {
-                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados).",
+                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados). Só com `include=conflicts`.",
                       "type": "integer"
                     },
                     "conflictsLost": {
-                      "description": "Clientes desta carteira em que outra da filial tem posto maior.",
+                      "description": "Clientes desta carteira em que outra da filial tem posto maior. Só com `include=conflicts`.",
                       "type": "integer"
                     },
                     "createdAt": {
@@ -9151,8 +9157,6 @@
                     "sellers",
                     "overridesInclude",
                     "overridesExclude",
-                    "conflictsBlocked",
-                    "conflictsLost",
                     "active",
                     "deactivatedAt",
                     "version",
@@ -9445,11 +9449,11 @@
                       "type": "object"
                     },
                     "conflictsBlocked": {
-                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados).",
+                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados). Só com `include=conflicts`.",
                       "type": "integer"
                     },
                     "conflictsLost": {
-                      "description": "Clientes desta carteira em que outra da filial tem posto maior.",
+                      "description": "Clientes desta carteira em que outra da filial tem posto maior. Só com `include=conflicts`.",
                       "type": "integer"
                     },
                     "createdAt": {
@@ -9691,8 +9695,6 @@
                     "sellers",
                     "overridesInclude",
                     "overridesExclude",
-                    "conflictsBlocked",
-                    "conflictsLost",
                     "active",
                     "deactivatedAt",
                     "version",
@@ -10213,11 +10215,11 @@
                       "type": "object"
                     },
                     "conflictsBlocked": {
-                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados).",
+                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados). Só com `include=conflicts`.",
                       "type": "integer"
                     },
                     "conflictsLost": {
-                      "description": "Clientes desta carteira em que outra da filial tem posto maior.",
+                      "description": "Clientes desta carteira em que outra da filial tem posto maior. Só com `include=conflicts`.",
                       "type": "integer"
                     },
                     "createdAt": {
@@ -10459,8 +10461,6 @@
                     "sellers",
                     "overridesInclude",
                     "overridesExclude",
-                    "conflictsBlocked",
-                    "conflictsLost",
                     "active",
                     "deactivatedAt",
                     "version",
@@ -11095,11 +11095,11 @@
                       "type": "object"
                     },
                     "conflictsBlocked": {
-                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados).",
+                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados). Só com `include=conflicts`.",
                       "type": "integer"
                     },
                     "conflictsLost": {
-                      "description": "Clientes desta carteira em que outra da filial tem posto maior.",
+                      "description": "Clientes desta carteira em que outra da filial tem posto maior. Só com `include=conflicts`.",
                       "type": "integer"
                     },
                     "createdAt": {
@@ -11341,8 +11341,6 @@
                     "sellers",
                     "overridesInclude",
                     "overridesExclude",
-                    "conflictsBlocked",
-                    "conflictsLost",
                     "active",
                     "deactivatedAt",
                     "version",
@@ -11590,11 +11588,11 @@
                       "type": "object"
                     },
                     "conflictsBlocked": {
-                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados).",
+                      "description": "Clientes desta carteira em empate de posto com outra da filial (bloqueados). Só com `include=conflicts`.",
                       "type": "integer"
                     },
                     "conflictsLost": {
-                      "description": "Clientes desta carteira em que outra da filial tem posto maior.",
+                      "description": "Clientes desta carteira em que outra da filial tem posto maior. Só com `include=conflicts`.",
                       "type": "integer"
                     },
                     "createdAt": {
@@ -11836,8 +11834,6 @@
                     "sellers",
                     "overridesInclude",
                     "overridesExclude",
-                    "conflictsBlocked",
-                    "conflictsLost",
                     "active",
                     "deactivatedAt",
                     "version",

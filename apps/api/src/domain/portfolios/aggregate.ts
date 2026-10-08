@@ -16,40 +16,23 @@ import {
   states,
 } from '../../db/schema.js';
 import { auditFields } from '../shared/audit.js';
-import { writeTx, type Conn, type Db, type Tx } from '../shared/db.js';
+import type { Conn } from '../shared/db.js';
 import { conflictTotals } from '../conflicts/members.js';
 import { notFound } from '../shared/errors.js';
 import type { PortfolioResponse, RegionResponse } from './schemas.js';
 
-/** Agregado sem as contagens de conflito (calculá-las custa uma passada pela disputa da filial). */
-export type AggregateBase = Omit<PortfolioResponse, 'conflictsBlocked' | 'conflictsLost'>;
-
 /**
- * Agregado completo: informações, filtros, vendedores, contagem dos ajustes da prévia e contagens de
- * conflito. Para leitura. As contagens de conflito percorrem a disputa da filial (medido: cerca de
- * meio segundo no pior caso de 50 mil clientes e 20 carteiras, imperceptível no uso comum), então
- * ficam fora das transações de escrita (ver `writeAggregateTx`).
+ * Acrescenta ao agregado as contagens de conflito (bloqueados e perdidos) da carteira. Só sob demanda:
+ * resolve a disputa de todos os membros da carteira contra as demais da filial (síncrono, bloqueia o
+ * laço de eventos), então não faz parte do agregado padrão nem das respostas de escrita.
  */
-export function loadAggregate(conn: Conn, id: number): PortfolioResponse {
-  return withConflicts(conn, loadAggregateBase(conn, id));
-}
-
-/** Acrescenta ao agregado as contagens de conflito (bloqueados e perdidos) da carteira. */
-export function withConflicts(conn: Conn, base: AggregateBase): PortfolioResponse {
+export function withConflicts(conn: Conn, base: PortfolioResponse): PortfolioResponse {
   const conflicts = conflictTotals(conn, base.id);
   return { ...base, conflictsBlocked: conflicts.blocked, conflictsLost: conflicts.lost };
 }
 
-/**
- * Escrita que devolve o agregado: a transação devolve só o agregado base (sem segurar o lock de
- * escrita) e as contagens de conflito são lidas depois do commit.
- */
-export function writeAggregateTx(db: Db, fn: (tx: Tx) => AggregateBase): PortfolioResponse {
-  return withConflicts(db, writeTx(db, fn));
-}
-
-/** Agregado sem as contagens de conflito (uso dentro de transações de escrita). */
-export function loadAggregateBase(conn: Conn, id: number): AggregateBase {
+/** Agregado (informações, filtros, vendedores e ajustes) sem as contagens de conflito. */
+export function loadAggregateBase(conn: Conn, id: number): PortfolioResponse {
   const row = conn
     .select({
       p: portfolios,

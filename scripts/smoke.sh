@@ -379,8 +379,9 @@ pf_tie=$new_pid
 tie_version=$new_version
 expect_c "$pf_hood" blocked 3
 expect_c "$pf_tie" blocked 3
-code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/portfolios/${pf_hood}" || true)
-[ "$code" = "200" ] || fail "GET /v1/portfolios/${pf_hood} esperado 200, recebido ${code}"
+# As contagens de conflito só vêm sob demanda (?include=conflicts): resolver a disputa inteira custa caro.
+code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/portfolios/${pf_hood}?include=conflicts" || true)
+[ "$code" = "200" ] || fail "GET /v1/portfolios/${pf_hood}?include=conflicts esperado 200, recebido ${code}"
 [ "$(json_get 'j.conflictsBlocked >= 1')" = "true" ] || fail "agregado esperava conflictsBlocked >= 1: $(cat "$body")"
 code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" -G "${API_URL}/v1/portfolios/${pf_hood}/preview" \
   --data-urlencode "q=$name_c" --data-urlencode "resolution=blocked" || true)

@@ -280,6 +280,22 @@ describe('ajustes: validações', () => {
     expect(pfs.get(adminSer, pid).version).toBe(before);
   });
 
+  it('5.000 inclusões válidas: replaceOverrides, getOverrides e prévia funcionam (sem estourar variáveis do SQLite)', () => {
+    const ids = bulkCustomers(5000);
+    const saved = put(adminSer, ids, []);
+    expect(saved).toMatchObject({ overridesInclude: 5000, overridesExclude: 0 });
+    expect(count('portfolio_customer_overrides')).toBe(5000);
+    const read = svc.getOverrides(adminSer, pid);
+    expect(read.include).toHaveLength(5000);
+    expect(read.include.every((o) => o.effective)).toBe(true);
+    // O mesmo vale para 5.000 exclusões (efetivas: os clientes casam o filtro da carteira).
+    const again = put(adminSer, [], ids);
+    expect(again).toMatchObject({ overridesInclude: 0, overridesExclude: 5000 });
+    const excluded = svc.getOverrides(adminSer, pid);
+    expect(excluded.exclude).toHaveLength(5000);
+    expect(excluded.exclude.every((o) => o.effective)).toBe(true);
+  });
+
   it('cliente de outra filial ou inexistente: 400, sem diferenciar', () => {
     const elsewhere = customer({ branches: [[car, true]] });
     const messages = [elsewhere, 987_654].map((id) => {

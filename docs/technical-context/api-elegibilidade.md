@@ -58,7 +58,7 @@ ganha prioridade por região. `matchedBy` continua informativo e indica quais cr
 Cada item traz também `rank` (posto da carteira para o cliente: 1 UF, 2 município, 3 bairro, 4 rede,
 5 grupo econômico, 6 inclusão manual), `resolution` (`assigned`, `lost` ou `blocked`) e `competitors`
 (`[{ portfolioId, name, rank }]`, carteiras não inativas da mesma filial em que o cliente também tem
-posto). O agregado da carteira ganha `conflictsBlocked` e `conflictsLost`. Regras e desempenho em
+posto). As contagens `conflictsBlocked` e `conflictsLost` do agregado vêm só com `GET /v1/portfolios/{id}?include=conflicts`. Regras e desempenho em
 [`api-conflitos.md`](./api-conflitos.md).
 
 ## Ajustes manuais

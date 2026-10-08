@@ -68,12 +68,16 @@ Item da prévia:
 Consulta: `resolution=assigned|lost|blocked` filtra os itens e o `total` respeita o filtro. Valor
 inválido (inclusive vazio ou em caixa alta) responde `400`.
 
-Agregado da carteira (`GET /v1/portfolios/{id}`):
+Agregado da carteira, **sob demanda** (`GET /v1/portfolios/{id}?include=conflicts`):
 
 - `conflictsBlocked`: clientes da carteira em empate de posto (bloqueados).
 - `conflictsLost`: clientes da carteira em que outra da filial tem posto maior.
 
-As contagens cobrem todos os clientes com posto na carteira, não só a página.
+As contagens cobrem todos os clientes com posto na carteira, não só a página. Sem `include=conflicts` o
+agregado (GET e respostas de escrita) **não traz nem calcula** esses campos: calculá-los resolve a
+disputa de todos os membros da carteira, de forma síncrona (bloqueia o laço de eventos), e o custo cresce
+com o número de carteiras da filial. Quem só precisa de um total pode usar o `total` da prévia com
+`resolution=blocked|lost` (`limit=1`). Qualquer outro valor de `include` responde `400`.
 
 ## Membros efetivos (entrada do E6)
 
@@ -85,10 +89,22 @@ e `blocked` exige revisão. A disputa é resolvida uma vez no início da iteraç
 
 ## Desempenho
 
-Medido com volume sintético de **50 mil clientes x 20 carteiras** na filial: **0,4 a 0,8 s** para a
-prévia com resolução. A primeira versão levou **6,5 s**; o ganho veio de restringir o cálculo aos
-clientes da filial e do índice `customers_state_code_idx`. Meta: 50 mil clientes com 20 carteiras; o
-custo cresce com o número de carteiras da filial. Sem materialização persistente (exigiria nova decisão).
+Medido com volume sintético (`apps/api/test/domain/conflicts-volume.test.ts`, conferido contra uma
+contagem independente em JS): a página 50 da prévia sem `resolution` e o GET do agregado ficam em
+**poucos ms a 0,2 s**. Com a disputa resolvida (prévia com `resolution`, `include=conflicts`,
+`effectiveMembers`):
+
+| Cenário                                                            | Tempo      |
+|--------------------------------------------------------------------|------------|
+| 50 mil clientes + 200 mil de outra filial na mesma UF, 20 carteiras | 0,6 a 0,8 s |
+| 50 mil clientes, 100 carteiras sobrepostas na filial                | 2,3 a 2,6 s |
+
+O segundo cenário passa do teto de 1,5 s. Como funciona: a carteira P é resolvida só para os seus
+membros (validados na filial já dentro dos braços de busca, sem varrer a UF no país); as concorrentes
+partem dos membros de P e nunca calculam o conjunto inteiro; a prévia sem `resolution` pagina e conta só
+os membros de P e resolve a disputa apenas dos clientes da página; os ids de uma lista entram como um
+único parâmetro JSON. O custo restante é proporcional ao número de pares (carteira, cliente) que casam.
+Sem materialização persistente (exigiria nova decisão).
 
 ## Fora do escopo
 
