@@ -38,9 +38,17 @@
 
 **Fases 3 e 4 concluídas 2026-10-08 (em paralelo)** · 225 testes. Integração única: `http.ts` + `crud.ts`, `v1Routes` no `app.ts`; auth em `onRequest` (401 antes de validar); `If-Match` ausente 428, malformado 400; CNPJ alfanumérico (IN RFB 2.229/2024) com DV conferido no exemplo oficial `12ABC34501DE35`; CNPJ mascarado no path dos logs.
 
-## Fase 5 — OpenAPI, smoke e documentação [ACTIVE]
+## Fase 5 — OpenAPI, smoke e documentação [DONE]
 
-- [ ] `@fastify/swagger` → `GET /v1/openapi.json`
-- [ ] `scripts/smoke.sh`: criar → ler → inativar um subgrupo com token de admin
-- [ ] `docs/technical-context/api-dados-mestres.md` (com carimbo de frescor) e inventário regenerado
-- [ ] Revisão de diff + lacunas de teste em paralelo antes do PR
+- [x] `@fastify/swagger` → `GET /v1/openapi.json`
+- [x] `scripts/smoke.sh`: criar → ler → inativar um subgrupo com token de admin
+- [x] `docs/technical-context/api-dados-mestres.md` (com carimbo de frescor) e inventário regenerado
+- [x] Revisão de diff + lacunas de teste em paralelo antes do PR
+
+**Concluída 2026-10-08** · `cba92a4` + correções da revisão `a8c3134` e `4e8f410` · 298 testes · smoke verde.
+
+## Fechamento do E2 [DONE]
+
+- Revisão: 1 alto (cliente/vendedor compartilhado) decidido pelo maestro e curado; 2 médios e 6 baixos curados. Resíduo em `docs/evolution/review/feature-carteira-e2-dados-mestres.md`.
+- Em aberto, a critério do maestro: rota explícita `deactivate-global` em vez da escalada implícita.
+- Pendências fora do E2: confirmar com a GMill que `branch_ids` do token são códigos de filial; validar respostas contra o OpenAPI (Ajv) no E3+.

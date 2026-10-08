@@ -67,8 +67,19 @@ As `branch_ids` do token são **códigos de filial** (`branches.code`). `[INFERI
 
 **Cliente que já existe em outra filial:** um `POST /v1/customers` com CNPJ já cadastrado responde
 409 `customer_exists`. O admin então liga o cliente à sua filial com
-`POST /v1/customers/by-cnpj/{cnpj}/branches` (`{ branchId }`). Isso expõe só que o CNPJ existe: é dado
-de empresa, não de pessoa.
+`POST /v1/customers/by-cnpj/{cnpj}/branches` (`{ branchId }`). Para o vendedor, o equivalente é
+`POST /v1/sellers/by-code/{code}/branches` (409 `seller_exists`).
+
+> **Corrigido em 2026-10-08, após a revisão.** A redação original dizia que o link "expõe só que o CNPJ
+> existe". Era falso: o link devolvia o cliente inteiro, e o admin que o fazia passava a poder inativar
+> o cliente para todas as filiais (o `active` era global) e a reescrever os dados compartilhados.
+> Decisão do maestro, aplicada a clientes e vendedores:
+> - O link responde só `{ id, version }` + `ETag`.
+> - **Ativo por vínculo** (`customer_branches.active` e `seller_branches.active`): inativar ou reativar
+>   age só nas filiais do token. O estado global só muda quando o admin cobre **todas** as filiais do
+>   registro.
+> - **Dados compartilhados** (razão social, nome fantasia, endereço, rede e grupo; nome do vendedor):
+>   alterar exige admin de todas as filiais do registro. Senão, 403.
 
 ## 4. Contrato HTTP
 

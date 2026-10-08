@@ -19,14 +19,14 @@ localidades IBGE) com API REST escopada por filial, para E3/E4 consumirem — ve
 - task-manager    → main: OG1-T3 (2723266000000151010) · provider: zoho
 
 ## NEXT
-phase: 5
-phase_title: OpenAPI, smoke e documentação
-status: in_progress
-next_action: "Adicionar @fastify/swagger com GET /v1/openapi.json, smoke de criar-ler-inativar e docs/technical-context/api-dados-mestres.md"
-blocked_by: none
-files_in_flight: [apps/api/src/routes/v1/openapi.ts, scripts/smoke.sh, docs/technical-context/]
+phase: done
+phase_title: E2 concluído — aguardando decisão de push/PR
+status: done
+next_action: "Com o ok do maestro: push da feature/carteira-e2-dados-mestres e PR via /engineer:pr"
+blocked_by: decisão do maestro (push/PR; rota deactivate-global opcional)
+files_in_flight: []
 validate_with: "pnpm test && bash scripts/smoke.sh"
-last_checkpoint: 2026-10-08T01:40Z
+last_checkpoint: 2026-10-08T03:30Z
 
 ## Native transcript
 resume_command: claude --resume <id>
