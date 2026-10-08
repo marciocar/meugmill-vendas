@@ -52,5 +52,5 @@
 | Contexto | Arquivos |
 |----------|---------:|
 | `business-context/` | 2 |
-| `technical-context/` | 7 |
+| `technical-context/` | 8 |
 | `compliance-context/` | 0 |

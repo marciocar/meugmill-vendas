@@ -18,6 +18,7 @@ import {
   sendDomainError,
   setEtag,
   withEtag,
+  serviceOptions,
 } from './http.js';
 
 const tags = ['portfolios'];
@@ -103,5 +104,8 @@ export function registerEligibilityRoutes(
 
 /** Plugin: prévia e ajustes da carteira. */
 export async function eligibilityRoutes(app: FastifyInstance): Promise<void> {
-  registerEligibilityRoutes(app, { prefix: '/portfolios', service: createEligibilityService(app.db) });
+  registerEligibilityRoutes(app, {
+    prefix: '/portfolios',
+    service: createEligibilityService(app.db, serviceOptions(app)),
+  });
 }

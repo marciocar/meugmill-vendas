@@ -62,6 +62,12 @@ validation_error` e a carteira continua inativa. Vendedores com vínculo inativo
 | Trocar filial ou responsável             | Só `admin`; a nova filial também precisa estar no token           |
 | Inativar e reativar                      | Só `admin` da filial                                              |
 
+- **Restrição de leitura (E8)**: a linha "Ler" acima vale para `admin`, `supervisao` e token sem perfil
+  conhecido (`legacy`, com log de aviso). `gestor` lê as carteiras em que é responsável; `vendedor`, as
+  carteiras em que o vendedor ligado ao seu `sub` atua (em `PUT /sellers` ou com vínculo ativo). Prévia,
+  ajustes, atribuições e vínculos de uma carteira (`/preview`, `/overrides`, `/assignments`, `/links`)
+  ficam restritos a `admin`, `supervisao` e ao responsável; os demais recebem `404`. A `supervisao` não
+  escreve. Ver [`api-visibilidade.md`](./api-visibilidade.md).
 - **Ordem dos erros nas escritas**: 404 (escopo), 403 (permissão de editar; trocar filial ou responsável
   também é decidido aqui, antes da versão), 428 (sem `If-Match`), 409 `portfolio_inactive`, 409
   `version_conflict`, e por fim as validações de negócio (400).
@@ -170,5 +176,4 @@ Em execução: `GET /v1/openapi.json`. Estático versionado: [`openapi-v1.json`]
 - **E5**: conflitos entre carteiras (prioridade bairro > cidade > estado).
 - **E6**: distribuição dos clientes entre os vendedores por subgrupo.
 - **E7**: finalizar (`draft` -> `active`) e gravar os vínculos cliente x vendedor.
-- **E8**: visibilidade por perfil (ligar o `sub` a um vendedor).
 - **E9/E10**: telas e arquivos.

@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-08
-source: apps/api/src/routes/v1/, apps/api/src/domain/shared/links.ts, apps/api/src/domain/shared/authz.ts, apps/api/src/domain/shared/errors.ts, apps/api/src/domain/shared/pagination.ts, apps/api/src/domain/shared/cnpj.ts, apps/api/src/plugins/openapi.ts, .claude/sessions/carteira-e2-dados-mestres/architecture.md
+source: apps/api/src/domain/visibility/, apps/api/src/routes/v1/, apps/api/src/domain/shared/links.ts, apps/api/src/domain/shared/authz.ts, apps/api/src/domain/shared/errors.ts, apps/api/src/domain/shared/pagination.ts, apps/api/src/domain/shared/cnpj.ts, apps/api/src/plugins/openapi.ts, .claude/sessions/carteira-e2-dados-mestres/architecture.md
 ---
 
 # API de dados mestres (v1)
@@ -46,6 +46,13 @@ recebem `branchIds` (ids internos) no corpo; as respostas trazem as filiais como
 - **Filiais nas respostas**: as respostas de cliente e de vendedor listam apenas as filiais que estão no
   escopo do ator; vínculos com outras filiais não aparecem.
 - Token sem filiais enxerga zero clientes e vendedores (falha fechada).
+- **`userSub` do vendedor (E8)**: `sub` opaco do login ligado ao cadastro (opcional, único). Só o admin o
+  grava (`POST`/`PATCH`; `null` desliga; repetido responde `409`) e só o admin o recebe na leitura; os
+  demais perfis o recebem omitido. Ver [`api-visibilidade.md`](./api-visibilidade.md).
+- **Leitura de clientes (E8)**: `admin`, `supervisao` e token sem perfil conhecido (`legacy`, com log de
+  aviso) leem todos os clientes das filiais do token. `vendedor` e `gestor` leem só os clientes visíveis a
+  eles (vínculos ativos do vendedor ligado ao `sub`, ou das carteiras que o gestor responde); os demais
+  recebem `404`, como fora do escopo. A escrita segue só do `admin`; a `supervisao` é só leitura.
 
 ## Concorrência otimista
 
@@ -144,5 +151,6 @@ texto fixo do domínio. **Nenhuma resposta de erro ecoa o valor enviado** (LGPD)
 
 ## IdP de teste
 
-No Compose, o mock-oauth2-server emite papel `vendedor` por padrão e `admin` (filial `filial-01`) quando
-o `client_id` é `smoke-admin`. Detalhes no comentário do serviço `idp` em `compose.yaml`.
+No Compose, o mock-oauth2-server emite papel `vendedor` por padrão e, pelo `client_id`: `smoke-admin`
+(admin, sub `admin-01`), `smoke-vendedor` (sub `vend-01`), `smoke-gestor` (sub `gest-01`) e
+`smoke-supervisao` (sub `sup-01`), todos na filial `filial-01`. Detalhes no comentário do serviço `idp` em `compose.yaml`.
