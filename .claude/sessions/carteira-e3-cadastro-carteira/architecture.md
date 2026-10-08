@@ -40,8 +40,15 @@ O E4 lê os filtros para montar a prévia, e o E6 lê os pares vendedor × subgr
     `neighborhood_label` (texto original, para exibir).
 - **Unicidade do nome:** é sobre a chave normalizada, então "Norte — Farmácias" e "NORTE - FARMACIAS"
   colidem. Vale também entre carteiras inativas.
+  > **Corrigido em 2026-10-08, após a revisão.** A primeira implementação usava a chave de busca do E2,
+  > que não normaliza pontuação, e as duas grafias não colidiam. Agora a carteira tem uma chave própria
+  > (`portfolioNameKey`: sem acento, sem caixa, com a pontuação virando espaço), recalculada de forma
+  > idempotente no boot.
 - **Status × ativo:** `status` é o ciclo do wizard (`draft` → `active` no E7), e `active` é a
   inativação (soft delete). São eixos independentes.
+- **Carteira inativa não aceita edição** (409 `portfolio_inactive`) até ser reativada. Reativar
+  revalida se a filial e o tipo estão ativos. Um vendedor que perdeu o vínculo não bloqueia a
+  reativação: isso é tratado no E6 e no E7. (Decidido em 2026-10-08, após a revisão.)
 
 ## 3. Autorização
 

@@ -18,14 +18,14 @@ etapa do wizard, para o E4 montar a prévia — ver context.md.
 - task-manager    → main: OG1-T4 (2723266000000145015) · provider: zoho
 
 ## NEXT
-phase: 1
-phase_title: Schema e migration da carteira
-status: in_progress
-next_action: "Acrescentar as tabelas do E3 em apps/api/src/db/schema.ts e gerar a migration 0004"
-blocked_by: none
-files_in_flight: [apps/api/src/db/schema.ts, apps/api/drizzle/]
-validate_with: "pnpm --filter @meugmill/api test"
-last_checkpoint: 2026-10-08T04:30Z
+phase: done
+phase_title: E3 concluído — aguardando decisão de push/PR
+status: done
+next_action: "Com o ok do maestro: push da feature/carteira-e3-cadastro-carteira e PR via /engineer:pr"
+blocked_by: decisão do maestro (push/PR)
+files_in_flight: []
+validate_with: "pnpm test && bash scripts/smoke.sh"
+last_checkpoint: 2026-10-08T07:00Z
 
 ## Native transcript
 resume_command: claude --resume <id>
