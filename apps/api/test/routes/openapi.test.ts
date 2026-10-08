@@ -1,0 +1,105 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { FastifyInstance } from 'fastify';
+import { buildApp } from '../../src/app.js';
+import { loadConfig } from '../../src/config.js';
+import { generateOpenApiJson } from '../../scripts/openapi-lib.js';
+
+type Operation = {
+  security?: unknown[];
+  parameters?: { name: string; in: string }[];
+  responses?: Record<string, unknown>;
+};
+type Doc = {
+  openapi: string;
+  info: { title: string; version: string };
+  paths: Record<string, Record<string, Operation>>;
+  components: { securitySchemes: Record<string, unknown> };
+};
+
+const PATHS = [
+  '/v1/customers',
+  '/v1/customers/{id}',
+  '/v1/customers/by-cnpj/{cnpj}/branches',
+  '/v1/sellers',
+  '/v1/branches',
+  '/v1/product-subgroups',
+  '/v1/retail-networks',
+  '/v1/economic-groups',
+  '/v1/geo/states',
+  '/v1/geo/municipalities',
+  '/v1/me',
+];
+
+const here = dirname(fileURLToPath(import.meta.url));
+
+describe('OpenAPI v1', () => {
+  let app: FastifyInstance;
+  let doc: Doc;
+
+  beforeAll(async () => {
+    app = buildApp(
+      loadConfig({
+        LOG_LEVEL: 'silent',
+        NODE_ENV: 'test',
+        DATABASE_PATH: ':memory:',
+        OIDC_ISSUER: 'https://idp.test',
+        OIDC_AUDIENCE: 'meugmill',
+      }),
+    );
+    await app.ready();
+    const res = await app.inject({ method: 'GET', url: '/v1/openapi.json' });
+    expect(res.statusCode).toBe(200);
+    doc = res.json<Doc>();
+  });
+  afterAll(() => app.close());
+
+  it('é OpenAPI 3.x com título e versão do package.json', () => {
+    const pkg = JSON.parse(readFileSync(resolve(here, '../../package.json'), 'utf8')) as {
+      version: string;
+    };
+    expect(doc.openapi).toMatch(/^3\./);
+    expect(doc.info.title).toBe('MeuGmill Vendas — Carteira de Clientes API');
+    expect(doc.info.version).toBe(pkg.version);
+    expect(doc.components.securitySchemes.bearerAuth).toMatchObject({ type: 'http', scheme: 'bearer' });
+  });
+
+  it.each(PATHS)('contém o path %s', (path) => {
+    expect(Object.keys(doc.paths)).toContain(path);
+  });
+
+  it('PATCH/deactivate/reactivate documentam If-Match, 409 e 428', () => {
+    for (const [path, method] of [
+      ['/v1/customers/{id}', 'patch'],
+      ['/v1/product-subgroups/{id}', 'patch'],
+      ['/v1/product-subgroups/{id}/deactivate', 'post'],
+      ['/v1/product-subgroups/{id}/reactivate', 'post'],
+    ] as const) {
+      const op = doc.paths[path]?.[method];
+      expect(op, `${method} ${path}`).toBeDefined();
+      expect(op?.parameters).toContainEqual(expect.objectContaining({ name: 'if-match', in: 'header' }));
+      expect(Object.keys(op?.responses ?? {})).toEqual(expect.arrayContaining(['409', '428']));
+    }
+  });
+
+  it('rotas autenticadas têm bearerAuth; health, ready e openapi não têm', () => {
+    expect(doc.paths['/v1/customers']?.get?.security).toEqual([{ bearerAuth: [] }]);
+    expect(doc.paths['/v1/geo/states']?.get?.security).toEqual([{ bearerAuth: [] }]);
+    expect(doc.paths['/v1/me']?.get?.security).toEqual([{ bearerAuth: [] }]);
+    expect(doc.paths['/health']?.get?.security).toBeUndefined();
+    expect(doc.paths['/ready']?.get?.security).toBeUndefined();
+    expect(doc.paths['/v1/openapi.json']).toBeUndefined();
+  });
+
+  it('não expõe interface visual', async () => {
+    const res = await app.inject({ method: 'GET', url: '/documentation' });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('openapi-v1.json versionado está em dia (rode `pnpm --filter @meugmill/api openapi:export`)', async () => {
+    const file = resolve(here, '../../../../docs/technical-context/openapi-v1.json');
+    expect(readFileSync(file, 'utf8')).toBe(await generateOpenApiJson());
+  });
+});

@@ -9,10 +9,12 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "dev": "tsx watch src/server.ts",
+    "openapi:export": "tsx scripts/export-openapi.ts",
     "start": "node dist/server.js"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",
+    "@fastify/swagger": "^9.9.1",
     "@meugmill/shared": "workspace:*",
     "@sinclair/typebox": "^0.34.52",
     "better-sqlite3": "^13.0.3",

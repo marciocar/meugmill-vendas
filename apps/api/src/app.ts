@@ -11,6 +11,7 @@ import {
   type LogStream,
 } from './plugins/observability.js';
 import { dbPlugin } from './plugins/db.js';
+import { openapiPlugin } from './plugins/openapi.js';
 import { healthRoutes } from './routes/health.js';
 import { meRoutes } from './routes/me.js';
 import { v1Routes } from './routes/v1/index.js';
@@ -49,6 +50,8 @@ export function buildApp(config: AppConfig, options: BuildAppOptions = {}): Fast
       ? { discoveryCooldownMs: options.discoveryCooldownMs }
       : {}),
   });
+  // Antes das rotas: o hook onRoute precisa ver todas elas.
+  void app.register(openapiPlugin);
   void app.register(healthRoutes);
   void app.register(meRoutes, { prefix: '/v1' });
   void app.register(v1Routes, { prefix: '/v1' });
