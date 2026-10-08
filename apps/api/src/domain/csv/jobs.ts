@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import Database from 'better-sqlite3';
 import { and, asc, desc, eq, gt, gte, inArray, lt, lte, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
@@ -66,6 +66,10 @@ const PARSE_SLICE = 1_000_000;
 const PARSE_RECORDS = 20_000;
 /** Páginas copiadas por passo do backup da simulação (~4 MB). */
 const BACKUP_PAGES = 1000;
+/** Prefixo dos diretórios das cópias de simulação. */
+const SNAPSHOT_PREFIX = 'carteira-sim-';
+/** Diretório das cópias, ao lado do arquivo do banco (mesmo volume e mesma retenção do banco). */
+const SIM_DIR = 'import-sim';
 /** Linhas pré-validadas, gravadas no relatório ou carregadas entre duas cessões de vez. */
 const ROW_SLICE = 10_000;
 
@@ -194,6 +198,13 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
     links: createLinkService(conn, opts),
   });
   const services = buildServices(db);
+  const client = (db as unknown as { $client?: Database.Database }).$client;
+  /**
+   * Diretório das cópias deste banco, ao lado do arquivo dele (limpo na subida). Banco em memória (testes)
+   * não tem lugar próprio: a cópia vai para o temporário do sistema e não há limpeza na subida.
+   */
+  const simRoot = (): string | null =>
+    client && !client.memory && client.name ? join(dirname(client.name), SIM_DIR) : null;
 
   const load = (id: number): ImportJob | undefined =>
     db.select().from(importJobs).where(eq(importJobs.id, id)).get();
@@ -429,11 +440,12 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
   /** Cópia do banco em memória para a simulação (descartada no fim). */
   async function snapshot(): Promise<{ conn: Db; close: () => void }> {
     // O `drizzle()` do better-sqlite3 expõe a conexão em `$client` (fora do tipo `Db`).
-    const client = (db as unknown as { $client?: Database.Database }).$client;
     if (!client) throw new Error('conexão SQLite indisponível para a simulação');
     // `backup` copia por páginas em passos e cede a vez entre eles: o custo não trava a API, por maior que
     // seja o banco. A cópia vai para um diretório temporário próprio, apagado no fim.
-    const dir = mkdtempSync(join(tmpdir(), 'carteira-sim-'));
+    const own = simRoot();
+    if (own) mkdirSync(own, { recursive: true, mode: 0o700 });
+    const dir = mkdtempSync(join(own ?? tmpdir(), SNAPSHOT_PREFIX));
     const drop = () => rmSync(dir, { recursive: true, force: true });
     try {
       await client.backup(join(dir, 'copia.sqlite'), { progress: () => BACKUP_PAGES });
@@ -496,10 +508,11 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
       ...(expected ? { expected } : {}),
     };
     let processed = pre.size;
+    let appliedAny = false;
     try {
       let next = 0;
       while (next < units.length) {
-        if (stopping) throw new Stopped(phase === 'apply' && processed > pre.size);
+        if (stopping) throw new Stopped(phase === 'apply' && appliedAny);
         const results = new Map<number, RowResult>();
         const stats: Record<string, number> = {};
         const runChunk = () => {
@@ -518,6 +531,7 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
           errors += tally(counts, results);
           for (const [k, v] of Object.entries(stats)) counts[k] = (counts[k] ?? 0) + v;
           processed += results.size;
+          if ([...results.values()].some((r) => r.ok)) appliedAny = true;
           saveLines(jobId, results, phase);
           patch(db, jobId, { processedRows: processed, errorRows: errors, counts: JSON.stringify(counts) });
         };
@@ -710,6 +724,10 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
     },
 
     recover() {
+      // Cópias de simulação que sobraram de um processo morto (o `close` não rodou). O diretório é só deste
+      // banco, então nenhuma outra instância está usando.
+      const own = simRoot();
+      if (own) rmSync(own, { recursive: true, force: true });
       const at = now();
       const expired = db
         .update(importJobs)

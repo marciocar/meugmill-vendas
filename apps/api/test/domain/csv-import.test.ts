@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -236,6 +236,13 @@ describe('banco em arquivo (WAL), como em produção', () => {
       await s.idle();
       expect(s.get(ADMIN, job.id).status).toBe('applied');
       expect(app.sqlite.prepare('select count(*) n from product_subgroups').get()).toEqual({ n: 2 });
+      // A cópia da simulação fica ao lado do banco e é apagada no fim.
+      expect(readdirSync(join(dir, 'import-sim'))).toEqual([]);
+      // Sobra de um processo morto: a subida (recover) apaga o diretório deste banco.
+      mkdirSync(join(dir, 'import-sim', 'carteira-sim-morto'));
+      writeFileSync(join(dir, 'import-sim', 'carteira-sim-morto', 'copia.sqlite'), 'x');
+      s.recover();
+      expect(existsSync(join(dir, 'import-sim'))).toBe(false);
     } finally {
       await app.close();
       rmSync(dir, { recursive: true, force: true });

@@ -83,7 +83,7 @@ POST /v1/imports?layout=…  ──202──▶ validating ──▶ validated �
      (subida ou desligamento da API com job aberto ──▶ interrupted · erro inesperado ──▶ failed)
 ```
 
-- **Simulação.** As escritas reais dos serviços rodam numa **cópia do banco**, feita no início com o `backup` do SQLite (por páginas, cedendo a vez entre os passos) num diretório temporário próprio, apagado no fim. Os blocos são cumulativos: cada um vê o efeito dos anteriores, como na gravação. O banco real não fica travado, e o relatório traz o que a gravação faria. O job termina `validated` sem nenhum erro e `invalid` com algum erro, ou com erro de arquivo em `fileError` (mensagem e linha).
+- **Simulação.** As escritas reais dos serviços rodam numa **cópia do banco**, feita no início com o `backup` do SQLite (por páginas, cedendo a vez entre os passos) em `import-sim/`, ao lado do arquivo do banco (mesmo volume e mesma retenção), apagada no fim e, se o processo morrer, na subida seguinte. Os blocos são cumulativos: cada um vê o efeito dos anteriores, como na gravação. O banco real não fica travado, e o relatório traz o que a gravação faria. O job termina `validated` sem nenhum erro e `invalid` com algum erro, ou com erro de arquivo em `fileError` (mensagem e linha).
 - **Confirmação.** Só vale para um job `validated` sem erros e do próprio usuário, dentro do prazo de 24 h e
   com o **mesmo escopo de token** da simulação: mesmos papéis e mesmas filiais. Outro escopo mudaria o
   resultado, por exemplo de `linked` para `update`, e responde `409 import_not_ready`. A gravação usa
@@ -159,5 +159,5 @@ página).
 3. A fila e os arquivos abertos são **do processo**. Com mais de uma instância da API, seria preciso uma
    fila compartilhada, o que vai junto com a troca para PostgreSQL.
 4. **Carteira grande nos vínculos** segura a API pelo tempo da finalização (ver Desempenho).
-5. A simulação ocupa, enquanto roda, **o tamanho do banco em disco temporário** (16 MB com 50 mil clientes).
+5. A simulação ocupa, enquanto roda, **o tamanho do banco em disco**, no mesmo volume do banco (16 MB com 50 mil clientes).
 6. A regra nova de código (sem `|` nem `:`) vale para os dados novos. Um código antigo com esses caracteres não volta a ser aceito no vínculo por código e faz a exportação falhar no meio do download. Ainda não há dado de produção; conferir antes da carga inicial.
