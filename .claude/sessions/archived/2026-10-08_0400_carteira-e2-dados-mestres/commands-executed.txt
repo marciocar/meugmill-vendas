@@ -1,0 +1,12 @@
+# Comandos que validam o E2 (rodar a partir da raiz)
+pnpm install --frozen-lockfile
+pnpm lint
+pnpm typecheck
+pnpm test                      # 302 testes na API + 22 no web
+pnpm --filter @meugmill/api openapi:export   # regenera docs/technical-context/openapi-v1.json
+docker build -f docker/api.Dockerfile -t carteira-api:local .
+docker build -f docker/web.Dockerfile -t carteira-web:local .
+docker compose up -d --no-build
+docker compose restart idp     # só se docker/idp-config.json mudou (o mock lê a config ao subir)
+bash scripts/smoke.sh
+# Seed IBGE (raro): baixar os JSONs oficiais e rodar apps/api/scripts/build-ibge-seed.ts
