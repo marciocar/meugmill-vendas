@@ -628,4 +628,63 @@ code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/port
 [ "$(json_get 'j.status')" = "draft" ] || fail "carteira inativada esperada em draft: $(cat "$body")"
 ok "carteira inativada voltou a draft"
 
+# Importação e exportação de CSV (E10), com o token de ADMIN. Códigos únicos por execução (epoch).
+code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/csv-layouts" || true)
+[ "$code" = "200" ] || fail "GET /v1/csv-layouts esperado 200, recebido ${code}"
+[ "$(json_get 'j.layouts.length')" = "8" ] || fail "esperava 8 layouts: $(cat "$body")"
+ok "GET /v1/csv-layouts -> 8 layouts com dicionário de dados"
+
+csv_file=$(mktemp)
+upload_csv() { # upload_csv <layout> <arquivo> <cabeçalho de auth> -> código HTTP (corpo em $body)
+  curl -s -o "$body" -w '%{http_code}' -X POST "${API_URL}/v1/imports?layout=$1" \
+    -H "$3" -H 'Content-Type: text/csv' --data-binary "@$2" || true
+}
+wait_job() { # wait_job <id> -> status final em $job_status (corpo em $body)
+  job_status=""
+  for _ in $(seq 1 120); do
+    curl -s -o "$body" -H "$auth_admin" "${API_URL}/v1/imports/$1" || true
+    job_status=$(json_get 'j.status')
+    case "$job_status" in validating | applying) sleep 0.5 ;; *) return 0 ;; esac
+  done
+  fail "job $1 não terminou (status ${job_status})"
+}
+
+printf '\357\273\277codigo;nome\r\nSMK-CSV-%s-1;CSV um\r\nSMK-CSV-%s-2;"CSV; dois"\r\n' "$epoch" "$epoch" > "$csv_file"
+code=$(upload_csv product-subgroups "$csv_file" "$auth_admin")
+[ "$code" = "202" ] || fail "POST /v1/imports esperado 202, recebido ${code}: $(cat "$body")"
+csv_job=$(json_get 'j.id')
+wait_job "$csv_job"
+[ "$job_status" = "validated" ] || fail "simulação esperada validated: $(cat "$body")"
+[ "$(json_get 'j.counts.create')" = "2" ] || fail "simulação esperava 2 create: $(cat "$body")"
+ok "POST /v1/imports -> 202; simulação validated com 2 create"
+
+code=$(curl -s -o "$body" -w '%{http_code}' -X POST -H "$auth_admin" "${API_URL}/v1/imports/${csv_job}/confirm" || true)
+[ "$code" = "202" ] || fail "confirm esperado 202, recebido ${code}: $(cat "$body")"
+wait_job "$csv_job"
+[ "$job_status" = "applied" ] || fail "gravação esperada applied: $(cat "$body")"
+ok "POST /v1/imports/{id}/confirm -> 202; gravação applied"
+
+code=$(curl -s -o "$csv_file" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/exports/product-subgroups" || true)
+[ "$code" = "200" ] || fail "GET /v1/exports/product-subgroups esperado 200, recebido ${code}"
+head -c 3 "$csv_file" | od -An -tx1 | grep -q 'ef bb bf' || fail "exportação sem BOM"
+grep -q "^SMK-CSV-${epoch}-2;\"CSV; dois\";S" "$csv_file" || fail "exportação sem o subgrupo importado"
+ok "GET /v1/exports/product-subgroups -> CSV com BOM e o subgrupo importado"
+
+code=$(upload_csv product-subgroups "$csv_file" "$auth_admin")
+[ "$code" = "202" ] || fail "reimportação esperada 202, recebido ${code}: $(cat "$body")"
+csv_job=$(json_get 'j.id')
+wait_job "$csv_job"
+[ "$job_status" = "validated" ] || fail "reimportação esperada validated: $(cat "$body")"
+[ "$(json_get 'Object.keys(j.counts).join()')" = "unchanged" ] || fail "reimportação esperava só unchanged: $(cat "$body")"
+code=$(curl -s -o "$body" -w '%{http_code}' -X POST -H "$auth_admin" "${API_URL}/v1/imports/${csv_job}/cancel" || true)
+[ "$code" = "200" ] || fail "cancel esperado 200, recebido ${code}: $(cat "$body")"
+ok "reimportar o exportado -> só unchanged (cancelado em seguida)"
+
+code=$(upload_csv product-subgroups "$csv_file" "Authorization: Bearer ${supervision_token}")
+[ "$code" = "403" ] || fail "importação da supervisão esperada 403, recebido ${code}: $(cat "$body")"
+code=$(curl -s -o /dev/null -w '%{http_code}' -H "$auth_seller" "${WEB_URL}/api/v1/exports/customers" || true)
+[ "$code" = "200" ] || fail "exportação pelo proxy (vendedor) esperada 200, recebido ${code}"
+ok "supervisão não importa (403); vendedor exporta pelo proxy /api (200)"
+rm -f "$csv_file"
+
 echo "Smoke concluído com sucesso."
