@@ -14,13 +14,14 @@ import { ERROR_RESPONSES, sendDomainError } from './http.js';
 /** Plugin: localidades IBGE (leitura). */
 export async function geoRoutes(app: FastifyInstance): Promise<void> {
   const service = createGeoService(app.db);
-  const preHandler = app.authenticate;
+  // onRequest: a autenticação roda antes da validação da query (anônimo é sempre 401).
+  const onRequest = app.authenticate;
   const tags = ['geo'];
 
   app.get(
     '/geo/states',
     {
-      preHandler,
+      onRequest,
       schema: { tags, response: { 200: Type.Array(StateResponseSchema), ...ERROR_RESPONSES } },
     },
     async (request, reply) => {
@@ -36,7 +37,7 @@ export async function geoRoutes(app: FastifyInstance): Promise<void> {
   app.get(
     '/geo/municipalities',
     {
-      preHandler,
+      onRequest,
       schema: {
         tags,
         querystring: MunicipalityQuerySchema,

@@ -18,6 +18,10 @@ describe('GET /v1/geo', () => {
     expect((await get('/v1/geo/municipalities', false)).statusCode).toBe(401);
   });
 
+  it('401 (não 400) sem token mesmo com query inválida: auth roda antes da validação', async () => {
+    expect((await get('/v1/geo/municipalities?limit=0', false)).statusCode).toBe(401);
+  });
+
   it('lista as 27 UFs', async () => {
     const res = await get('/v1/geo/states');
     expect(res.statusCode).toBe(200);

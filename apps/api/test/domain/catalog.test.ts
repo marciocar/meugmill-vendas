@@ -92,6 +92,8 @@ describe('catálogo (subgrupos, redes, grupos)', () => {
     expect(svc.list(reader, { q: 'item 3' }).items.map((i) => i.code)).toEqual(['S3']);
     expect(svc.list(reader, { q: 's5' }).items).toHaveLength(1);
     expect(svc.list(reader, { q: '%' }).items).toHaveLength(0); // % é literal
+    expect(svc.list(reader, { q: '_' }).items).toHaveLength(0); // _ é literal (códigos S1..S5 não têm _)
+    expect(svc.list(reader, { q: 'S\\' }).items).toHaveLength(0); // barra invertida é literal
     expect(codeOf(() => svc.list(reader, { limit: 500 }))).toBe('validation_error');
   });
 
