@@ -16,6 +16,12 @@ const TABS: { id: Tab; label: string }[] = [
 /** Navegação interna por abas: o componente não mexe na URL do host. */
 export function Shell({ me }: { me: Me }) {
   const [tab, setTab] = useState<Tab>('portfolios');
+  // As abas já visitadas ficam montadas (só escondidas): trocar de aba não descarta o wizard em edição.
+  const [visited, setVisited] = useState<Tab[]>(['portfolios']);
+  const open = (t: Tab) => {
+    setTab(t);
+    setVisited((v) => (v.includes(t) ? v : [...v, t]));
+  };
   return (
     <div className="gc-shell">
       <nav className="gc-tabs" role="tablist" aria-label="Seções">
@@ -26,19 +32,21 @@ export function Shell({ me }: { me: Me }) {
             role="tab"
             aria-selected={tab === t.id}
             className={`gc-tab${tab === t.id ? ' gc-tab-active' : ''}`}
-            onClick={() => setTab(t.id)}
+            onClick={() => open(t.id)}
           >
             {t.label}
           </button>
         ))}
       </nav>
-      <div role="tabpanel" className="gc-panel">
-        <ErrorBoundary key={tab}>
-          {tab === 'portfolios' && <PortfoliosView me={me} />}
-          {tab === 'my-customers' && <MyCustomersView />}
-          {tab === 'csv' && <CsvView me={me} />}
-        </ErrorBoundary>
-      </div>
+      {TABS.filter((t) => visited.includes(t.id)).map((t) => (
+        <div key={t.id} role="tabpanel" className="gc-panel" hidden={tab !== t.id}>
+          <ErrorBoundary>
+            {t.id === 'portfolios' && <PortfoliosView me={me} />}
+            {t.id === 'my-customers' && <MyCustomersView />}
+            {t.id === 'csv' && <CsvView me={me} />}
+          </ErrorBoundary>
+        </div>
+      ))}
     </div>
   );
 }

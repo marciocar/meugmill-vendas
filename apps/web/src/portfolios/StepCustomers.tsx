@@ -103,6 +103,7 @@ function PreviewPanel({ portfolio, editable, busy, write }: StepProps) {
 
   const include = overrides.data?.include.map((o) => o.customer.id) ?? [];
   const exclude = overrides.data?.exclude.map((o) => o.customer.id) ?? [];
+  // Os botões ficam na tela (a busca de inclusão não se perde) e só se habilitam com a lista em dia.
   const canWrite = editable && !busy && !overrides.loading && overrides.data?.version === portfolio.version;
 
   const saveOverrides = (nextInclude: number[], nextExclude: number[], success: string) =>
@@ -179,11 +180,11 @@ function PreviewPanel({ portfolio, editable, busy, write }: StepProps) {
                   )}
                 </td>
                 <td>
-                  {canWrite && item.source === 'filter' && (
+                  {editable && item.source === 'filter' && (
                     <button
                       type="button"
                       className="gc-button gc-button-secondary"
-                      disabled={busy}
+                      disabled={!canWrite}
                       onClick={() =>
                         void saveOverrides(
                           include.filter((id) => id !== c.id),
@@ -195,11 +196,11 @@ function PreviewPanel({ portfolio, editable, busy, write }: StepProps) {
                       Excluir
                     </button>
                   )}
-                  {canWrite && item.source === 'manual' && (
+                  {editable && item.source === 'manual' && (
                     <button
                       type="button"
                       className="gc-button gc-button-secondary"
-                      disabled={busy}
+                      disabled={!canWrite}
                       onClick={() =>
                         void saveOverrides(
                           include.filter((id) => id !== c.id),
@@ -234,11 +235,11 @@ function PreviewPanel({ portfolio, editable, busy, write }: StepProps) {
               <li key={o.customer.id}>
                 {formatCnpj(o.customer.cnpj)} — {o.customer.legalName}
                 {!o.effective && <span className="gc-muted"> (sem efeito: não casa mais os filtros)</span>}
-                {canWrite && (
+                {editable && (
                   <button
                     type="button"
                     className="gc-link"
-                    disabled={busy}
+                    disabled={!canWrite}
                     onClick={() =>
                       void saveOverrides(
                         include,
@@ -261,9 +262,9 @@ function PreviewPanel({ portfolio, editable, busy, write }: StepProps) {
           mas não entram na carteira.
         </Notice>
       )}
-      {canWrite && (
+      {editable && (
         <IncludeCustomer
-          busy={busy}
+          busy={!canWrite}
           isIncluded={(id) => include.includes(id)}
           onInclude={(id) =>
             void saveOverrides(

@@ -268,4 +268,48 @@ describe('telas de CSV: modos de falha', () => {
     expect(() => button(el, 'Confirmar e gravar')).toThrow();
     expect(text(el)).toContain('O prazo da simulação venceu');
   });
+
+  it('o erro do confirmar continua na tela depois da releitura do job', async () => {
+    routeFetch([
+      ['GET', /\/v1\/me$/, () => json(200, ADMIN)],
+      ['GET', /\/v1\/csv-layouts$/, () => json(200, LAYOUTS)],
+      ['GET', /\/v1\/imports$/, () => json(200, page([job({ status: 'validated' })]))],
+      [
+        'GET',
+        /\/v1\/imports\/11$/,
+        () => json(200, job({ status: 'validated', expiresAt: Date.now() + 60000 })),
+      ],
+      [
+        'POST',
+        /\/v1\/imports\/11\/confirm$/,
+        () => json(409, { error: 'import_not_ready', message: 'Escopo do token diferente da simulação' }),
+      ],
+    ]);
+    const el = await mountWith();
+    await click(el, 'Importar e exportar');
+    await click(el, 'Ver');
+    await click(el, 'Confirmar e gravar');
+    await settle(50);
+    expect(text(el)).toContain('Escopo do token diferente da simulação');
+  });
+
+  it('a primeira leitura do job que falha é tentada de novo', async () => {
+    let reads = 0;
+    routeFetch([
+      ['GET', /\/v1\/me$/, () => json(200, ADMIN)],
+      ['GET', /\/v1\/csv-layouts$/, () => json(200, LAYOUTS)],
+      ['GET', /\/v1\/imports$/, () => json(200, page([job({ status: 'applied' })]))],
+      [
+        'GET',
+        /\/v1\/imports\/11$/,
+        () => (++reads <= 2 ? json(502, {}) : json(200, job({ status: 'applied' }))),
+      ],
+    ]);
+    const el = await mountWith();
+    await click(el, 'Importar e exportar');
+    await click(el, 'Ver');
+    await settle(1100);
+    await settle(1100);
+    expect(el.shadowRoot?.querySelector('[data-testid="job-status"]')?.textContent).toBe('Gravada');
+  });
 });

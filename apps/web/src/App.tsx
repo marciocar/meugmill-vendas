@@ -43,7 +43,8 @@ export function App({ apiBase, token, debug = false }: AppProps) {
   // Último usuário confirmado e o token que o confirmou. Renovar o token com o mesmo `sub` não desmonta as
   // telas nem perde o wizard; enquanto o /v1/me do token novo não responde, as telas ficam ocultas. Se o
   // token novo falhar sem nunca ter sido confirmado, o usuário anterior sai da tela (outro login pode ter
-  // entrado no mesmo terminal).
+  // entrado no mesmo terminal). Troca consciente: uma renovação do mesmo usuário cujo /v1/me falhe também
+  // desmonta as telas e perde a edição não salva, porque a tela não sabe se o `sub` é o mesmo.
   const [me, setMe] = useState<Me | null>(null);
   const [confirmedFor, setConfirmedFor] = useState<string | null>(null);
   useEffect(() => {

@@ -288,7 +288,7 @@ describe('wizard: modos de falha da revisão adversarial', () => {
     expect(calls.filter((c) => c.method === 'PATCH')[0]?.body).toEqual({ description: 'nova descrição' });
   });
 
-  it('ajustes: enquanto a lista relê depois de uma gravação, não há botão de escrita', async () => {
+  it('ajustes: enquanto a lista relê depois de uma gravação, os botões de escrita ficam desabilitados', async () => {
     let releaseOverrides: (() => void) | null = null;
     let writes = 0;
     routeFetch([
@@ -337,10 +337,10 @@ describe('wizard: modos de falha da revisão adversarial', () => {
     await click(el, 'Abrir');
     await click(el, /Clientes/);
     await click(el, 'Excluir');
-    expect(() => button(el, 'Excluir')).toThrow();
+    expect(button(el, 'Excluir').disabled).toBe(true);
     await act(async () => releaseOverrides?.());
     await settle();
-    expect(button(el, 'Excluir')).toBeTruthy();
+    expect(button(el, 'Excluir').disabled).toBe(false);
   });
 
   it('inativar pede confirmação antes de gravar', async () => {
@@ -407,5 +407,24 @@ describe('wizard: modos de falha da revisão adversarial', () => {
     expect(text(el)).not.toContain('admin-01');
     expect(text(el)).not.toContain('Carteira Norte');
     expect(text(el)).toContain('Serviço indisponível');
+  });
+
+  it('trocar de aba e voltar mantém o wizard e a edição não salva', async () => {
+    routeFetch([
+      ['GET', /\/v1\/me$/, () => json(200, ADMIN)],
+      ['GET', /\/v1\/portfolios$/, () => json(200, page([summaryRow]))],
+      ['GET', /\/v1\/portfolios\/7$/, () => json(200, portfolio())],
+      [
+        'GET',
+        /\/v1\/me\/visibility$/,
+        () => json(200, { profiles: ['admin'], mode: 'profiles', seller: null, visibleCustomers: 0 }),
+      ],
+    ]);
+    const el = await mountWith();
+    await click(el, 'Abrir');
+    await type(field(el, 'Nome'), 'Nome em edição');
+    await click(el, 'Meus clientes');
+    await click(el, 'Carteiras');
+    expect(field(el, 'Nome').value).toBe('Nome em edição');
   });
 });

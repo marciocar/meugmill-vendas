@@ -43,6 +43,12 @@
 | Simulação vencida | Confirmar até a varredura | A tela trava no prazo | 10 |
 | Token `legacy` | Etapa 5 escondida | Visível; com `deny`, a API responde 404 e a tela mostra a mensagem | 11 |
 
+2ª passada (REPROVADO): trocar de aba descartava o wizard (agora as abas visitadas ficam montadas) e o erro
+do confirmar do CSV sumia na releitura (agora fica num estado próprio). Também corrigidos: os botões de
+ajuste ficam desabilitados em vez de sumir (a busca de inclusão não se perde), a primeira leitura do job
+tenta de novo, e o prazo da simulação é reavaliado a cada 30 s. Registrado: renovar o token do mesmo
+usuário com o `/v1/me` falhando desmonta as telas (troca consciente pela proteção da troca de usuário).
+
 Dívidas registradas (achados 12 a 15, em `front-web.md`): o corte em 2.000 itens nas listas de seleção; a
 inclusão manual pelo gestor; os ajustes órfãos apagados pelo PUT; a cobertura (fake timers no teste do
 job).

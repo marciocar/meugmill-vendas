@@ -62,7 +62,10 @@ function defaultLineFilter(status: ImportStatus): string {
 export function ImportJobPanel({ jobId, onClose }: { jobId: number; onClose: () => void }) {
   const api = useApi();
   const [job, setJob] = useState<ImportJob | null>(null);
+  // Dois erros separados: o do acompanhamento (some quando a releitura dá certo) e o da última ação
+  // (confirmar ou cancelar), que fica até a próxima ação.
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [lineFilter, setLineFilter] = useState<string | null>(null);
 
@@ -85,8 +88,9 @@ export function ImportJobPanel({ jobId, onClose }: { jobId: number; onClose: () 
   }, [fetchJob]);
 
   const running = job !== null && RUNNING.includes(job.status);
+  // Também tenta de novo quando a primeira leitura falhou (ainda sem job).
   useEffect(() => {
-    if (!running) return;
+    if (!running && !(job === null && failures > 0)) return;
     const delay = Math.min(1000 * 2 ** Math.max(failures - 1, 0), 15000);
     const t = setTimeout(() => void fetchJob(), delay);
     return () => clearTimeout(t);
@@ -100,12 +104,12 @@ export function ImportJobPanel({ jobId, onClose }: { jobId: number; onClose: () 
   const act = async (action: 'confirm' | 'cancel') => {
     if (!job) return;
     setBusy(true);
-    setError(null);
+    setActionError(null);
     try {
       setJob(await api.send<ImportJob>('POST', `/v1/imports/${job.id}/${action}`));
       setLineFilter(null);
     } catch (err) {
-      setError(describeError(err));
+      setActionError(describeError(err));
       void fetchJob();
     } finally {
       setBusy(false);
@@ -121,6 +125,14 @@ export function ImportJobPanel({ jobId, onClose }: { jobId: number; onClose: () 
     [api, jobId, running, job?.status, filter],
   );
 
+  // Redesenha a cada 30 s enquanto aguarda confirmação, para o prazo travar o botão mesmo com a tela parada.
+  const [, setNow] = useState(0);
+  const waiting = job?.status === 'validated';
+  useEffect(() => {
+    if (!waiting) return;
+    const t = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, [waiting]);
   // A varredura da API marca `expired` a cada 10 min; a tela já trava o confirmar no prazo.
   const overdue = job?.status === 'validated' && job.expiresAt !== null && job.expiresAt <= Date.now();
   const counts = job ? Object.entries(job.counts).filter(([, n]) => n > 0) : [];
@@ -132,6 +144,7 @@ export function ImportJobPanel({ jobId, onClose }: { jobId: number; onClose: () 
       </button>
       <h2>Importação #{jobId}</h2>
       <Notice kind="error">{error}</Notice>
+      <Notice kind="error">{actionError}</Notice>
       {!job && !error && <p>Carregando…</p>}
       {job && (
         <>

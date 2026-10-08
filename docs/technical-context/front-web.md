@@ -48,15 +48,17 @@ Inativar e reativar ficam no cabeçalho do wizard, só para o admin da filial.
   nova é ignorada.
 - **Ajustes.** O `PUT /overrides` substitui o conjunto inteiro. Por isso a tela só oferece "excluir",
   "incluir" e "desfazer" quando a lista de ajustes foi lida na versão atual da carteira. Enquanto ela relê,
-  os botões somem: um segundo clique rápido apagaria o ajuste anterior. Gravar ajustes pela tela também
+  os botões ficam desabilitados: um segundo clique rápido apagaria o ajuste anterior. Gravar ajustes pela tela também
   apaga os ajustes órfãos, que o `GET /overrides` não lista (ver `api-elegibilidade.md`).
 - **Edição não salva.** As etapas 1 a 3 avisam o wizard quando têm edição pendente. Trocar de etapa ou
   voltar à lista pede confirmação ("Descartar e sair da etapa").
 - **Ações que encerram vínculos.** Inativar a carteira e trocar a filial pedem confirmação explícita.
 - **Troca de usuário.** O cabeçalho e as telas só aparecem quando o `/v1/me` do token atual confirmou o
   usuário. Enquanto ele não responde, as telas ficam ocultas. Se ele falha para um token nunca confirmado,
-  o usuário anterior sai da tela. Um 401 de uma requisição feita com um token que o host já trocou não
-  emite `token-expired`.
+  o usuário anterior sai da tela. É uma troca consciente: na renovação do mesmo usuário com o `/v1/me`
+  falhando, a tela também sai e a edição não salva se perde, porque a tela não sabe se o `sub` é o mesmo.
+  Um 401 de uma requisição feita com um token que o host já trocou não emite `token-expired`.
+- **Abas.** As abas visitadas ficam montadas, só escondidas: trocar de aba não descarta o wizard.
 - **Permissão.** A tela esconde ou trava o que o perfil não pode: criar é só do admin; editar, do admin da
   filial ou do responsável; inativar e trocar filial ou responsável, só do admin da filial. A etapa 5 aparece
   para admin, supervisão, o responsável e o token sem perfil conhecido (`legacy`). A importação é só do admin. Mesmo assim, um 403 ou 404 da API é
@@ -67,8 +69,8 @@ Inativar e reativar ficam no cabeçalho do wizard, só para o admin da filial.
   nesta tela" e um botão para tentar de novo.
 - **CSV.** O arquivo vai cru (`Content-Type: text/csv`), sem ser lido no navegador, porque a API detecta a
   codificação pelos bytes. Acima de 16 MB, a tela recusa antes de enviar. O job é consultado a cada 1 s
-  enquanto está `validating` ou `applying`. Se uma consulta falha, a tela tenta de novo com espera
-  crescente, até 15 s. Uma simulação com o prazo vencido não oferece confirmar, mesmo antes de a varredura
+  enquanto está `validating` ou `applying`. Se uma consulta falha, inclusive a primeira, a tela tenta de novo com
+  espera crescente, até 15 s. O erro de confirmar ou cancelar fica na tela até a próxima ação. Uma simulação com o prazo vencido não oferece confirmar, mesmo antes de a varredura
   da API marcá-la `expired`. O relatório abre nas linhas com erro primeiro.
 - **Exportação.** Um `fetch` com o Bearer baixa o arquivo, e um link temporário dentro do shadow root
   dispara o download. O token não vai na URL.
