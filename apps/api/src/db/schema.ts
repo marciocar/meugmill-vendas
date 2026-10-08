@@ -195,6 +195,9 @@ export const portfolios = sqliteTable(
     status: text('status', { enum: ['draft', 'active'] })
       .notNull()
       .default('draft'),
+    // Última finalização que mudou os vínculos (E7); null enquanto rascunho.
+    finalizedAt: integer('finalized_at'),
+    finalizedBy: text('finalized_by'),
     ...auditColumns(),
   },
   (t) => [
@@ -337,6 +340,69 @@ export const portfolioAssignments = sqliteTable(
     index('portfolio_assignments_customer_id_idx').on(t.customerId),
     index('portfolio_assignments_seller_id_idx').on(t.sellerId),
     index('portfolio_assignments_product_subgroup_id_idx').on(t.productSubgroupId),
+  ],
+);
+
+// Vínculos (E7): carteira x cliente x subgrupo x vendedor, com histórico. O encerrado nunca é apagado.
+export const portfolioLinks = sqliteTable(
+  'portfolio_links',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    portfolioId: integer('portfolio_id')
+      .notNull()
+      .references(() => portfolios.id),
+    branchId: integer('branch_id')
+      .notNull()
+      .references(() => branches.id),
+    customerId: integer('customer_id')
+      .notNull()
+      .references(() => customers.id),
+    productSubgroupId: integer('product_subgroup_id')
+      .notNull()
+      .references(() => productSubgroups.id),
+    sellerId: integer('seller_id')
+      .notNull()
+      .references(() => sellers.id),
+    active: integer('active', { mode: 'boolean' }).notNull().default(true),
+    validFrom: integer('valid_from').notNull(),
+    validTo: integer('valid_to'),
+    createdBy: text('created_by').notNull(),
+    endedBy: text('ended_by'),
+  },
+  (t) => [
+    // No máximo um vínculo ativo por (filial, cliente, subgrupo), entre todas as carteiras da filial.
+    uniqueIndex('portfolio_links_active_cell_unique')
+      .on(t.branchId, t.customerId, t.productSubgroupId)
+      .where(sql`${t.active} = 1`),
+    index('portfolio_links_portfolio_active_idx').on(t.portfolioId, t.active),
+    index('portfolio_links_seller_id_idx').on(t.sellerId),
+    // Histórico da carteira por id (sem TEMP B-TREE), com ou sem filtro de cliente.
+    index('portfolio_links_portfolio_id_idx').on(t.portfolioId),
+    index('portfolio_links_portfolio_customer_idx').on(t.portfolioId, t.customerId),
+    // Encerramento por cliente (inativação/saída de filial no cadastro).
+    index('portfolio_links_customer_id_idx').on(t.customerId),
+  ],
+);
+
+// Outbox (E7): um evento por criação/encerramento de vínculo, na mesma transação. Lida por cursor (id).
+export const portfolioLinkEvents = sqliteTable(
+  'portfolio_link_events',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    linkId: integer('link_id')
+      .notNull()
+      .references(() => portfolioLinks.id),
+    kind: text('kind', { enum: ['created', 'ended'] }).notNull(),
+    portfolioId: integer('portfolio_id').notNull(),
+    branchId: integer('branch_id').notNull(),
+    customerId: integer('customer_id').notNull(),
+    productSubgroupId: integer('product_subgroup_id').notNull(),
+    sellerId: integer('seller_id').notNull(),
+    occurredAt: integer('occurred_at').notNull(),
+  },
+  (t) => [
+    index('portfolio_link_events_branch_id_idx').on(t.branchId, t.id),
+    check('portfolio_link_events_kind_check', sql`${t.kind} in ('created', 'ended')`),
   ],
 );
 

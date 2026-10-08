@@ -66,14 +66,14 @@ posto). As contagens `conflictsBlocked` e `conflictsLost` do agregado vêm só c
 - `GET /v1/portfolios/{id}/overrides` lista `{ include[], exclude[] }`; cada entrada traz o cliente e
   `effective`.
 - `PUT /v1/portfolios/{id}/overrides` **substitui o conjunto inteiro**: `{ "include": [customerId],
-  "exclude": [customerId] }`. Vazio limpa. Máximo de 5000 ajustes somados (inclusões + exclusões).
+"exclude": [customerId] }`. Vazio limpa. Máximo de 5000 ajustes somados (inclusões + exclusões).
 - **[auto] Inclusão e exclusão são mutuamente exclusivas por cliente.** Um mesmo id nas duas listas
   responde `400 validation_error`.
 - `effective` mostra se o ajuste ainda tem efeito:
   - inclusão: `true` se o cliente está ativo e com vínculo ativo na filial;
   - exclusão: `true` se o cliente **casaria pelos filtros hoje**.
-  Um ajuste que deixou de ter efeito continua gravado, mas a prévia o ignora e a lista o marca
-  `effective: false`.
+    Um ajuste que deixou de ter efeito continua gravado, mas a prévia o ignora e a lista o marca
+    `effective: false`.
 - A inclusão é validada na escrita (cliente ativo, vínculo ativo na filial). Depois disso, os cadastros
   podem mudar, e é para isso que serve `effective`.
 - **Ajustes só de clientes com vínculo (ativo ou inativo) com a filial da carteira**, em inclusões e
@@ -98,10 +98,10 @@ posto). As contagens `conflictsBlocked` e `conflictsLost` do agregado vêm só c
 
 Iguais ao E3 ([`api-carteiras.md`](./api-carteiras.md)).
 
-| Operação                  | Regra                                                                  |
-| ------------------------- | ---------------------------------------------------------------------- |
-| Ler prévia e ajustes      | Qualquer autenticado com a filial da carteira em `branch_ids`          |
-| Gravar ajustes (`PUT`)    | `admin` da filial **ou** o responsável (`responsibleSub` = `sub`)      |
+| Operação               | Regra                                                             |
+| ---------------------- | ----------------------------------------------------------------- |
+| Ler prévia e ajustes   | Qualquer autenticado com a filial da carteira em `branch_ids`     |
+| Gravar ajustes (`PUT`) | `admin` da filial **ou** o responsável (`responsibleSub` = `sub`) |
 
 - O `PUT` exige `If-Match` e usa a **versão única do agregado**: gravar ajustes incrementa a versão, e a
   resposta é a carteira completa com `ETag` novo.
@@ -121,13 +121,13 @@ Iguais ao E3 ([`api-carteiras.md`](./api-carteiras.md)).
 
 ## Parâmetros da prévia
 
-| Parâmetro | Descrição                                                                                       |
-| --------- | ----------------------------------------------------------------------------------------------- |
-| `q`       | Busca por razão social, nome fantasia ou CNPJ (texto normalizado, sem acento e sem caixa)       |
-| `source`  | `filter` ou `manual`                                                                            |
-| `resolution` | `assigned`, `lost` ou `blocked` (E5); o `total` respeita o filtro                            |
-| `cursor`  | Cursor opaco da página seguinte (`nextCursor` da resposta anterior)                             |
-| `limit`   | Tamanho da página (1 até o teto comum de paginação)                                             |
+| Parâmetro    | Descrição                                                                                 |
+| ------------ | ----------------------------------------------------------------------------------------- |
+| `q`          | Busca por razão social, nome fantasia ou CNPJ (texto normalizado, sem acento e sem caixa) |
+| `source`     | `filter` ou `manual`                                                                      |
+| `resolution` | `assigned`, `lost` ou `blocked` (E5); o `total` respeita o filtro                         |
+| `cursor`     | Cursor opaco da página seguinte (`nextCursor` da resposta anterior)                       |
+| `limit`      | Tamanho da página (1 até o teto comum de paginação)                                       |
 
 Parâmetro desconhecido responde `400`. A resposta traz o `total` de itens da prévia (com `q`, `source` e `resolution` aplicados). Teto de `limit`: 200.
 
@@ -181,14 +181,14 @@ e também pelo proxy da demo (`/api/v1/portfolios/{id}/preview`).
 
 Formato `{ "error": "<codigo>", "message"?: "..." }`, sem eco do valor enviado.
 
-| Status | `error`                                                                                                                  |
-| ------ | ------------------------------------------------------------------------------------------------------------------------ |
+| Status | `error`                                                                                                                                       |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | 400    | `validation_error` (id em inclusão e exclusão, cliente fora do escopo ou inexistente, inclusão inválida, excesso de 5000, parâmetro inválido) |
-| 401    | token ausente ou inválido                                                                                                |
-| 403    | `forbidden` (sem papel para gravar ajustes)                                                                              |
-| 404    | `not_found` (carteira inexistente ou fora do escopo)                                                                     |
-| 409    | `portfolio_inactive`, `version_conflict`                                                                                 |
-| 428    | `precondition_required`                                                                                                  |
+| 401    | token ausente ou inválido                                                                                                                     |
+| 403    | `forbidden` (sem papel para gravar ajustes)                                                                                                   |
+| 404    | `not_found` (carteira inexistente ou fora do escopo)                                                                                          |
+| 409    | `portfolio_inactive`, `version_conflict`                                                                                                      |
+| 428    | `precondition_required`                                                                                                                       |
 
 ## Fica para os próximos épicos
 

@@ -1,5 +1,6 @@
 import { and, asc, eq, gt, or, sql } from 'drizzle-orm';
 import { sellers } from '../../db/schema.js';
+import { endLinksWhere } from '../links/write.js';
 import { assertVersion, requireVersion, type AuditedTable } from '../shared/audit.js';
 import { assertAllInScope, intersects, requireAdmin, resolveScopeIds, type Actor } from '../shared/authz.js';
 import { isUniqueViolation, writeTx, type Conn, type Db, type ServiceOptions } from '../shared/db.js';
@@ -100,6 +101,7 @@ export function createSellerService(db: Db, opts: ServiceOptions = {}): SellerSe
     return writeTx(db, (tx) => {
       const scopeIds = resolveScopeIds(tx, actor);
       const row = findVisible(tx, id, scopeIds);
+      const at = now();
       // Semântica documentada em `applyLinkActiveTransition` / `applyGlobalActiveTransition`.
       (scope === 'link' ? applyLinkActiveTransition : applyGlobalActiveTransition)({
         conn: tx,
@@ -110,8 +112,20 @@ export function createSellerService(db: Db, opts: ServiceOptions = {}): SellerSe
         active,
         expectedVersion: version,
         sub: actor.sub,
-        at: now(),
+        at,
       });
+      // Vendedor inativo não mantém clientes presos (E7): encerra os vínculos de carteira, com eventos.
+      if (!active) {
+        if (scope === 'global') endLinksWhere(tx, { sellerId: id }, actor.sub, at);
+        else {
+          const inScope = new Set(scopeIds);
+          const off = sellerLinks
+            .links(tx, id)
+            .filter((l) => inScope.has(l.branchId) && !l.active)
+            .map((l) => l.branchId);
+          endLinksWhere(tx, { sellerId: id, branchIds: off }, actor.sub, at);
+        }
+      }
       return toResponses(tx, [findRaw(tx, id)], scopeIds)[0] as SellerResponse;
     });
   }
@@ -207,6 +221,7 @@ export function createSellerService(db: Db, opts: ServiceOptions = {}): SellerSe
         if (data.branchIds !== undefined) {
           const plan = planLinkChange(sellerLinks, tx, id, data.branchIds, scopeIds);
           sellerLinks.remove(tx, id, plan.toRemove);
+          endLinksWhere(tx, { sellerId: id, branchIds: plan.toRemove }, actor.sub, at);
           sellerLinks.add(tx, id, plan.toAdd, actor.sub, at);
         }
         tx.update(sellers)

@@ -8,6 +8,7 @@ import {
   portfolios,
   portfolioTypes,
 } from '../../db/schema.js';
+import { endAllActiveLinks } from '../links/write.js';
 import { assertVersion, requireVersion, writeActive, type AuditedTable } from '../shared/audit.js';
 import { assertAllInScope, requireAdmin, resolveScopeIds, type Actor } from '../shared/authz.js';
 import { isUniqueViolation, writeTx, type Conn, type Db, type ServiceOptions } from '../shared/db.js';
@@ -135,7 +136,16 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
         assertBranchesActive(tx, [row.branchId]);
         assertActiveType(tx, row.portfolioTypeId);
       }
-      writeActive(tx, portfolios as unknown as AuditedTable, id, active, actor.sub, now());
+      const at = now();
+      // Carteira inativa não mantém clientes presos: encerra os vínculos (E7) na mesma transação.
+      // Reativar não os recria; é preciso finalizar de novo.
+      // Sem vínculos a carteira volta a rascunho (`finalized_at` fica como histórico); reativar não a
+      // reativa de fato: só finalizar de novo.
+      if (!active) {
+        endAllActiveLinks(tx, id, actor.sub, at);
+        tx.update(portfolios).set({ status: 'draft' }).where(eq(portfolios.id, id)).run();
+      }
+      writeActive(tx, portfolios as unknown as AuditedTable, id, active, actor.sub, at);
       return loadAggregateBase(tx, id);
     });
   }
@@ -251,6 +261,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
         const responsibleSub =
           data.responsibleSub === undefined ? row.responsibleSub : cleanSub(data.responsibleSub);
         const changesBranch = branchId !== row.branchId;
+        const at = now();
         if (changesBranch) {
           assertAllInScope([branchId], resolveScopeIds(tx, actor));
           assertBranchesActive(tx, [branchId]);
@@ -262,6 +273,9 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
             .map((r) => r.id);
           assertSellersUsable(tx, branchId, sellerIds);
           replaceOverridesOnBranchChange(tx, id, row.branchId, branchId);
+          // Os vínculos pertencem à filial de origem: encerra todos (com eventos, na outbox da origem) e
+          // volta a rascunho; é preciso finalizar de novo na nova filial.
+          endAllActiveLinks(tx, id, actor.sub, at);
         }
         const typeId = data.portfolioTypeId ?? row.portfolioTypeId;
         if (typeId !== row.portfolioTypeId) assertActiveType(tx, typeId);
@@ -271,7 +285,8 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
           throw new DomainError('conflict', NAME_TAKEN);
         }
         try {
-          bump(tx, row, actor, now(), {
+          bump(tx, row, actor, at, {
+            ...(changesBranch ? { status: 'draft' as const } : {}),
             name,
             nameKey: key,
             branchId,

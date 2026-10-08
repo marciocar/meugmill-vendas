@@ -5,6 +5,7 @@ import { customerRoutes } from './customers.js';
 import { distributionRoutes } from './distribution.js';
 import { eligibilityRoutes } from './eligibility.js';
 import { geoRoutes } from './geo.js';
+import { linkRoutes } from './links.js';
 import { portfolioRoutes } from './portfolios.js';
 import { portfolioTypeRoutes } from './portfolio-types.js';
 import { sellerRoutes } from './sellers.js';
@@ -23,4 +24,5 @@ export async function v1Routes(app: FastifyInstance): Promise<void> {
   await app.register(portfolioRoutes);
   await app.register(eligibilityRoutes);
   await app.register(distributionRoutes);
+  await app.register(linkRoutes);
 }

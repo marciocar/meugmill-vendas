@@ -23,14 +23,14 @@ cliente fica bloqueado nas duas prévias para que a equipe revise o conflito."
 
 ## Posto (rank)
 
-| Posto | Correspondência                          |
-| ----- | ---------------------------------------- |
-| 6     | Inclusão manual **[auto]**               |
-| 5     | Grupo econômico                          |
-| 4     | Rede                                     |
-| 3     | Região por bairro                        |
-| 2     | Região por município                     |
-| 1     | Região por UF                            |
+| Posto | Correspondência            |
+| ----- | -------------------------- |
+| 6     | Inclusão manual **[auto]** |
+| 5     | Grupo econômico            |
+| 4     | Rede                       |
+| 3     | Região por bairro          |
+| 2     | Região por município       |
+| 1     | Região por UF              |
 
 - **[auto]** O posto de uma carteira para um cliente é o **maior** entre os critérios que **casaram** o
   cliente nela. Uma carteira com região e rede que casa os dois vale pela rede (4).
@@ -50,11 +50,11 @@ inativar uma carteira libera os clientes bloqueados por ela.
 
 Para um cliente com posto `r` na carteira P, e as demais carteiras da filial em que ele tem posto:
 
-| `resolution` | Condição                                                              |
-| ------------ | --------------------------------------------------------------------- |
-| `assigned`   | Sem concorrente, ou `r` maior que o posto de todos os concorrentes    |
-| `lost`       | Algum concorrente tem posto maior que `r`                             |
-| `blocked`    | `r` é o maior e algum concorrente empata nele                         |
+| `resolution` | Condição                                                           |
+| ------------ | ------------------------------------------------------------------ |
+| `assigned`   | Sem concorrente, ou `r` maior que o posto de todos os concorrentes |
+| `lost`       | Algum concorrente tem posto maior que `r`                          |
+| `blocked`    | `r` é o maior e algum concorrente empata nele                      |
 
 ## Campos
 
@@ -94,8 +94,8 @@ contagem independente em JS): a página 50 da prévia sem `resolution` e o GET d
 **poucos ms a 0,2 s**. Com a disputa resolvida (prévia com `resolution`, `include=conflicts`,
 `effectiveMembers`):
 
-| Cenário                                                            | Tempo      |
-|--------------------------------------------------------------------|------------|
+| Cenário                                                             | Tempo       |
+| ------------------------------------------------------------------- | ----------- |
 | 50 mil clientes + 200 mil de outra filial na mesma UF, 20 carteiras | 0,6 a 0,8 s |
 | 50 mil clientes, 100 carteiras sobrepostas na filial                | 2,3 a 2,6 s |
 

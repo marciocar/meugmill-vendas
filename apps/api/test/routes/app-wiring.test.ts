@@ -17,10 +17,18 @@ const PATHS = [
   '/v1/customers',
   '/v1/portfolio-types',
   '/v1/portfolios',
+  '/v1/link-events',
 ];
 
 // Rotas aninhadas da carteira: 401 sem token; 404 (carteira inexistente) com token de leitor.
-const PORTFOLIO_SUBPATHS = ['preview', 'overrides', 'assignments', 'assignments/summary'];
+const PORTFOLIO_SUBPATHS = [
+  'preview',
+  'overrides',
+  'assignments',
+  'assignments/summary',
+  'links',
+  'links/history',
+];
 
 describe('buildApp: rotas v1 registradas', () => {
   let app: FastifyInstance;
@@ -70,6 +78,13 @@ describe('buildApp: rotas v1 registradas', () => {
 
   it('POST /v1/portfolios/{id}/distribute: 401 sem token e 404 para carteira inexistente', async () => {
     const url = '/v1/portfolios/99999/distribute';
+    expect((await app.inject({ method: 'POST', url })).statusCode).toBe(401);
+    const res = await app.inject({ method: 'POST', url, headers: { ...auth, 'if-match': '"1"' } });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('POST /v1/portfolios/{id}/finalize: 401 sem token e 404 para carteira inexistente', async () => {
+    const url = '/v1/portfolios/99999/finalize';
     expect((await app.inject({ method: 'POST', url })).statusCode).toBe(401);
     const res = await app.inject({ method: 'POST', url, headers: { ...auth, 'if-match': '"1"' } });
     expect(res.statusCode).toBe(404);

@@ -5,6 +5,7 @@ import { requireAdmin, type Actor } from '../shared/authz.js';
 import { isUniqueViolation, writeTx, type Conn, type Db, type ServiceOptions } from '../shared/db.js';
 import { DomainError, forbidden, invalid, notFound } from '../shared/errors.js';
 import { findMunicipality } from '../geo/repository.js';
+import { endLinksWhere } from '../links/write.js';
 import {
   decodeCursor,
   ListQuerySchema,
@@ -63,7 +64,10 @@ export function createBranchService(db: Db, opts: ServiceOptions = {}): BranchSe
       const row = visible(actor, find(tx, id));
       if (row.active === active) return toResponse(row);
       assertVersion(row.version, version);
-      writeActive(tx, branches, id, active, actor.sub, now());
+      const at = now();
+      writeActive(tx, branches, id, active, actor.sub, at);
+      // Filial inativa não mantém vínculos de carteira (E7): encerra todos, com eventos.
+      if (!active) endLinksWhere(tx, { branchIds: [id] }, actor.sub, at);
       return toResponse(visible(actor, find(tx, id)));
     });
   }
