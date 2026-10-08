@@ -39,8 +39,8 @@ import {
   assertActiveNetworks,
   assertActiveType,
   assertNoDuplicates,
-  assertOverridesLinked,
   assertSellersUsable,
+  replaceOverridesOnBranchChange,
   validateAssignments,
   validateRegions,
 } from './validate.js';
@@ -256,7 +256,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
             .all()
             .map((r) => r.id);
           assertSellersUsable(tx, branchId, sellerIds);
-          assertOverridesLinked(tx, id, branchId);
+          replaceOverridesOnBranchChange(tx, id, row.branchId, branchId);
         }
         const typeId = data.portfolioTypeId ?? row.portfolioTypeId;
         if (typeId !== row.portfolioTypeId) assertActiveType(tx, typeId);

@@ -178,18 +178,32 @@ export function assertSellersLinkedToBranch(conn: Conn, branchId: number, seller
 }
 
 /**
- * Troca de filial: todo cliente com ajuste manual precisa ter vínculo (ativo ou não) com a filial
- * nova; senão a carteira passaria a guardar ajustes de clientes que a filial não enxerga.
+ * Troca de filial. Primeiro descarta os ajustes órfãos em relação à filial ATUAL (cliente que perdeu
+ * o vínculo com ela: sem efeito e invisíveis). Depois exige que todo cliente com ajuste restante
+ * tenha vínculo (ativo ou não) com a filial nova; senão lança 400 e a transação desfaz tudo,
+ * inclusive a limpeza.
  */
-export function assertOverridesLinked(conn: Conn, portfolioId: number, branchId: number): void {
-  const orphan = conn.get<{ n: number }>(
+export function replaceOverridesOnBranchChange(
+  conn: Conn,
+  portfolioId: number,
+  currentBranchId: number,
+  newBranchId: number,
+): void {
+  conn.run(
+    sql`delete from portfolio_customer_overrides
+         where portfolio_id = ${portfolioId}
+           and not exists (select 1 from customer_branches cb
+                            where cb.customer_id = portfolio_customer_overrides.customer_id
+                              and cb.branch_id = ${currentBranchId})`,
+  );
+  const unlinked = conn.get<{ n: number }>(
     sql`select 1 as n from portfolio_customer_overrides ov
          where ov.portfolio_id = ${portfolioId}
            and not exists (select 1 from customer_branches cb
-                            where cb.customer_id = ov.customer_id and cb.branch_id = ${branchId})
+                            where cb.customer_id = ov.customer_id and cb.branch_id = ${newBranchId})
          limit 1`,
   );
-  if (orphan) throw invalid('Há ajustes de clientes sem vínculo com a filial da carteira');
+  if (unlinked) throw invalid('Há ajustes de clientes sem vínculo com a filial da carteira');
 }
 
 function assertActiveSubgroups(conn: Conn, ids: number[]): void {

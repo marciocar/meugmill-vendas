@@ -1,4 +1,4 @@
-import { asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import {
   branches,
   economicGroups,
@@ -97,7 +97,16 @@ export function loadAggregate(conn: Conn, id: number): PortfolioResponse {
       exclude: sql<number>`coalesce(sum(${portfolioCustomerOverrides.kind} = 'exclude'), 0)`,
     })
     .from(portfolioCustomerOverrides)
-    .where(eq(portfolioCustomerOverrides.portfolioId, id))
+    .where(
+      and(
+        eq(portfolioCustomerOverrides.portfolioId, id),
+        // Ajuste órfão (cliente sem vínculo, ativo ou não, com a filial atual) não conta: não tem
+        // efeito nem aparece, e contá-lo revelaria algo oculto.
+        sql`exists (select 1 from customer_branches cb
+                     where cb.customer_id = ${portfolioCustomerOverrides.customerId}
+                       and cb.branch_id = ${row.p.branchId})`,
+      ),
+    )
     .get() ?? { include: 0, exclude: 0 };
 
   return {

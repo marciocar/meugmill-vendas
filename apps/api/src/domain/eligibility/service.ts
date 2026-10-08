@@ -2,7 +2,7 @@ import { eq, inArray, sql } from 'drizzle-orm';
 import { customers, municipalities, portfolioCustomerOverrides } from '../../db/schema.js';
 import { loadAggregate } from '../portfolios/aggregate.js';
 import { bump, findScoped, openForEdit } from '../portfolios/access.js';
-import { resolveScopeIds, type Actor } from '../shared/authz.js';
+import { type Actor } from '../shared/authz.js';
 import { writeTx, type Conn, type Db, type ServiceOptions } from '../shared/db.js';
 import { invalid } from '../shared/errors.js';
 import { parseInput } from '../shared/validate.js';
@@ -106,18 +106,18 @@ export function createEligibilityService(db: Db, opts: ServiceOptions = {}): Eli
     },
 
     getOverrides(actor, portfolioId) {
-      findScoped(db, actor, portfolioId);
+      const portfolio = findScoped(db, actor, portfolioId);
       const rows = db
         .select({ customerId: portfolioCustomerOverrides.customerId, kind: portfolioCustomerOverrides.kind })
         .from(portfolioCustomerOverrides)
         .where(eq(portfolioCustomerOverrides.portfolioId, portfolioId))
         .orderBy(portfolioCustomerOverrides.customerId)
         .all();
-      // Defesa em profundidade: só aparecem ajustes de clientes visíveis ao leitor (vínculo com alguma
-      // filial do token); os demais são omitidos da lista, sem sinal de que existem.
+      // Só aparecem ajustes de clientes com vínculo (ativo ou não) com a filial da carteira; os demais
+      // (órfãos, p.ex. após o cliente perder o vínculo) são omitidos, sem sinal de que existem.
       const visible = idsLinkedTo(
         db,
-        resolveScopeIds(db, actor),
+        [portfolio.branchId],
         rows.map((r) => r.customerId),
       );
       const ids = rows.map((r) => r.customerId).filter((id) => visible.has(id));

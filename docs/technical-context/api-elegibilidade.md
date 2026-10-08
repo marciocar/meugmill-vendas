@@ -72,13 +72,19 @@ ganha prioridade por região. `matchedBy` continua informativo e indica quais cr
   exclusões; a exclusão aceita vínculo inativo, a inclusão exige vínculo ativo. O escopo do ator (filiais
   do token) não basta: um admin de SER+CAR não grava ajuste de cliente só de CAR numa carteira de SER.
 - **Troca de filial recusada com ajustes incompatíveis.** O `PATCH` do E3 que muda a filial responde
-  `400 validation_error` (e não troca nada) se algum cliente ajustado não tem vínculo com a filial nova,
-  na mesma linha da regra dos vendedores incompatíveis.
-- **`GET /overrides` mostra só clientes visíveis ao leitor** (vínculo com alguma filial do token). Os não
-  visíveis são omitidos da lista (defesa em profundidade; pela API normal não chegam a existir). As
-  contagens `overridesInclude`/`overridesExclude` do agregado são o total de ajustes gravados.
+  `400 validation_error` (e não troca nada) se algum cliente ajustado, ainda vinculado à filial atual,
+  não tem vínculo com a filial nova, na mesma linha da regra dos vendedores incompatíveis.
+- **[auto] Ajustes órfãos.** Ajuste órfão é o de um cliente que deixou de ter vínculo (ativo ou inativo)
+  com a filial da carteira. Surge quando `PATCH /customers/{id}` com `branchIds` remove o vínculo, pois
+  essa operação não olha ajustes. O órfão fica gravado, mas não tem efeito, **não aparece** em
+  `GET /overrides` (que lista só clientes vinculados à filial da carteira, sem sinal de que algo foi
+  omitido) e **não entra** em `overridesInclude`/`overridesExclude` (que contam só ajustes de clientes
+  vinculados à filial atual). Um `PUT /overrides` o apaga (substitui o conjunto). A troca de filial o
+  **descarta** na mesma transação, antes de validar os demais ajustes; se a troca for recusada (400), a
+  transação inteira é desfeita, inclusive esse descarte, e a versão não muda. A troca bem-sucedida
+  incrementa a versão uma vez.
 - **[auto]** Incluir um cliente que já casa o filtro é aceito: ele aparece como `source: filter` (não como
-  `manual`) e conta em `overridesInclude`, que é o total de ajustes gravados.
+  `manual`) e conta em `overridesInclude` (total de ajustes de clientes vinculados à filial).
 
 ## Permissões e versão
 

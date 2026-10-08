@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createEligibilityService, type EligibilityService } from '../../src/domain/eligibility/service.js';
+import { createCustomerService } from '../../src/domain/customers/service.js';
 import { createPortfolioTypeService } from '../../src/domain/portfolio-types/service.js';
 import { createPortfolioService, type PortfolioService } from '../../src/domain/portfolios/service.js';
 import { neighborhoodKey, searchKey } from '../../src/domain/shared/normalize.js';
@@ -456,18 +457,19 @@ describe('ajustes: vazamento de escopo entre filiais (regressão)', () => {
     expect(pfs.update(both, p.id, res.version, { branchId: ser }).branch.code).toBe('SER');
   });
 
-  it('getOverrides omite ajustes de clientes invisíveis ao leitor (defesa em profundidade)', () => {
+  it('getOverrides omite ajustes de clientes sem vínculo com a filial da carteira', () => {
     const visible = customer({ name: 'Visível' });
     const hidden = customer({ name: 'Segredo CAR', branches: [[car, true]] });
     put(adminSer, [], [visible]);
-    // estado impossível pela API, gravado direto para provar a defesa
+    // ajuste órfão (cliente sem vínculo com SER), gravado direto; o caminho pela API está em "ajustes órfãos"
     fx.app.sqlite
       .prepare("insert into portfolio_customer_overrides values (?,?,'exclude',?,'t')")
       .run(pid, hidden, NOW);
     const forReader = svc.getOverrides(readerSer, pid);
     expect(forReader.exclude.map((e) => e.customer.id)).toEqual([visible]);
     expect(JSON.stringify(forReader)).not.toContain('Segredo CAR');
-    expect(svc.getOverrides(both, pid).exclude.map((e) => e.customer.id)).toEqual([visible, hidden]);
+    // órfão não aparece para ninguém, nem para quem enxerga a outra filial
+    expect(svc.getOverrides(both, pid).exclude.map((e) => e.customer.id)).toEqual([visible]);
   });
 });
 
@@ -579,5 +581,67 @@ describe('versão compartilhada entre E3 e E4', () => {
     expect(codeOf(() => svc.replaceOverrides(adminSer, pid, f.version, { include: [], exclude: [] }))).toBe(
       'version_conflict',
     );
+  });
+});
+
+describe('ajustes órfãos (cliente perdeu o vínculo com a filial da carteira)', () => {
+  const both = adminOf('SER', 'CAR');
+  const rows = () => count('portfolio_customer_overrides');
+
+  /** Cria o órfão pela API de clientes: update de branchIds removendo SER. */
+  function orphanize(id: number): void {
+    createCustomerService(fx.db).update(both, id, 1, { branchIds: [car] });
+  }
+  const shared = () =>
+    customer({
+      branches: [
+        [ser, true],
+        [car, true],
+      ],
+    });
+
+  it('não aparece em GET /overrides, nas contagens nem na prévia; o PUT o apaga', () => {
+    const orphan = shared();
+    const kept = shared();
+    put(adminSer, [orphan], [kept]);
+    expect(pfs.get(adminSer, pid)).toMatchObject({ overridesInclude: 1, overridesExclude: 1 });
+    orphanize(orphan);
+
+    const o = svc.getOverrides(adminSer, pid);
+    expect(o.include).toEqual([]);
+    expect(o.exclude.map((e) => e.customer.id)).toEqual([kept]);
+    expect(pfs.get(adminSer, pid)).toMatchObject({ overridesInclude: 0, overridesExclude: 1 });
+    expect(previewIds()).not.toContain(orphan);
+    expect(rows()).toBe(2); // a linha continua gravada, só não é vista nem contada
+
+    const res = svc.replaceOverrides(adminSer, pid, version, { include: [], exclude: [kept] });
+    expect(res).toMatchObject({ overridesInclude: 0, overridesExclude: 1 });
+    expect(rows()).toBe(1);
+  });
+
+  it('troca de filial válida descarta o órfão e incrementa a versão uma vez', () => {
+    const orphan = shared();
+    const kept = shared();
+    put(adminSer, [orphan], [kept]);
+    orphanize(orphan);
+    const before = version;
+    const res = pfs.update(both, pid, before, { branchId: car });
+    expect(res.branch.code).toBe('CAR');
+    expect(res.version).toBe(before + 1);
+    expect(rows()).toBe(1);
+    expect(res).toMatchObject({ overridesInclude: 0, overridesExclude: 1 });
+  });
+
+  it('troca recusada por ajuste não órfão incompatível mantém tudo, inclusive o órfão e a versão', () => {
+    const orphan = shared();
+    const serOnly = customer();
+    put(adminSer, [orphan], [serOnly]);
+    orphanize(orphan);
+    const before = version;
+    expect(codeOf(() => pfs.update(both, pid, before, { branchId: car }))).toBe('validation_error');
+    const after = pfs.get(both, pid);
+    expect(after.branch.code).toBe('SER');
+    expect(after.version).toBe(before);
+    expect(rows()).toBe(2);
   });
 });
