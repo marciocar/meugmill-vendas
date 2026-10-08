@@ -83,4 +83,51 @@ code=$(curl -s -o "$body" -w '%{http_code}' -H "Authorization: Bearer ${token}" 
 grep -q '"sub"' "$body" || fail "resposta de /api/v1/me (proxy) sem campo sub"
 ok "proxy /api da demo -> /health 200 e /v1/me 200 com token"
 
+# Proxy da demo para um endpoint novo da E2.
+code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${token}" "${WEB_URL}/api/v1/geo/states" || true)
+[ "$code" = "200" ] || fail "GET ${WEB_URL}/api/v1/geo/states (proxy) com token esperado 200, recebido ${code}"
+ok "proxy /api da demo -> /v1/geo/states 200 com token"
+
+# Contrato OpenAPI público (sem token).
+code=$(curl -s -o "$body" -w '%{http_code}' "${API_URL}/v1/openapi.json" || true)
+[ "$code" = "200" ] || fail "GET /v1/openapi.json esperado 200, recebido ${code}"
+grep -q '"openapi"' "$body" || fail "resposta de /v1/openapi.json sem o campo openapi"
+ok "GET /v1/openapi.json -> 200 com openapi"
+
+# Dados mestres com token de ADMIN (o IdP de teste escolhe o perfil pelo client_id; ver compose.yaml).
+admin_json=$(curl -s -X POST "${IDP_URL}/default/token" \
+  -d grant_type=client_credentials -d client_id=smoke-admin -d client_secret=smoke -d scope=openid) \
+  || fail "não foi possível obter token de admin em ${IDP_URL}/default/token"
+admin_token=$(printf '%s' "$admin_json" | sed -n 's/.*"access_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+[ -n "$admin_token" ] || fail "resposta do IdP sem access_token de admin"
+ok "token de admin obtido do IdP"
+
+hdrs=$(mktemp)
+trap 'rm -f "$body" "$hdrs"' EXIT
+auth_admin="Authorization: Bearer ${admin_token}"
+code_value="SMK-$(date +%s)"
+
+code=$(curl -s -D "$hdrs" -o "$body" -w '%{http_code}' -X POST "${API_URL}/v1/product-subgroups" \
+  -H "$auth_admin" -H 'Content-Type: application/json' \
+  -d "{\"code\":\"${code_value}\",\"name\":\"Subgrupo de fumaça\"}" || true)
+[ "$code" = "201" ] || fail "POST /v1/product-subgroups esperado 201, recebido ${code}: $(cat "$body")"
+tr -d '\r' < "$hdrs" | grep -qix 'etag: "1"' || fail "POST de subgrupo sem ETag \"1\": $(cat "$hdrs")"
+subgroup_id=$(sed -n 's/.*"id"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$body" | head -n1)
+[ -n "$subgroup_id" ] || fail "resposta do POST de subgrupo sem id: $(cat "$body")"
+ok "POST /v1/product-subgroups -> 201 com ETag \"1\" (código ${code_value})"
+
+code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/product-subgroups/${subgroup_id}" || true)
+[ "$code" = "200" ] || fail "GET /v1/product-subgroups/${subgroup_id} esperado 200, recebido ${code}"
+ok "GET /v1/product-subgroups/{id} -> 200"
+
+code=$(curl -s -o "$body" -w '%{http_code}' -X PATCH "${API_URL}/v1/product-subgroups/${subgroup_id}" \
+  -H "$auth_admin" -H 'Content-Type: application/json' -d '{"name":"Subgrupo de fumaça 2"}' || true)
+[ "$code" = "428" ] || fail "PATCH sem If-Match esperado 428, recebido ${code}: $(cat "$body")"
+ok "PATCH sem If-Match -> 428"
+
+code=$(curl -s -o "$body" -w '%{http_code}' -X POST "${API_URL}/v1/product-subgroups/${subgroup_id}/deactivate" \
+  -H "$auth_admin" -H 'If-Match: "1"' || true)
+[ "$code" = "200" ] || fail "deactivate com If-Match esperado 200, recebido ${code}: $(cat "$body")"
+ok "POST /v1/product-subgroups/{id}/deactivate com If-Match -> 200"
+
 echo "Smoke concluído com sucesso."

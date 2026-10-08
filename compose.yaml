@@ -17,6 +17,12 @@ services:
       - "${BIND_ADDR:-127.0.0.1}:${IDP_PORT:-39080}:8080"
     environment:
       # Arquivo de configuração: tokens do issuer "default" com aud/roles/branch_ids da carteira.
+      # Perfis de teste (requestMappings: vale o PRIMEIRO que casar, na ordem do arquivo):
+      #   client_id=smoke-admin -> sub admin-01, roles ["admin"], branch_ids ["filial-01"]
+      #   qualquer outro client_id -> sub vendedor-01, roles ["vendedor"], branch_ids ["filial-01"]
+      # Pede-se o token de admin com: -d client_id=smoke-admin. O mock NÃO aceita `scope` como
+      # requestParam (removido desde a v0.3.x por causa do nimbus), por isso o seletor é o client_id.
+      # Fonte: README do navikt/mock-oauth2-server (seção "Token callbacks") e OAuth2TokenCallback.kt.
       JSON_CONFIG_PATH: /config/idp-config.json
     volumes:
       - ./docker/idp-config.json:/config/idp-config.json:ro

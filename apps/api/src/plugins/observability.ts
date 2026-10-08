@@ -28,7 +28,43 @@ const REDACT_PATHS = [
   '*.password',
   '*.cpf',
   '*.email',
+  // Cinto de segurança: o Drizzle anexa `query`/`params` (valores de SQL) aos erros de banco.
+  '*.params',
+  '*.query',
+  'err.query',
+  'err.params',
 ];
+
+// O CNPJ de cliente viaja no path (`/by-cnpj/{cnpj}/...`) e o código de vendedor em `/by-code/{code}/...`.
+// No log tudo após o marcador é mascarado (inclusive o sufixo, se a barra do CNPJ vier sem codificar),
+// e a query string é descartada.
+export function safePath(url: string | undefined): string | undefined {
+  return url
+    ?.split('?')[0]
+    ?.replace(/\/by-cnpj\/.*$/i, '/by-cnpj/:cnpj/...')
+    .replace(/\/by-code\/.*$/i, '/by-code/:code/...');
+}
+
+// Só campos seguros de um erro 5xx. Nunca `message`, `query`, `params` nem `cause.message`: o
+// `DrizzleQueryError` embute o SQL e os parâmetros (CNPJ, nomes) na mensagem. A stack entra só com os
+// frames (`    at ...`): a primeira linha (e qualquer continuação) repete a mensagem e é descartada.
+export function safeError(error: unknown): Record<string, unknown> {
+  const e = (error ?? {}) as { name?: unknown; code?: unknown; stack?: unknown; cause?: unknown };
+  const cause = (e.cause ?? undefined) as { name?: unknown; code?: unknown } | undefined;
+  const frames =
+    typeof e.stack === 'string'
+      ? e.stack
+          .split('\n')
+          .filter((l) => /^\s+at /.test(l))
+          .join('\n')
+      : undefined;
+  return {
+    name: e.name,
+    code: e.code,
+    ...(cause ? { causeName: cause.name, causeCode: cause.code } : {}),
+    stack: frames,
+  };
+}
 
 // Configuração do logger do Fastify: JSON estruturado, serializers enxutos e redact.
 export function buildLoggerOptions(
@@ -43,7 +79,7 @@ export function buildLoggerOptions(
       // Sem headers, sem corpo e sem query string (pode carregar token/PII).
       req: (req: { method?: string; url?: string }) => ({
         method: req.method,
-        url: req.url?.split('?')[0],
+        url: safePath(req.url),
       }),
       res: (res: { statusCode?: number }) => ({ statusCode: res.statusCode }),
     },
@@ -61,15 +97,15 @@ export const observabilityPlugin = fp(
     // 404 próprio: o log padrão do Fastify ("Route ... not found") traz a URL com query string.
     // Aqui só método e caminho (sem query) vão para o log, e a resposta não ecoa a URL.
     app.setNotFoundHandler((request, reply) => {
-      request.log.info({ method: request.method, path: request.url.split('?')[0] }, 'Rota não encontrada');
+      request.log.info({ method: request.method, path: safePath(request.url) }, 'Rota não encontrada');
       return reply.code(404).send({ error: 'not_found' });
     });
 
     app.setErrorHandler((error: FastifyError, request, reply) => {
       const status = error.statusCode && error.statusCode >= 400 ? error.statusCode : 500;
       if (status >= 500) {
-        // Stack e mensagem ficam só no log; a resposta é genérica.
-        request.log.error({ err: error }, 'Erro interno');
+        // Só campos seguros vão para o log (ver safeError); a resposta é genérica.
+        request.log.error({ err: safeError(error) }, 'Erro interno');
         return reply.code(status).send({ error: 'internal_error' });
       }
       request.log.warn({ code: error.code, status }, 'Requisição rejeitada');

@@ -6,6 +6,16 @@
       "tokenExpiry": 3600,
       "requestMappings": [
         {
+          "requestParam": "client_id",
+          "match": "smoke-admin",
+          "claims": {
+            "sub": "admin-01",
+            "aud": ["carteira-api"],
+            "roles": ["admin"],
+            "branch_ids": ["filial-01"]
+          }
+        },
+        {
           "requestParam": "grant_type",
           "match": "*",
           "claims": {

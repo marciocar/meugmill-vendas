@@ -5,3 +5,5 @@ docs/sdaal/
 docs/knowledge-base/
 # SSOT gerado por máquina (inventory.sh) — precisa bater byte-a-byte com o lint; prettier quebra o match
 docs/onion/inventory.md
+# Snapshot do IBGE gerado por apps/api/scripts/build-ibge-seed.ts — dado, não código
+apps/api/drizzle/data/
