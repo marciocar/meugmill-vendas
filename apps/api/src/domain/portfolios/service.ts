@@ -10,14 +10,14 @@ import {
 } from '../../db/schema.js';
 import { assertVersion, requireVersion, writeActive, type AuditedTable } from '../shared/audit.js';
 import { assertAllInScope, requireAdmin, resolveScopeIds, type Actor } from '../shared/authz.js';
-import { isUniqueViolation, writeTx, type Conn, type Db, type ServiceOptions } from '../shared/db.js';
+import { isUniqueViolation, type Conn, type Db, type ServiceOptions } from '../shared/db.js';
 import { DomainError, invalid } from '../shared/errors.js';
 import { assertBranchesActive } from '../shared/links.js';
 import { decodeCursor, resolveLimit, toPage, type Page } from '../shared/pagination.js';
 import { likeContains } from '../shared/sql.js';
 import { cleanText, parseInput } from '../shared/validate.js';
 import { findScoped, openForEdit, bump } from './access.js';
-import { loadAggregate } from './aggregate.js';
+import { loadAggregate, loadAggregateBase, writeAggregateTx } from './aggregate.js';
 import { requireAdminister } from './authz.js';
 import { portfolioNameKey } from './name-key.js';
 import {
@@ -119,11 +119,11 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
   }
 
   function transition(actor: Actor, id: number, expected: number | undefined, active: boolean) {
-    return writeTx(db, (tx) => {
+    return writeAggregateTx(db, (tx) => {
       const row = findScoped(tx, actor, id);
       requireAdminister(actor);
       const version = requireVersion(expected);
-      if (row.active === active) return loadAggregate(tx, id); // idempotente
+      if (row.active === active) return loadAggregateBase(tx, id); // idempotente
       assertVersion(row.version, version);
       if (active) {
         // Reativar revalida o que pode ter mudado enquanto estava inativa. Vendedores com vínculo
@@ -132,7 +132,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
         assertActiveType(tx, row.portfolioTypeId);
       }
       writeActive(tx, portfolios as unknown as AuditedTable, id, active, actor.sub, now());
-      return loadAggregate(tx, id);
+      return loadAggregateBase(tx, id);
     });
   }
 
@@ -198,7 +198,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
       const data = parseInput(CreatePortfolioSchema, input);
       const name = cleanText(data.name, 'name');
       const responsibleSub = cleanSub(data.responsibleSub);
-      return writeTx(db, (tx) => {
+      return writeAggregateTx(db, (tx) => {
         assertAllInScope([data.branchId], resolveScopeIds(tx, actor));
         assertBranchesActive(tx, [data.branchId]);
         assertActiveType(tx, data.portfolioTypeId);
@@ -222,7 +222,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
             })
             .returning({ id: portfolios.id })
             .get();
-          return loadAggregate(tx, row.id);
+          return loadAggregateBase(tx, row.id);
         } catch (err) {
           if (isUniqueViolation(err)) throw new DomainError('conflict', NAME_TAKEN);
           throw err;
@@ -231,7 +231,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
     },
 
     update(actor, id, expectedVersion, patch) {
-      return writeTx(db, (tx) => {
+      return writeAggregateTx(db, (tx) => {
         let data!: UpdatePortfolioInput;
         const row = openForEdit(tx, actor, id, expectedVersion, (current) => {
           data = parseInput(UpdatePortfolioSchema, patch);
@@ -279,12 +279,12 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
           if (isUniqueViolation(err)) throw new DomainError('conflict', NAME_TAKEN);
           throw err;
         }
-        return loadAggregate(tx, id);
+        return loadAggregateBase(tx, id);
       });
     },
 
     replaceFilters(actor, id, expectedVersion, input) {
-      return writeTx(db, (tx) => {
+      return writeAggregateTx(db, (tx) => {
         const row = openForEdit(tx, actor, id, expectedVersion);
         const data = parseInput(ReplaceFiltersSchema, input);
         const regions = validateRegions(tx, data.regions);
@@ -312,12 +312,12 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
             .run();
         }
         bump(tx, row, actor, now());
-        return loadAggregate(tx, id);
+        return loadAggregateBase(tx, id);
       });
     },
 
     replaceSellers(actor, id, expectedVersion, input) {
-      return writeTx(db, (tx) => {
+      return writeAggregateTx(db, (tx) => {
         const row = openForEdit(tx, actor, id, expectedVersion);
         const data = parseInput(ReplaceSellersSchema, input);
         validateAssignments(tx, row.branchId, data.assignments);
@@ -328,7 +328,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
             .run();
         }
         bump(tx, row, actor, now());
-        return loadAggregate(tx, id);
+        return loadAggregateBase(tx, id);
       });
     },
 

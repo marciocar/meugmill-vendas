@@ -176,6 +176,9 @@ describe('prévia: leitura e escopo', () => {
       source: 'filter',
       matchedRegionLevel: 'state',
       matchedBy: { region: true, retailNetwork: false, economicGroup: false },
+      rank: 1,
+      resolution: 'assigned',
+      competitors: [],
     });
   });
 
