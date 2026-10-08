@@ -15,6 +15,8 @@ const PATHS = [
   '/v1/geo/states',
   '/v1/sellers',
   '/v1/customers',
+  '/v1/portfolio-types',
+  '/v1/portfolios',
 ];
 
 describe('buildApp: rotas v1 registradas', () => {

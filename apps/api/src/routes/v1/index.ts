@@ -3,10 +3,12 @@ import { branchRoutes } from './branches.js';
 import { catalogRoutes } from './catalog.js';
 import { customerRoutes } from './customers.js';
 import { geoRoutes } from './geo.js';
+import { portfolioRoutes } from './portfolios.js';
+import { portfolioTypeRoutes } from './portfolio-types.js';
 import { sellerRoutes } from './sellers.js';
 
 /**
- * Agregador das rotas v1 de dados mestres: catálogos, filiais, geo, vendedores e clientes.
+ * Agregador das rotas v1 de dados mestres: catálogos, filiais, geo, vendedores, clientes e carteiras.
  * Registrar com `app.register(v1Routes, { prefix: '/v1' })`; requer `app.db` e `app.authenticate`.
  */
 export async function v1Routes(app: FastifyInstance): Promise<void> {
@@ -15,4 +17,6 @@ export async function v1Routes(app: FastifyInstance): Promise<void> {
   await app.register(geoRoutes);
   await app.register(sellerRoutes);
   await app.register(customerRoutes);
+  await app.register(portfolioTypeRoutes);
+  await app.register(portfolioRoutes);
 }
