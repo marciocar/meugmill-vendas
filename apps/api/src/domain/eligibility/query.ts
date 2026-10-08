@@ -193,3 +193,34 @@ export function previewPage(db: Conn, criteria: PortfolioCriteria, params: Previ
     total,
   };
 }
+
+export interface EligibilityState {
+  /** Cliente ativo com vínculo ativo na filial da carteira (pode entrar na prévia). */
+  member: boolean;
+  /** Casa os filtros da carteira hoje (candidato por filtro). */
+  byFilter: boolean;
+}
+
+/**
+ * Situação de elegibilidade de clientes específicos, pela mesma tabela virtual do motor
+ * (a regra de casamento fica num lugar só). Cliente que não é membro não aparece no mapa.
+ */
+export function eligibilityOf(
+  db: Conn,
+  criteria: PortfolioCriteria,
+  portfolioId: number,
+  customerIds: number[],
+): Map<number, EligibilityState> {
+  const out = new Map<number, EligibilityState>();
+  if (customerIds.length === 0) return out;
+  const list = sql.join(
+    customerIds.map((id) => sql`${id}`),
+    sql`, `,
+  );
+  const rows = db.all<{ id: number; is_filter: number }>(
+    sql`select m.id as id, m.is_filter as is_filter
+      from (${membersSql(criteria.branchId, portfolioId)}) m where m.id in (${list})`,
+  );
+  for (const r of rows) out.set(r.id, { member: true, byFilter: !!r.is_filter });
+  return out;
+}

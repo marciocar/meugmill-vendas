@@ -1,34 +1,24 @@
 import { and, asc, eq, gt, inArray, ne, sql } from 'drizzle-orm';
 import {
   branches,
-  economicGroups,
-  municipalities,
   portfolioEconomicGroups,
   portfolioRegions,
   portfolioRetailNetworks,
   portfolioSellers,
   portfolios,
   portfolioTypes,
-  productSubgroups,
-  retailNetworks,
-  sellers,
-  states,
 } from '../../db/schema.js';
-import {
-  assertVersion,
-  auditFields,
-  requireVersion,
-  writeActive,
-  type AuditedTable,
-} from '../shared/audit.js';
+import { assertVersion, requireVersion, writeActive, type AuditedTable } from '../shared/audit.js';
 import { assertAllInScope, requireAdmin, resolveScopeIds, type Actor } from '../shared/authz.js';
 import { isUniqueViolation, writeTx, type Conn, type Db, type ServiceOptions } from '../shared/db.js';
-import { DomainError, invalid, notFound } from '../shared/errors.js';
+import { DomainError, invalid } from '../shared/errors.js';
 import { assertBranchesActive } from '../shared/links.js';
 import { decodeCursor, resolveLimit, toPage, type Page } from '../shared/pagination.js';
 import { likeContains } from '../shared/sql.js';
 import { cleanText, parseInput } from '../shared/validate.js';
-import { requireAdminister, requireEdit } from './authz.js';
+import { findScoped, openForEdit, bump } from './access.js';
+import { loadAggregate } from './aggregate.js';
+import { requireAdminister } from './authz.js';
 import { portfolioNameKey } from './name-key.js';
 import {
   CreatePortfolioSchema,
@@ -40,7 +30,6 @@ import {
   type PortfolioListItem,
   type PortfolioListParams,
   type PortfolioResponse,
-  type RegionResponse,
   type ReplaceFiltersInput,
   type ReplaceSellersInput,
   type UpdatePortfolioInput,
@@ -54,8 +43,6 @@ import {
   validateAssignments,
   validateRegions,
 } from './validate.js';
-
-type PortfolioRow = typeof portfolios.$inferSelect;
 
 export interface PortfolioService {
   /** Itens resumidos, só das filiais do token. */
@@ -90,7 +77,6 @@ export interface PortfolioService {
 }
 
 const NAME_TAKEN = 'Já existe carteira com este nome na filial';
-const INACTIVE = 'Carteira inativa: reative antes de editar';
 
 /** Chave do nome; nome sem letra nem dígito (só pontuação) não identifica a carteira. */
 function nameKeyOf(name: string): string {
@@ -115,13 +101,6 @@ function cleanSub(value: string): string {
 export function createPortfolioService(db: Db, opts: ServiceOptions = {}): PortfolioService {
   const now = opts.now ?? Date.now;
 
-  /** Carteira visível ao ator (filial no token); fora do escopo é not_found. */
-  function findScoped(conn: Conn, actor: Actor, id: number): PortfolioRow {
-    const row = conn.select().from(portfolios).where(eq(portfolios.id, id)).get();
-    if (!row || !resolveScopeIds(conn, actor).includes(row.branchId)) throw notFound();
-    return row;
-  }
-
   function nameTaken(conn: Conn, branchId: number, key: string, exceptId?: number): boolean {
     return (
       conn
@@ -136,122 +115,6 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
         )
         .get() !== undefined
     );
-  }
-
-  function loadAggregate(conn: Conn, id: number): PortfolioResponse {
-    const row = conn
-      .select({
-        p: portfolios,
-        branch: { id: branches.id, code: branches.code, name: branches.name },
-        type: { id: portfolioTypes.id, code: portfolioTypes.code, name: portfolioTypes.name },
-      })
-      .from(portfolios)
-      .innerJoin(branches, eq(branches.id, portfolios.branchId))
-      .innerJoin(portfolioTypes, eq(portfolioTypes.id, portfolios.portfolioTypeId))
-      .where(eq(portfolios.id, id))
-      .get();
-    if (!row) throw notFound();
-
-    const regions: RegionResponse[] = conn
-      .select({
-        level: portfolioRegions.level,
-        stateCode: portfolioRegions.stateCode,
-        uf: states.uf,
-        municipalityCode: portfolioRegions.municipalityCode,
-        municipalityName: municipalities.name,
-        neighborhoodKey: portfolioRegions.neighborhoodKey,
-        neighborhoodLabel: portfolioRegions.neighborhoodLabel,
-      })
-      .from(portfolioRegions)
-      .innerJoin(states, eq(states.ibgeCode, portfolioRegions.stateCode))
-      .leftJoin(municipalities, eq(municipalities.ibgeCode, portfolioRegions.municipalityCode))
-      .where(eq(portfolioRegions.portfolioId, id))
-      .orderBy(asc(portfolioRegions.id))
-      .all()
-      .map((r) => ({
-        level: r.level,
-        stateCode: r.stateCode,
-        uf: r.uf,
-        ...(r.municipalityCode === null ? {} : { municipalityCode: r.municipalityCode }),
-        ...(r.municipalityName === null ? {} : { municipalityName: r.municipalityName }),
-        ...(r.neighborhoodKey === null ? {} : { neighborhoodKey: r.neighborhoodKey }),
-        ...(r.neighborhoodLabel === null ? {} : { neighborhoodLabel: r.neighborhoodLabel }),
-      }));
-
-    const networks = conn
-      .select({ id: retailNetworks.id, code: retailNetworks.code, name: retailNetworks.name })
-      .from(portfolioRetailNetworks)
-      .innerJoin(retailNetworks, eq(retailNetworks.id, portfolioRetailNetworks.retailNetworkId))
-      .where(eq(portfolioRetailNetworks.portfolioId, id))
-      .orderBy(asc(retailNetworks.code))
-      .all();
-    const groups = conn
-      .select({ id: economicGroups.id, code: economicGroups.code, name: economicGroups.name })
-      .from(portfolioEconomicGroups)
-      .innerJoin(economicGroups, eq(economicGroups.id, portfolioEconomicGroups.economicGroupId))
-      .where(eq(portfolioEconomicGroups.portfolioId, id))
-      .orderBy(asc(economicGroups.code))
-      .all();
-    const pairs = conn
-      .select({
-        seller: { id: sellers.id, code: sellers.code, name: sellers.name },
-        productSubgroup: {
-          id: productSubgroups.id,
-          code: productSubgroups.code,
-          name: productSubgroups.name,
-        },
-      })
-      .from(portfolioSellers)
-      .innerJoin(sellers, eq(sellers.id, portfolioSellers.sellerId))
-      .innerJoin(productSubgroups, eq(productSubgroups.id, portfolioSellers.productSubgroupId))
-      .where(eq(portfolioSellers.portfolioId, id))
-      .orderBy(asc(sellers.code), asc(productSubgroups.code))
-      .all();
-
-    return {
-      id: row.p.id,
-      name: row.p.name,
-      description: row.p.description,
-      branch: row.branch,
-      type: row.type,
-      responsibleSub: row.p.responsibleSub,
-      status: row.p.status,
-      filters: { regions, retailNetworks: networks, economicGroups: groups },
-      sellers: pairs,
-      ...auditFields(row.p),
-    };
-  }
-
-  /** Incrementa a versão do agregado uma vez e registra a auditoria. */
-  function bump(conn: Conn, row: PortfolioRow, actor: Actor, extra: Partial<PortfolioRow> = {}): void {
-    conn
-      .update(portfolios)
-      .set({ ...extra, version: row.version + 1, updatedAt: now(), updatedBy: actor.sub })
-      .where(eq(portfolios.id, row.id))
-      .run();
-  }
-
-  /**
-   * Passos comuns das escritas, nesta ordem: carteira no escopo (404), permissão de edição (403),
-   * `beforeVersion` (permissões extras que dependem do corpo), versão presente (428), carteira
-   * ativa (409 `portfolio_inactive`) e versão igual à atual (409 `version_conflict`).
-   * A inativa vem antes da versão: com a versão velha, o 409 de versão mandaria recarregar e
-   * tentar de novo, e o erro certo (reativar) só apareceria depois.
-   */
-  function openForEdit(
-    conn: Conn,
-    actor: Actor,
-    id: number,
-    expected: number | undefined,
-    beforeVersion?: (row: PortfolioRow) => void,
-  ): PortfolioRow {
-    const row = findScoped(conn, actor, id);
-    requireEdit(actor, row);
-    beforeVersion?.(row);
-    const version = requireVersion(expected);
-    if (!row.active) throw new DomainError('portfolio_inactive', INACTIVE);
-    assertVersion(row.version, version);
-    return row;
   }
 
   function transition(actor: Actor, id: number, expected: number | undefined, active: boolean) {
@@ -401,7 +264,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
           throw new DomainError('conflict', NAME_TAKEN);
         }
         try {
-          bump(tx, row, actor, {
+          bump(tx, row, actor, now(), {
             name,
             nameKey: key,
             branchId,
@@ -446,7 +309,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
             .values(data.economicGroupIds.map((economicGroupId) => ({ portfolioId: id, economicGroupId })))
             .run();
         }
-        bump(tx, row, actor);
+        bump(tx, row, actor, now());
         return loadAggregate(tx, id);
       });
     },
@@ -462,7 +325,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
             .values(data.assignments.map((a) => ({ portfolioId: id, ...a })))
             .run();
         }
-        bump(tx, row, actor);
+        bump(tx, row, actor, now());
         return loadAggregate(tx, id);
       });
     },
