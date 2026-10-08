@@ -7,7 +7,7 @@
 // Todos os dados são fictícios e só de empresa. Uso: node scripts/demo/seed.mjs [--expect-unchanged]
 // `--expect-unchanged` (usado no CI na 2ª execução) não escreve nada e falha se algo precisaria mudar:
 // prova que o seed é idempotente.
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -227,7 +227,10 @@ async function summary() {
 
 for (const file of Object.keys(LAYOUT_OF)) {
   if (file === '07-portfolios.csv') await ensurePortfolioTypes();
-  if (!readdirSync(DATA).includes(file)) fail(`arquivo ausente: ${file}`);
+  if (!existsSync(join(DATA, file)))
+    fail(
+      `arquivo ausente: ${join('scripts/demo/data', file)} (gere com python3 scripts/demo/generate-data.py)`,
+    );
   await importCsv(file);
 }
 await linkSellerLogin('V101', 'demo-vend');

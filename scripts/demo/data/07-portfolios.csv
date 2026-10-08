@@ -1,0 +1,5 @@
+﻿filial_codigo;nome;tipo_codigo;responsavel_sub;descricao;regioes;redes;grupos_economicos;vendedores;ativo
+DEMO-ES;Serra Norte;GEO;demo-gestor;Farmácias de Laranjeiras e Jacaraípe.;ES/3205002/Laranjeiras|ES/3205002/Jacaraípe;;;GEN:V101|GEN:V102|MIP:V103|DERM:V104;S
+DEMO-ES;Grande Vitória;GEO;demo-gestor;Vitória e Vila Velha.;ES/3205309|ES/3205200;;;GEN:V105|MIP:V106;S
+DEMO-ES;Vitória Centro;GEO;demo-admin;Rascunho que disputa Vitória com a Grande Vitória.;ES/3205309;;;GEN:V106;S
+DEMO-ES;Rede FarmaVida;REDE;demo-admin;Todas as lojas da rede, onde estiverem.;;RD-FARMAVIDA;;GEN:V107|FRIO:V107;S
