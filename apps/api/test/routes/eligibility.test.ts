@@ -228,6 +228,47 @@ describe('contrato HTTP: prévia e ajustes', () => {
     }
   });
 
+  it('limite de 5.000 ajustes com clientes reais: 5.000 aceitos; 5.001 dá 400 com a mensagem do limite', async () => {
+    const { id, etag } = await portfolioWithFilter();
+    const insC = fx.app.sqlite.prepare(
+      `insert into customers (cnpj, legal_name, legal_name_key, state_code, municipality_code, neighborhood,
+        neighborhood_key, active, created_at, updated_at, created_by, updated_by)
+       values (?,?,?,?,?,?,?,1,1,1,'t','t')`,
+    );
+    const insL = fx.app.sqlite.prepare(
+      'insert into customer_branches (customer_id, branch_id, active) values (?,?,1)',
+    );
+    const ids: number[] = [];
+    fx.app.sqlite.transaction(() => {
+      for (let i = 0; i < 5001; i++) {
+        seq += 1;
+        const cid = insC.run(
+          String(seq).padStart(14, '0'),
+          `Lote ${seq}`,
+          `LOTE ${seq}`,
+          ES,
+          SERRA,
+          'Centro',
+          'CENTRO',
+        ).lastInsertRowid as number;
+        insL.run(cid, ser);
+        ids.push(cid);
+      }
+    })();
+    const tooMany = await call('PUT', `/${id}/overrides`, ADMIN, {
+      ifMatch: etag,
+      body: { include: ids.slice(0, 3000), exclude: ids.slice(3000) },
+    });
+    expect(tooMany.statusCode).toBe(400);
+    expect(tooMany.json()).toEqual({ error: 'validation_error', message: 'Limite de ajustes excedido' });
+    const ok = await call('PUT', `/${id}/overrides`, ADMIN, {
+      ifMatch: etag,
+      body: { include: ids.slice(0, 3000), exclude: ids.slice(3000, 5000) },
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json()).toMatchObject({ overridesInclude: 3000, overridesExclude: 2000 });
+  }, 30000);
+
   it('LGPD: CNPJ e razão social não aparecem nos logs da requisição de prévia', async () => {
     const { id } = await portfolioWithFilter();
     customer({ name: SECRET_NAME, cnpj: SECRET_CNPJ });

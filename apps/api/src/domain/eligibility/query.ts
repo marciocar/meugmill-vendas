@@ -186,7 +186,9 @@ export function previewPage(db: Conn, criteria: PortfolioCriteria, params: Previ
     items: page.items.map((r) => ({
       customerId: r.id,
       source: r.is_filter ? 'filter' : 'manual',
-      matchedRegionLevel: r.rank === null ? null : (LEVEL_BY_RANK[r.rank] ?? null),
+      // Inclusão manual não tem nível de região: o E5 não deve priorizar por região quem não casou
+      // pelo filtro. `matchedBy` segue informativo.
+      matchedRegionLevel: r.is_filter && r.rank !== null ? (LEVEL_BY_RANK[r.rank] ?? null) : null,
       matchedBy: { region: r.rank !== null, retailNetwork: !!r.by_net, economicGroup: !!r.by_grp },
     })),
     nextCursor: page.nextCursor,

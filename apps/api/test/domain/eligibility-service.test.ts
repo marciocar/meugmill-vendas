@@ -76,6 +76,38 @@ function customer(
   return id;
 }
 
+/** Muitos clientes ativos vinculados a SER, numa transação (volume de teste de limite). */
+function bulkCustomers(n: number): number[] {
+  const insC = fx.app.sqlite.prepare(
+    `insert into customers (cnpj, legal_name, legal_name_key, state_code, municipality_code, neighborhood,
+      neighborhood_key, active, created_at, updated_at, created_by, updated_by)
+     values (?,?,?,?,?,?,?,1,?,?,'t','t')`,
+  );
+  const insL = fx.app.sqlite.prepare(
+    'insert into customer_branches (customer_id, branch_id, active) values (?,?,1)',
+  );
+  const out: number[] = [];
+  fx.app.sqlite.transaction(() => {
+    for (let i = 0; i < n; i++) {
+      seq += 1;
+      const id = insC.run(
+        String(seq).padStart(14, '0'),
+        `Lote ${seq}`,
+        `LOTE ${seq}`,
+        ES,
+        SERRA,
+        'Centro',
+        neighborhoodKey('Centro'),
+        NOW,
+        NOW,
+      ).lastInsertRowid as number;
+      insL.run(id, ser);
+      out.push(id);
+    }
+  })();
+  return out;
+}
+
 /** Carteira em SER filtrando o ES inteiro; `version` acompanha o agregado. */
 function newPortfolio(state: number | null = ES): number {
   const p = pfs.create(adminSer, {
@@ -224,12 +256,24 @@ describe('ajustes: validações', () => {
     );
   });
 
-  it('limite de 5.000 no total', () => {
-    const include = Array.from({ length: 3000 }, (_, i) => i + 1);
-    const exclude = Array.from({ length: 2001 }, (_, i) => i + 10_000);
-    expect(codeOf(() => put(adminSer, include, exclude))).toBe('validation_error');
-    const tooMany = Array.from({ length: 5001 }, (_, i) => i + 1);
-    expect(codeOf(() => put(adminSer, tooMany, []))).toBe('validation_error');
+  it('limite de 5.000 com clientes reais: 5.000 persistem; 5.001 dá 400 com a mensagem do limite', () => {
+    const ids = bulkCustomers(5001);
+    put(adminSer, ids.slice(0, 3000), ids.slice(3000, 5000));
+    expect(count('portfolio_customer_overrides')).toBe(5000);
+    expect(pfs.get(adminSer, pid)).toMatchObject({ overridesInclude: 3000, overridesExclude: 2000 });
+    const before = version;
+    const err = (() => {
+      try {
+        put(adminSer, ids.slice(0, 3000), ids.slice(3000, 5001));
+      } catch (e) {
+        return e as Error & { code: string };
+      }
+      return null;
+    })();
+    expect(err?.code).toBe('validation_error');
+    expect(err?.message).toBe('Limite de ajustes excedido');
+    expect(count('portfolio_customer_overrides')).toBe(5000);
+    expect(pfs.get(adminSer, pid).version).toBe(before);
   });
 
   it('cliente de outra filial ou inexistente: 400, sem diferenciar', () => {
@@ -248,14 +292,22 @@ describe('ajustes: validações', () => {
     expect(codeOf(() => put(adminSer, [elsewhere], []))).toBe('validation_error');
   });
 
-  it('o escopo é o do ator: cliente da filial CAR passa para quem tem as duas filiais', () => {
-    const both = customer({
+  it('cliente só da filial CAR em carteira de SER: 400, mesmo para quem tem as duas filiais', () => {
+    const carOnly = customer({ branches: [[car, true]] });
+    const both = adminOf('SER', 'CAR');
+    expect(codeOf(() => put(both, [carOnly], []))).toBe('validation_error');
+    expect(codeOf(() => put(both, [], [carOnly]))).toBe('validation_error');
+    expect(count('portfolio_customer_overrides')).toBe(0);
+  });
+
+  it('cliente com as duas filiais é aceito (o vínculo com a filial da carteira basta)', () => {
+    const shared = customer({
       branches: [
         [ser, true],
         [car, true],
       ],
     });
-    expect(put(adminOf('SER', 'CAR'), [both], []).overridesInclude).toBe(1);
+    expect(put(adminOf('SER', 'CAR'), [shared], []).overridesInclude).toBe(1);
   });
 
   it('inclusão exige cliente ativo e vínculo ativo na filial da carteira', () => {
@@ -266,7 +318,7 @@ describe('ajustes: validações', () => {
     expect(codeOf(() => put(adminSer, [inactive], []))).toBe('validation_error');
     expect(codeOf(() => put(adminSer, [linkOff], []))).toBe('validation_error');
     expect(codeOf(() => put(scoped, [otherBranchOnly], []))).toBe('validation_error');
-    // exclusão aceita qualquer cliente do escopo
+    // exclusão aceita cliente inativo ou com vínculo inativo na filial da carteira
     expect(put(adminSer, [], [inactive, linkOff]).overridesExclude).toBe(2);
   });
 });
@@ -353,5 +405,179 @@ describe('ajustes: atomicidade', () => {
     expect(svc.getOverrides(adminSer, pid).include).toEqual([]);
     expect(pfs.get(adminSer, pid).version).toBe(before);
     version = before;
+  });
+});
+
+describe('ajustes: vazamento de escopo entre filiais (regressão)', () => {
+  const both = adminOf('SER', 'CAR');
+
+  it('admin SER+CAR não consegue gravar exclusão de cliente só de CAR em carteira de SER', () => {
+    const carOnly = customer({ name: 'Segredo CAR', branches: [[car, true]] });
+    expect(codeOf(() => put(both, [], [carOnly]))).toBe('validation_error');
+    const shown = JSON.stringify(svc.getOverrides(readerSer, pid));
+    expect(shown).not.toContain('Segredo CAR');
+  });
+
+  it('troca de filial com ajustes sem vínculo na filial nova: 400, sem trocar nada', () => {
+    const p = pfs.create(both, {
+      name: 'Carteira CAR',
+      branchId: car,
+      responsibleSub: 'r',
+      portfolioTypeId: typeId,
+    });
+    const carOnly = customer({ branches: [[car, true]] });
+    const res = svc.replaceOverrides(both, p.id, p.version, { include: [carOnly], exclude: [] });
+    expect(codeOf(() => pfs.update(both, p.id, res.version, { branchId: ser }))).toBe('validation_error');
+    const after = pfs.get(both, p.id);
+    expect(after.branch.code).toBe('CAR');
+    expect(after.version).toBe(res.version);
+  });
+
+  it('troca de filial passa quando todos os clientes ajustados têm vínculo (ativo ou não) na filial nova', () => {
+    const p = pfs.create(both, {
+      name: 'Carteira CAR 2',
+      branchId: car,
+      responsibleSub: 'r',
+      portfolioTypeId: typeId,
+    });
+    const a = customer({
+      branches: [
+        [car, true],
+        [ser, true],
+      ],
+    });
+    const b = customer({
+      branches: [
+        [car, true],
+        [ser, false],
+      ],
+    });
+    const res = svc.replaceOverrides(both, p.id, p.version, { include: [a], exclude: [b] });
+    expect(pfs.update(both, p.id, res.version, { branchId: ser }).branch.code).toBe('SER');
+  });
+
+  it('getOverrides omite ajustes de clientes invisíveis ao leitor (defesa em profundidade)', () => {
+    const visible = customer({ name: 'Visível' });
+    const hidden = customer({ name: 'Segredo CAR', branches: [[car, true]] });
+    put(adminSer, [], [visible]);
+    // estado impossível pela API, gravado direto para provar a defesa
+    fx.app.sqlite
+      .prepare("insert into portfolio_customer_overrides values (?,?,'exclude',?,'t')")
+      .run(pid, hidden, NOW);
+    const forReader = svc.getOverrides(readerSer, pid);
+    expect(forReader.exclude.map((e) => e.customer.id)).toEqual([visible]);
+    expect(JSON.stringify(forReader)).not.toContain('Segredo CAR');
+    expect(svc.getOverrides(both, pid).exclude.map((e) => e.customer.id)).toEqual([visible, hidden]);
+  });
+});
+
+describe('prévia: estado muda entre chamadas (sem cache)', () => {
+  it('filtro trocado, cliente mudou de bairro e vínculo reativado', () => {
+    const inEs = customer();
+    const inSp = customer({ state: SP, municipality: SAO_PAULO });
+    expect(previewIds()).toEqual([inEs]);
+    version = pfs.replaceFilters(adminSer, pid, version, {
+      regions: [{ level: 'state', stateCode: SP }],
+      retailNetworkIds: [],
+      economicGroupIds: [],
+    }).version;
+    expect(previewIds()).toEqual([inSp]);
+
+    version = pfs.replaceFilters(adminSer, pid, version, {
+      regions: [
+        { level: 'neighborhood', stateCode: ES, municipalityCode: SERRA, neighborhoodLabel: 'Laranjeiras' },
+      ],
+      retailNetworkIds: [],
+      economicGroupIds: [],
+    }).version;
+    expect(previewIds()).toEqual([]);
+    fx.app.sqlite
+      .prepare('update customers set neighborhood = ?, neighborhood_key = ? where id = ?')
+      .run('Laranjeiras', neighborhoodKey('Laranjeiras'), inEs);
+    expect(previewIds()).toEqual([inEs]);
+
+    fx.app.sqlite.prepare('update customer_branches set active = 0 where customer_id = ?').run(inEs);
+    expect(previewIds()).toEqual([]);
+    fx.app.sqlite.prepare('update customer_branches set active = 1 where customer_id = ?').run(inEs);
+    expect(previewIds()).toEqual([inEs]);
+  });
+});
+
+describe('prévia: paginação com ajustes', () => {
+  it('inclusões e exclusões intercaladas: cada cliente uma vez e soma das páginas = total', () => {
+    const inFilter = Array.from({ length: 7 }, () => customer());
+    const outFilter = Array.from({ length: 5 }, () => customer({ state: SP, municipality: SAO_PAULO }));
+    // exclui um sim, outro não; inclui alguns de fora do filtro, intercalados
+    put(
+      adminSer,
+      [outFilter[0] as number, outFilter[2] as number, outFilter[4] as number],
+      [inFilter[1] as number, inFilter[3] as number, inFilter[5] as number],
+    );
+    const walk = (params: object) => {
+      const seen: number[] = [];
+      let cursor: string | undefined;
+      let total: number | undefined;
+      do {
+        const page = svc.preview(adminSer, pid, { limit: 2, ...params, ...(cursor ? { cursor } : {}) });
+        total = page.total;
+        seen.push(...page.items.map((i) => i.customer.id));
+        cursor = page.nextCursor ?? undefined;
+      } while (cursor);
+      return { seen, total };
+    };
+    const all = walk({});
+    expect(new Set(all.seen).size).toBe(all.seen.length);
+    expect(all.seen).toHaveLength(all.total ?? -1);
+    expect(all.total).toBe(7 - 3 + 3);
+    expect(all.seen).toEqual([...all.seen].sort((x, y) => x - y));
+  });
+
+  it('q + source + ajustes: soma das páginas = total', () => {
+    const named = Array.from({ length: 6 }, (_, i) => customer({ name: `Alfa ${i}` }));
+    const manual = Array.from({ length: 4 }, (_, i) =>
+      customer({ name: `Alfa fora ${i}`, state: SP, municipality: SAO_PAULO }),
+    );
+    customer({ name: 'Beta' });
+    put(adminSer, [manual[0] as number, manual[1] as number, manual[3] as number], [named[2] as number]);
+    for (const source of ['filter', 'manual', undefined] as const) {
+      const seen: number[] = [];
+      let cursor: string | undefined;
+      let total: number | undefined;
+      do {
+        const page = svc.preview(adminSer, pid, {
+          q: 'alfa',
+          limit: 2,
+          ...(source ? { source } : {}),
+          ...(cursor ? { cursor } : {}),
+        });
+        total = page.total;
+        seen.push(...page.items.map((i) => i.customer.id));
+        cursor = page.nextCursor ?? undefined;
+      } while (cursor);
+      expect(new Set(seen).size).toBe(seen.length);
+      expect(seen).toHaveLength(total ?? -1);
+      expect(total).toBe({ filter: 5, manual: 3, undefined: 8 }[String(source) as 'filter']);
+    }
+  });
+});
+
+describe('versão compartilhada entre E3 e E4', () => {
+  it('PUT filtros e PUT ajustes incrementam a mesma versão e o agregado traz as contagens', () => {
+    const a = customer();
+    const b = customer();
+    const start = version;
+    const f = pfs.replaceFilters(adminSer, pid, version, {
+      regions: [{ level: 'state', stateCode: ES }],
+      retailNetworkIds: [],
+      economicGroupIds: [],
+    });
+    expect(f.version).toBe(start + 1);
+    const o = svc.replaceOverrides(adminSer, pid, f.version, { include: [a], exclude: [b] });
+    expect(o.version).toBe(start + 2);
+    expect(o).toMatchObject({ overridesInclude: 1, overridesExclude: 1 });
+    // a versão velha de filtros já não vale para ajustes
+    expect(codeOf(() => svc.replaceOverrides(adminSer, pid, f.version, { include: [], exclude: [] }))).toBe(
+      'version_conflict',
+    );
   });
 });

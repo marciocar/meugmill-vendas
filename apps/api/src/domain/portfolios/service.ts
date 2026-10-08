@@ -39,6 +39,7 @@ import {
   assertActiveNetworks,
   assertActiveType,
   assertNoDuplicates,
+  assertOverridesLinked,
   assertSellersUsable,
   validateAssignments,
   validateRegions,
@@ -255,6 +256,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
             .all()
             .map((r) => r.id);
           assertSellersUsable(tx, branchId, sellerIds);
+          assertOverridesLinked(tx, id, branchId);
         }
         const typeId = data.portfolioTypeId ?? row.portfolioTypeId;
         if (typeId !== row.portfolioTypeId) assertActiveType(tx, typeId);

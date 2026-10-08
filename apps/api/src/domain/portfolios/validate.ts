@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
   economicGroups,
   municipalities,
@@ -175,6 +175,21 @@ export function assertSellersLinkedToBranch(conn: Conn, branchId: number, seller
     )
     .all().length;
   if (n !== sellerIds.length) throw invalid('Vendedor sem vínculo ativo com a filial da carteira');
+}
+
+/**
+ * Troca de filial: todo cliente com ajuste manual precisa ter vínculo (ativo ou não) com a filial
+ * nova; senão a carteira passaria a guardar ajustes de clientes que a filial não enxerga.
+ */
+export function assertOverridesLinked(conn: Conn, portfolioId: number, branchId: number): void {
+  const orphan = conn.get<{ n: number }>(
+    sql`select 1 as n from portfolio_customer_overrides ov
+         where ov.portfolio_id = ${portfolioId}
+           and not exists (select 1 from customer_branches cb
+                            where cb.customer_id = ov.customer_id and cb.branch_id = ${branchId})
+         limit 1`,
+  );
+  if (orphan) throw invalid('Há ajustes de clientes sem vínculo com a filial da carteira');
 }
 
 function assertActiveSubgroups(conn: Conn, ids: number[]): void {

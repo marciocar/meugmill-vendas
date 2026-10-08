@@ -63,11 +63,14 @@ function customersById(conn: Conn, ids: number[]): Map<number, PreviewCustomer> 
 export function createEligibilityService(db: Db, opts: ServiceOptions = {}): EligibilityService {
   const now = opts.now ?? Date.now;
 
-  /** Ids que existem E têm vínculo (ativo ou não) com alguma filial do escopo do ator. */
-  function idsInScope(conn: Conn, actor: Actor, ids: number[]): Set<number> {
-    const scopeIds = resolveScopeIds(conn, actor);
+  /** Ids de clientes que existem E têm vínculo (ativo ou não) com alguma das filiais dadas. */
+  function idsLinkedTo(conn: Conn, branchIds: number[], ids: number[]): Set<number> {
     const found = new Set<number>();
-    if (scopeIds.length === 0) return found;
+    if (branchIds.length === 0) return found;
+    const branchList = sql.join(
+      branchIds.map((id) => sql`${id}`),
+      sql`, `,
+    );
     for (let i = 0; i < ids.length; i += BATCH) {
       const rows = conn.all<{ id: number }>(
         sql`select c.id as id from customers c
@@ -76,11 +79,7 @@ export function createEligibilityService(db: Db, opts: ServiceOptions = {}): Eli
             sql`, `,
           )})
             and exists (select 1 from customer_branches cb
-                         where cb.customer_id = c.id
-                           and cb.branch_id in (${sql.join(
-                             scopeIds.map((id) => sql`${id}`),
-                             sql`, `,
-                           )}))`,
+                         where cb.customer_id = c.id and cb.branch_id in (${branchList}))`,
       );
       for (const r of rows) found.add(r.id);
     }
@@ -114,12 +113,19 @@ export function createEligibilityService(db: Db, opts: ServiceOptions = {}): Eli
         .where(eq(portfolioCustomerOverrides.portfolioId, portfolioId))
         .orderBy(portfolioCustomerOverrides.customerId)
         .all();
-      const ids = rows.map((r) => r.customerId);
+      // Defesa em profundidade: só aparecem ajustes de clientes visíveis ao leitor (vínculo com alguma
+      // filial do token); os demais são omitidos da lista, sem sinal de que existem.
+      const visible = idsLinkedTo(
+        db,
+        resolveScopeIds(db, actor),
+        rows.map((r) => r.customerId),
+      );
+      const ids = rows.map((r) => r.customerId).filter((id) => visible.has(id));
       const data = customersById(db, ids);
       const state = eligibilityOf(db, loadPortfolioCriteria(db, portfolioId), portfolioId, ids);
       const out: OverridesResponse = { include: [], exclude: [] };
       for (const r of rows) {
-        const customer = data.get(r.customerId);
+        const customer = visible.has(r.customerId) ? data.get(r.customerId) : undefined;
         if (!customer) continue;
         const s = state.get(r.customerId);
         const effective = r.kind === 'include' ? s?.member === true : s?.byFilter === true;
@@ -136,9 +142,11 @@ export function createEligibilityService(db: Db, opts: ServiceOptions = {}): Eli
         if (all.length > MAX_OVERRIDES) throw invalid('Limite de ajustes excedido');
         assertNoDuplicates(all, String, 'Cliente repetido nos ajustes');
 
-        // Existência e escopo juntos: inexistente e fora do escopo dão a mesma resposta.
-        const inScope = idsInScope(tx, actor, all);
-        if (all.some((id) => !inScope.has(id))) throw invalid('Cliente inválido ou fora do escopo');
+        // Existência e vínculo com a FILIAL DA CARTEIRA (não com o escopo do ator) juntos: inexistente
+        // e fora da filial dão a mesma resposta. O vínculo pode estar inativo (exclusão); inclusão
+        // exige vínculo ativo, validado abaixo.
+        const linked = idsLinkedTo(tx, [row.branchId], all);
+        if (all.some((id) => !linked.has(id))) throw invalid('Cliente inválido ou fora do escopo');
 
         const state = eligibilityOf(tx, loadPortfolioCriteria(tx, portfolioId), portfolioId, data.include);
         if (data.include.some((id) => !state.get(id)?.member)) {

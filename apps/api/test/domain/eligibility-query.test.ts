@@ -293,7 +293,9 @@ describe('motor de elegibilidade: ajustes manuais', () => {
       [far, 'manual'],
     ]);
     expect(p.items[1]?.matchedBy).toEqual({ region: true, retailNetwork: false, economicGroup: false });
-    expect(p.items[1]?.matchedRegionLevel).toBe('state');
+    // inclusão manual não carrega nível de região, mesmo quando a região casou
+    expect(p.items[0]?.matchedRegionLevel).toBe('state');
+    expect(p.items[1]?.matchedRegionLevel).toBeNull();
     expect(p.items[2]?.matchedBy).toEqual({ region: false, retailNetwork: true, economicGroup: false });
     expect(p.items[2]?.matchedRegionLevel).toBeNull();
   });
@@ -313,6 +315,48 @@ describe('motor de elegibilidade: ajustes manuais', () => {
     state(ES);
     override(a, 'exclude', other);
     expect(ids(preview())).toEqual([a]);
+  });
+});
+
+describe('motor de elegibilidade: combinações de critérios', () => {
+  it('região + rede + grupo juntos: só quem casa os três entra, com matchedBy correto', () => {
+    const r1 = seedRetailNetwork(fx.db, 'R1');
+    const g1 = seedEconomicGroup(fx.db, 'G1');
+    const all3 = customer({ network: r1, group: g1 });
+    customer({ network: r1, group: null });
+    customer({ network: null, group: g1 });
+    customer({ network: r1, group: g1, state: SP, municipality: SAO_PAULO });
+    customer({ network: null, group: null });
+    state(ES);
+    network(r1);
+    group(g1);
+    const p = preview();
+    expect(p.total).toBe(1);
+    expect(p.items).toEqual([
+      {
+        customerId: all3,
+        source: 'filter',
+        matchedRegionLevel: 'state',
+        matchedBy: { region: true, retailNetwork: true, economicGroup: true },
+      },
+    ]);
+  });
+
+  it('região mista: cada cliente recebe o nível mais específico que casou', () => {
+    state(ES);
+    city(SERRA, ES);
+    hood(VITORIA, ES, 'Praia do Canto');
+    const onlyState = customer({ municipality: 3201308 }); // outro município do ES
+    const city1 = customer({ municipality: SERRA, neighborhood: 'Laranjeiras' });
+    const hood1 = customer({ municipality: VITORIA, neighborhood: 'Praia do Canto' });
+    const hood2 = customer({ municipality: VITORIA, neighborhood: 'Centro' }); // só a UF
+    const p = preview();
+    expect(p.items.map((i) => [i.customerId, i.matchedRegionLevel])).toEqual([
+      [onlyState, 'state'],
+      [city1, 'municipality'],
+      [hood1, 'neighborhood'],
+      [hood2, 'state'],
+    ]);
   });
 });
 
