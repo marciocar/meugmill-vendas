@@ -49,11 +49,6 @@ export function registerCsvRoutes(
   const onRequest = app.authenticate;
   const idOf = (request: { params: unknown }) => (request.params as { id: number }).id;
 
-  // O arquivo chega cru (`text/csv`); o codec decide a codificação. Limite próprio, maior que o JSON.
-  app.addContentTypeParser('text/csv', { parseAs: 'buffer', bodyLimit: MAX_FILE_BYTES }, (_req, body, done) =>
-    done(null, body),
-  );
-
   app.get(
     '/csv-layouts',
     { onRequest, schema: { tags, response: { 200: LayoutsSchema, ...ERROR_RESPONSES } } },
@@ -69,34 +64,56 @@ export function registerCsvRoutes(
     async (request) => LAYOUTS[(request.params as { layout: LayoutId }).layout],
   );
 
-  app.post(
-    '/imports',
-    {
-      onRequest,
-      bodyLimit: MAX_FILE_BYTES,
-      schema: {
-        tags,
-        description:
-          'Envia um CSV (`Content-Type: text/csv`, até 16 MB e 100 mil linhas) e agenda a simulação. ' +
-          'Responde 202 com o job em `validating`; acompanhe por `GET /v1/imports/{id}`.',
-        querystring: ImportQuerySchema,
-        response: { 202: ImportJobResponseSchema, ...ERROR_RESPONSES },
+  // Envio do arquivo num escopo próprio: só aqui vale o parser `text/csv` com limite de 16 MB, e o perfil é
+  // conferido no `onRequest`, ANTES de ler o corpo (quem não pode importar não faz a API guardar 16 MB).
+  void app.register(async (scope) => {
+    scope.addContentTypeParser(
+      'text/csv',
+      { parseAs: 'buffer', bodyLimit: MAX_FILE_BYTES },
+      (_req, body, done) => done(null, body),
+    );
+    scope.post(
+      '/imports',
+      {
+        onRequest: [
+          app.authenticate,
+          async (request, reply) => {
+            try {
+              jobs.assertCanImport(actorOf(request));
+            } catch (err) {
+              return sendDomainError(reply, err);
+            }
+          },
+        ],
+        bodyLimit: MAX_FILE_BYTES,
+        schema: {
+          tags,
+          description:
+            'Envia um CSV (`Content-Type: text/csv`, até 16 MB e 100 mil linhas) e agenda a simulação. ' +
+            'Responde 202 com o job em `validating`; acompanhe por `GET /v1/imports/{id}`.',
+          querystring: ImportQuerySchema,
+          response: { 202: ImportJobResponseSchema, ...ERROR_RESPONSES },
+        },
       },
-    },
-    async (request, reply) => {
-      try {
-        if (!Buffer.isBuffer(request.body)) {
-          return await reply
-            .code(400)
-            .send({ error: 'validation_error', message: 'Envie o arquivo como text/csv' });
+      async (request, reply) => {
+        try {
+          if (!Buffer.isBuffer(request.body)) {
+            return await reply
+              .code(400)
+              .send({ error: 'validation_error', message: 'Envie o arquivo como text/csv' });
+          }
+          const job = jobs.submit(
+            actorOf(request),
+            (request.query as { layout: string }).layout,
+            request.body,
+          );
+          return await reply.code(202).send(job);
+        } catch (err) {
+          return sendDomainError(reply, err);
         }
-        const job = jobs.submit(actorOf(request), (request.query as { layout: string }).layout, request.body);
-        return await reply.code(202).send(job);
-      } catch (err) {
-        return sendDomainError(reply, err);
-      }
-    },
-  );
+      },
+    );
+  });
 
   app.get(
     '/imports',
@@ -245,9 +262,13 @@ export async function csvRoutes(app: FastifyInstance): Promise<void> {
     },
   });
   const recovered = jobs.recover();
-  if (recovered > 0)
-    app.log.warn({ recovered }, 'import_jobs_recovered: jobs interrompidos ou vencidos na subida');
+  if (recovered > 0) {
+    app.log.warn({ recovered }, 'import_jobs_recovered: jobs abertos perderam o arquivo na subida');
+  }
+  jobs.start();
+  // Ao desligar, o job em curso para no próximo bloco (vira `interrupted`) em vez de segurar o processo.
   app.addHook('onClose', async () => {
+    jobs.stop();
     await jobs.idle();
   });
   registerCsvRoutes(app, { jobs, exports: createExportService(app.db, options) });

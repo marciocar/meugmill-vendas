@@ -159,6 +159,18 @@ describe('importação e exportação por HTTP', () => {
     expect(json.json()).toEqual({ error: 'validation_error', message: 'Envie o arquivo como text/csv' });
     const big = await upload('branches', Buffer.alloc(16 * 1024 * 1024 + 1, 0x61));
     expect(big.statusCode).toBe(413);
+    // Quem não importa recebe 403 antes de a API ler o corpo (mesmo grande demais).
+    expect((await upload('branches', Buffer.alloc(16 * 1024 * 1024 + 1, 0x61), SUPERVISION)).statusCode).toBe(
+      403,
+    );
+    // O parser de CSV vale só no envio: confirmar com corpo text/csv não é aceito.
+    const confirmCsv = await t.app.inject({
+      method: 'POST',
+      url: '/v1/imports/1/confirm',
+      headers: { ...(await t.headers(ADMIN)), 'content-type': 'text/csv' },
+      payload: 'a\n',
+    });
+    expect(confirmCsv.statusCode).toBe(415);
   });
 
   it('o job é só de quem o criou; cancela; exporta só o que o perfil lê', async () => {

@@ -23,7 +23,7 @@ CREATE TABLE `import_jobs` (
 	`updated_at` integer NOT NULL,
 	`file_sha256` text NOT NULL,
 	`file_bytes` integer NOT NULL,
-	`content` blob,
+	`actor_scope` text NOT NULL,
 	`total_rows` integer DEFAULT 0 NOT NULL,
 	`processed_rows` integer DEFAULT 0 NOT NULL,
 	`error_rows` integer DEFAULT 0 NOT NULL,

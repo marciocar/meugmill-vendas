@@ -35,6 +35,21 @@ O **E10** é o motor de backend: layouts, importação e exportação, com API, 
 | LGPD e auditoria | `import_jobs` guarda quem, quando, o layout, o hash SHA-256 do arquivo, as contagens e o estado. O **conteúdo** do arquivo é apagado ao terminar (gravado, cancelado, expirado ou com falha). O job `validated` expira em 24 h. O relatório guarda o nº da linha, a ação, o código e a mensagem fixa, nunca o conteúdo da linha. `userSub` do vendedor **não** entra no CSV. Sem CPF. | Minimização: o arquivo traz nomes de vendedores (pessoa física). |
 | Limites | Até 16 MB e 100 mil linhas de dados por arquivo. | Folga para os 50 mil clientes da meta. |
 
+### Revisão adversarial (REPROVADO, depois corrigido) — decisões [auto] revistas, 2026-10-08
+
+| Tema | Antes | Agora | Achado |
+|---|---|---|---|
+| Simulação | Transação desfeita por bloco, então cada bloco não via o anterior | **Cópia do banco em memória** (`serialize`), com blocos cumulativos e descartada no fim | 1 |
+| Escopo na confirmação | Valia o token da confirmação | A confirmação exige **os mesmos papéis e filiais** da simulação, e a linha com ação ou ativação diferente do simulado falha (`changed_since_validation`) | 2 |
+| Arquivo | Coluna `content` no banco, apagada ao terminar | **Só na memória do processo**, nunca no banco nem no WAL. Teto de 128 MB abertos. Varredura de vencimento a cada 10 min e a cada envio. Reiniciar a API interrompe os jobs abertos | 3 |
+| Bloqueio da API | Parse e pré-validação de uma vez | Leitor incremental, fatias com cessão de vez, campo gigante recusado durante a leitura, linha como classe. Teto do teste no p99 do event loop. Carteira grande nos vínculos documentada | 4 |
+| Separadores | Sem regra | Código sem `\|` nem `:` e bairro de região sem `\|` (domínio E2/E3). A exportação falha em vez de gerar lista ambígua | 5 |
+| `linked` + `ativo=N` | O `N` era ignorado | Inativa o vínculo recém-feito | 6 |
+| Envio | O 403 vinha depois de ler o corpo | Admin conferido no `onRequest`. O parser de 16 MB só na rota de envio | 7 |
+| Oráculo de existência | Mensagens diferentes | Filial do token antes de buscar a carteira. CNPJ inexistente igual a não membro (mesma mensagem do E6) | 8 |
+| Relatório da gravação | Gravado fora da transação dos dados | Na mesma transação | 9 |
+| Fórmula com `'` | Perdia o apóstrofo | A saída acrescenta sempre um `'`, e a entrada tira um | 10 |
+
 ## Riscos
 
 1. **Gravação em blocos não é atômica no arquivo inteiro.** Uma falha no meio deixa os blocos anteriores

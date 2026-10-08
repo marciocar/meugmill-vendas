@@ -1,7 +1,8 @@
 import { eq, inArray } from 'drizzle-orm';
 import { branches } from '../../../db/schema.js';
 import type { Conn } from '../../shared/db.js';
-import { DomainError, invalid } from '../../shared/errors.js';
+import type { Actor } from '../../shared/authz.js';
+import { DomainError, forbidden, invalid } from '../../shared/errors.js';
 import { trimCollapse } from '../../shared/normalize.js';
 import { splitList } from '../codec.js';
 import type { Row } from '../layouts.js';
@@ -71,6 +72,15 @@ export function branchIdByCode(conn: Conn, value: string, column: string): numbe
   const row = conn.select({ id: branches.id }).from(branches).where(eq(branches.code, value)).get();
   if (!row) throw invalid(`Código não encontrado: ${column}`);
   return row.id;
+}
+
+/**
+ * Filial da carteira (carteiras e vínculos): precisa estar no token ANTES de qualquer busca, para a
+ * simulação não revelar o que existe em outra filial (mesma resposta para inexistente e fora do escopo).
+ */
+export function scopedBranchId(conn: Conn, actor: Actor, value: string, column: string): number {
+  if (!actor.branchCodes.includes(value)) throw forbidden('Filial fora do escopo do usuário');
+  return branchIdByCode(conn, value, column);
 }
 
 export function sameSet<T>(a: readonly T[], b: readonly T[]): boolean {

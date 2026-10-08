@@ -26,9 +26,12 @@ export function cleanOptionalText(value: string | null | undefined): string | nu
   return out === '' ? null : out;
 }
 
-/** Código do ERP: trim, não vazio e sem espaço interno. */
+/**
+ * Código do ERP: trim, não vazio, sem espaço interno e sem `|` nem `:` (separadores das listas do CSV do
+ * E10: com eles o código não volta igual de uma exportação).
+ */
 export function cleanCode(value: string): string {
   const out = cleanText(value, 'code');
-  if (/\s/.test(out)) throw invalid('Campo inválido: code');
+  if (/[\s|:]/.test(out)) throw invalid('Campo inválido: code');
   return out;
 }

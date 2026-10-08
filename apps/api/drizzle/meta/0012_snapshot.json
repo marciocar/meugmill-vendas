@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7e6105de-165a-43bc-908f-aea1d3c8b88c",
+  "id": "17ee6b39-1df7-47e4-aede-6aaf40f5fde7",
   "prevId": "d8261857-6d40-4eb5-b69c-674d3abdce0c",
   "tables": {
     "branches": {
@@ -664,11 +664,11 @@
           "notNull": true,
           "autoincrement": false
         },
-        "content": {
-          "name": "content",
-          "type": "blob",
+        "actor_scope": {
+          "name": "actor_scope",
+          "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
         "total_rows": {

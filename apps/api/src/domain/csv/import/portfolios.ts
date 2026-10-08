@@ -19,13 +19,13 @@ import type { Row } from '../layouts.js';
 import {
   active,
   assertUnchangedSinceValidation,
-  branchIdByCode,
   clean,
   code,
   codeList,
   ok,
   required,
   sameSet,
+  scopedBranchId,
   single,
 } from './common.js';
 import type { Activation, Importer, RowResult } from './types.js';
@@ -128,7 +128,7 @@ export const portfolioImporter: Importer = {
     const row = unit.rows[0] as Row;
     return single(row, (): RowResult => {
       const svc = ctx.services.portfolios;
-      const branchId = branchIdByCode(ctx.db, code(row, 'filial_codigo'), 'filial_codigo');
+      const branchId = scopedBranchId(ctx.db, ctx.actor, code(row, 'filial_codigo'), 'filial_codigo');
       const name = clean(required(row, 'nome'));
       const [portfolioTypeId] = idsByCode(ctx.db, portfolioTypes, [code(row, 'tipo_codigo')], 'tipo_codigo');
       const responsibleSub = required(row, 'responsavel_sub');

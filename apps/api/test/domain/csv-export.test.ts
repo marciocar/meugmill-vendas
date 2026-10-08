@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createProductSubgroupService } from '../../src/domain/catalog/service.js';
 import { parseCsv } from '../../src/domain/csv/codec.js';
 import { createExportService } from '../../src/domain/csv/export.js';
 import { createImportJobService, type ImportJobService } from '../../src/domain/csv/jobs.js';
 import { LAYOUT_IDS, LAYOUTS, headerOf } from '../../src/domain/csv/layouts.js';
+import { createPortfolioService } from '../../src/domain/portfolios/service.js';
 import type { Actor } from '../../src/domain/shared/authz.js';
 import {
   CNPJ_A,
@@ -133,6 +135,35 @@ describe('exportação', () => {
     // Supervisão lê como o admin.
     const sup = actor({ sub: 'sup', roles: ['supervisao'], branches: ['SER'] });
     expect(parseCsv(exportText(sup, 'links')).records).toHaveLength(2);
+  });
+
+  it('o domínio recusa | e : em código e | no bairro da região (não voltariam iguais no CSV)', () => {
+    const sg = createProductSubgroupService(fx.db);
+    expect(codeOf(() => sg.create(ADMIN, { code: 'A|B', name: 'x' }))).toBe('validation_error');
+    expect(codeOf(() => sg.create(ADMIN, { code: 'A:B', name: 'x' }))).toBe('validation_error');
+    const p = createPortfolioService(fx.db);
+    const id = (
+      fx.app.sqlite.prepare("select id, version from portfolios where name = 'Vitória'").get() as {
+        id: number;
+      }
+    ).id;
+    const version = p.get(ADMIN, id).version;
+    expect(
+      codeOf(() =>
+        p.replaceFilters(ADMIN, id, version, {
+          regions: [
+            {
+              level: 'neighborhood',
+              stateCode: 32,
+              municipalityCode: VITORIA,
+              neighborhoodLabel: 'Centro|SP',
+            },
+          ],
+          retailNetworkIds: [],
+          economicGroupIds: [],
+        }),
+      ),
+    ).toBe('validation_error');
   });
 
   it('recusa layout desconhecido e papel quase conhecido antes do primeiro byte', () => {

@@ -1,4 +1,9 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { buildApp } from '../../src/app.js';
+import { loadConfig } from '../../src/config.js';
 import { createCustomerService } from '../../src/domain/customers/service.js';
 import { createProductSubgroupService } from '../../src/domain/catalog/service.js';
 import { createImportJobService, type ImportJobService } from '../../src/domain/csv/jobs.js';
@@ -79,8 +84,18 @@ async function importAll(layout: string, content: Buffer, who: Actor = ADMIN) {
 }
 
 const lines = (id: number, who: Actor = ADMIN): ImportLineResponse[] => jobs.lines(who, id).items;
+/** [linha, status, ação ou código do erro, ativação ou mensagem do erro]. */
 const brief = (id: number) =>
-  lines(id).map((l) => [l.line, l.status, l.action ?? l.errorCode, l.activation ?? l.message]);
+  lines(id).map((l) =>
+    l.errorCode === null
+      ? [l.line, l.status, l.action, l.activation]
+      : [l.line, l.status, l.errorCode, l.message],
+  );
+/** O arquivo nunca vai para o banco: nenhuma coluna de conteúdo em `import_jobs`. */
+const jobColumns = () =>
+  (sq().prepare('select name from pragma_table_info(?)').all('import_jobs') as { name: string }[]).map(
+    (c) => c.name,
+  );
 
 describe('cadastros simples (subgrupos)', () => {
   it('simula sem gravar nada, confirma e grava; reimportar o mesmo arquivo não muda nada', async () => {
@@ -104,9 +119,11 @@ describe('cadastros simples (subgrupos)', () => {
       { code: 'SG1', name: 'Genéricos', created_by: 'user-1' },
       { code: 'SG2', name: 'Éticos', created_by: 'user-1' },
     ]);
-    // O conteúdo do arquivo é apagado ao terminar (LGPD); a auditoria fica.
-    expect(sq().prepare('select content from import_jobs where id = ?').get(sim.id)).toEqual({
-      content: null,
+    // O arquivo nunca vai para o banco (LGPD); a auditoria (hash, tamanho, quem, quando) fica.
+    expect(jobColumns()).not.toContain('content');
+    expect(sq().prepare('select created_by, file_bytes from import_jobs where id = ?').get(sim.id)).toEqual({
+      created_by: 'user-1',
+      file_bytes: file.length,
     });
 
     const again = await importAll('product-subgroups', file);
@@ -148,10 +165,6 @@ describe('cadastros simples (subgrupos)', () => {
     ]);
     expect(codeOf(() => jobs.confirm(ADMIN, sim.id))).toBe('import_not_ready');
     expect(count('product_subgroups')).toBe(0);
-    // Simulação com erro não guarda o arquivo.
-    expect(sq().prepare('select content from import_jobs where id = ?').get(sim.id)).toEqual({
-      content: null,
-    });
   });
 
   it('erro de arquivo (cabeçalho, UTF-8) invalida o job inteiro, com a linha', async () => {
@@ -199,6 +212,37 @@ describe('cadastros simples (subgrupos)', () => {
   });
 });
 
+describe('banco em arquivo (WAL), como em produção', () => {
+  it('simula sobre a cópia e grava no banco real', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'csv-wal-'));
+    const app = buildApp(
+      loadConfig({
+        LOG_LEVEL: 'silent',
+        NODE_ENV: 'test',
+        DATABASE_PATH: join(dir, 'carteira.sqlite'),
+        OIDC_ISSUER: 'https://idp.test',
+        OIDC_AUDIENCE: 'meugmill',
+      }),
+    );
+    try {
+      await app.ready();
+      expect(app.sqlite.pragma('journal_mode', { simple: true })).toBe('wal');
+      seedBranch(app.db, 'SER');
+      const s = createImportJobService(app.db, { onJobError: (_id, err) => jobErrors.push(err) });
+      const job = s.submit(ADMIN, 'product-subgroups', csv('codigo;nome', 'W1;Um', 'W2;Dois'));
+      await s.idle();
+      expect(s.get(ADMIN, job.id)).toMatchObject({ status: 'validated', counts: { create: 2 } });
+      s.confirm(ADMIN, job.id);
+      await s.idle();
+      expect(s.get(ADMIN, job.id).status).toBe('applied');
+      expect(app.sqlite.prepare('select count(*) n from product_subgroups').get()).toEqual({ n: 2 });
+    } finally {
+      await app.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('estado e acesso do job', () => {
   it('só admin importa; o job é só de quem o criou', async () => {
     expect(
@@ -219,12 +263,9 @@ describe('estado e acesso do job', () => {
     expect(jobs.list(ADMIN).items.map((j) => j.id)).toEqual([sim.id]);
   });
 
-  it('cancelar apaga o conteúdo; confirmar de novo é conflito', async () => {
+  it('cancelar descarta o arquivo; confirmar de novo é conflito', async () => {
     const sim = await simulate('product-subgroups', csv('codigo;nome', 'SG1;A'));
     expect(jobs.cancel(ADMIN, sim.id).status).toBe('cancelled');
-    expect(sq().prepare('select content from import_jobs where id = ?').get(sim.id)).toEqual({
-      content: null,
-    });
     expect(codeOf(() => jobs.confirm(ADMIN, sim.id))).toBe('import_not_ready');
     expect(codeOf(() => jobs.cancel(ADMIN, sim.id))).toBe('import_not_ready');
   });
@@ -236,21 +277,64 @@ describe('estado e acesso do job', () => {
     expect(short.get(ADMIN, sim.id).status).toBe('expired');
     expect(codeOf(() => short.confirm(ADMIN, sim.id))).toBe('import_not_ready');
 
-    sq()
-      .prepare(
-        `insert into import_jobs (layout, status, created_by, created_at, updated_at, file_sha256, file_bytes, content)
-         values ('branches','applying','user-1',1,1,'x',1,x'00'), ('branches','validated','user-1',1,1,'x',1,x'00')`,
-      )
-      .run();
-    sq()
-      .prepare('update import_jobs set expires_at = ? where status = ?')
-      .run(clock - 1, 'validated');
-    expect(jobs.recover()).toBe(2);
-    expect(sq().prepare('select status, content from import_jobs order by id').all()).toEqual([
-      { status: 'expired', content: null },
-      { status: 'interrupted', content: null },
-      { status: 'expired', content: null },
+    // Na subida, o arquivo dos jobs abertos se perdeu com o processo: vencido vira `expired`, o resto
+    // `interrupted`.
+    const ins = sq().prepare(
+      `insert into import_jobs (layout, status, created_by, created_at, updated_at, file_sha256, file_bytes,
+        actor_scope, expires_at) values ('branches', ?, 'user-1', 1, 1, 'x', 1, '{}', ?)`,
+    );
+    ins.run('applying', null);
+    ins.run('validated', clock - 1);
+    ins.run('validated', clock + 1000);
+    ins.run('validating', null);
+    expect(jobs.recover()).toBe(4);
+    expect(sq().prepare('select status from import_jobs order by id').all()).toEqual([
+      { status: 'expired' },
+      { status: 'interrupted' },
+      { status: 'expired' },
+      { status: 'interrupted' },
+      { status: 'interrupted' },
     ]);
+  });
+
+  it('a varredura vence a simulação sem ninguém ler o job', async () => {
+    const short = svc(200, 1000);
+    const sim = await simulate('product-subgroups', csv('codigo;nome', 'SG1;A'), ADMIN, short);
+    clock += 1000;
+    expect(short.sweep()).toBe(1);
+    expect(sq().prepare('select status from import_jobs where id = ?').get(sim.id)).toEqual({
+      status: 'expired',
+    });
+    // O envio também varre: a simulação vencida não conta como aberta.
+    for (let i = 0; i < 5; i++) {
+      await simulate('product-subgroups', csv('codigo;nome', `S${i};A`), ADMIN, short);
+    }
+    clock += 1000;
+    expect(short.submit(ADMIN, 'product-subgroups', csv('codigo;nome', 'X;A')).status).toBe('validating');
+    await short.idle();
+  });
+
+  it('confirmar com outro escopo de token exige simular de novo', async () => {
+    const sim = await simulate('product-subgroups', csv('codigo;nome', 'SG1;A'));
+    expect(codeOf(() => jobs.confirm(adminOf('SER', 'CAR'), sim.id))).toBe('import_not_ready');
+    expect(codeOf(() => jobs.confirm(actor({ roles: ['admin', 'gestor'], branches: ['SER'] }), sim.id))).toBe(
+      'import_not_ready',
+    );
+    // Mesmo escopo em outra ordem vale.
+    expect(jobs.confirm(actor({ roles: ['admin'], branches: ['SER', 'SER'] }), sim.id).status).toBe(
+      'applying',
+    );
+    await jobs.idle();
+  });
+
+  it('parar o serviço interrompe o job no próximo bloco', async () => {
+    const s1 = svc(1);
+    const rows = Array.from({ length: 50 }, (_, i) => `S${i};Nome ${i}`);
+    const job = s1.submit(ADMIN, 'product-subgroups', csv('codigo;nome', ...rows));
+    s1.stop();
+    await s1.idle();
+    expect(s1.get(ADMIN, job.id).status).toBe('interrupted');
+    expect(codeOf(() => s1.confirm(ADMIN, job.id))).toBe('import_not_ready');
   });
 
   it('limita os jobs abertos por usuário', async () => {
@@ -361,6 +445,37 @@ describe('filiais, vendedores e clientes', () => {
       legal_name: 'Original',
     });
   });
+  it('cliente de fora do escopo com ativo N: liga e inativa o vínculo com as filiais do usuário', async () => {
+    const carId = (sq().prepare("select id from branches where code='CAR'").get() as { id: number }).id;
+    const serId = (sq().prepare("select id from branches where code='SER'").get() as { id: number }).id;
+    createCustomerService(fx.db).create(adminOf('CAR'), {
+      cnpj: CNPJ_D,
+      legalName: 'Original',
+      municipalityCode: VITORIA,
+      neighborhood: 'Centro',
+      branchIds: [carId],
+    });
+    const done = await importAll(
+      'customers',
+      csv(
+        'cnpj;razao_social;municipio_ibge;bairro;filiais;ativo',
+        `${CNPJ_D};Original;${VITORIA};Centro;SER;N`,
+      ),
+    );
+    expect(lines(done.id)[0]).toMatchObject({ action: 'linked', activation: 'deactivate' });
+    expect(
+      sq()
+        .prepare(
+          'select branch_id b, active a from customer_branches where customer_id = (select id from customers where cnpj = ?) order by branch_id',
+        )
+        .all(CNPJ_D),
+    ).toEqual(
+      [
+        { b: serId, a: 0 },
+        { b: carId, a: 1 },
+      ].sort((x, y) => x.b - y.b),
+    );
+  });
 });
 
 describe('carteiras e vínculos', () => {
@@ -467,5 +582,55 @@ describe('carteiras e vínculos', () => {
 
     const missing = await simulate('links', csv(lHead, `SER;Nenhuma;${CNPJ_A};SG1;V1`));
     expect(lines(missing.id)[0]).toMatchObject({ errorCode: 'not_found' });
+  });
+
+  it('a simulação é cumulativa: a carteira que toma o cliente de outra no mesmo arquivo grava igual', async () => {
+    await world();
+    const lHead = 'filial_codigo;carteira;cnpj;subgrupo_codigo;vendedor_codigo';
+    // PB pega o ES inteiro (posto de UF) e fica com A e C; depois PA (município, posto maior) é criada.
+    await importAll('portfolios', csv(pHead, 'SER;PB;GEO;gest-01;ES;SG1:V1'));
+    await importAll(
+      'links',
+      csv(lHead, `SER;PB;${CNPJ_A};SG1;V1`, `SER;PB;${CNPJ_B};SG1;V1`, `SER;PB;${CNPJ_C};SG1;V1`),
+    );
+    await importAll('portfolios', csv(pHead, `SER;PA;GEO;gest-01;ES/${VITORIA};SG1:V2`));
+    // Um bloco por carteira: PA toma A e B de PB no 1º bloco; o 2º bloco precisa ver isso.
+    const s1 = svc(1);
+    const file = csv(lHead, `SER;PA;${CNPJ_A};SG1;V2`, `SER;PA;${CNPJ_B};SG1;V2`, `SER;PB;${CNPJ_C};SG1;V1`);
+    const sim = await simulate('links', file, ADMIN, s1);
+    expect(sim.status, JSON.stringify(brief(sim.id))).toBe('validated');
+    const done = await confirm(sim.id, ADMIN, s1);
+    expect(done).toMatchObject({ status: 'applied', errorRows: 0 });
+    expect(done.counts).toMatchObject({ create: 2, unchanged: 1, linksTakenOver: 2, portfoliosFinalized: 2 });
+    expect(
+      sq()
+        .prepare(
+          `select p.name, count(*) n from portfolio_links l join portfolios p on p.id = l.portfolio_id
+           where l.active = 1 group by p.name order by p.name`,
+        )
+        .all(),
+    ).toEqual([
+      { name: 'PA', n: 2 },
+      { name: 'PB', n: 1 },
+    ]);
+  });
+
+  it('não revela o que existe fora do escopo: filial do token antes, mesma mensagem para CNPJ inexistente', async () => {
+    await world();
+    await importAll('portfolios', csv(pHead, `SER;VN;GEO;gest-01;ES/${VITORIA};SG1:V1`));
+    const lHead = 'filial_codigo;carteira;cnpj;subgrupo_codigo;vendedor_codigo';
+    // D não existe; C existe (Serra) e não é membro: a resposta só depende da posição, não da existência.
+    const notMember = [2, 'invalid', 'validation_error', 'Cliente não é membro efetivo da carteira'];
+    const unitFailed = [3, 'invalid', 'validation_error', 'Carteira não gravada: outra linha dela tem erro'];
+    const dc = await simulate('links', csv(lHead, `SER;VN;${CNPJ_D};SG1;V1`, `SER;VN;${CNPJ_C};SG1;V1`));
+    expect(brief(dc.id)).toEqual([notMember, unitFailed]);
+    const cd = await simulate('links', csv(lHead, `SER;VN;${CNPJ_C};SG1;V1`, `SER;VN;${CNPJ_D};SG1;V1`));
+    expect(brief(cd.id)).toEqual([notMember, unitFailed]);
+    // CAR existe mas não está no token; XYZ nem existe: mesma resposta, antes de procurar a carteira.
+    const out = await simulate('portfolios', csv(pHead, 'CAR;VN;GEO;g;;', 'XYZ;VN;GEO;g;;'));
+    expect(brief(out.id)).toEqual([
+      [2, 'invalid', 'forbidden', 'Filial fora do escopo do usuário'],
+      [3, 'invalid', 'forbidden', 'Filial fora do escopo do usuário'],
+    ]);
   });
 });

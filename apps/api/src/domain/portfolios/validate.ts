@@ -102,6 +102,8 @@ export function validateRegions(conn: Conn, input: RegionInput[]): RegionRow[] {
     // Sem letra nem dígito (só pontuação) não identifica bairro algum.
     if (label === '' || key === '' || !/[\p{L}\p{N}]/u.test(key))
       throw invalid('Região de bairro exige o nome do bairro');
+    // `|` separa as regiões no CSV do E10: com ele o bairro não volta igual de uma exportação.
+    if (label.includes('|')) throw invalid('Campo inválido: neighborhoodLabel');
     return {
       level: 'neighborhood',
       stateCode: r.stateCode,

@@ -51,10 +51,12 @@ export interface Services {
   links: LinkService;
 }
 
-/** Alvo esperado de uma linha na confirmação (o que a simulação leu). */
+/** O que a simulação viu e previu para uma linha; a confirmação exige o mesmo. */
 export interface Expected {
   targetId: number | null;
   targetVersion: number | null;
+  action: RowAction | null;
+  activation: Activation | null;
 }
 
 export interface ImportContext {

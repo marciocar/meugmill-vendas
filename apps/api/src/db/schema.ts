@@ -1,6 +1,5 @@
 import { sql } from 'drizzle-orm';
 import {
-  blob,
   check,
   index,
   integer,
@@ -417,8 +416,9 @@ export const portfolioLinkEvents = sqliteTable(
   ],
 );
 
-// Jobs de importação de CSV (E10). Auditoria: quem, quando, layout, hash e contagens. O conteúdo do
-// arquivo (`content`) é apagado ao terminar (LGPD); o relatório por linha nunca guarda o conteúdo da linha.
+// Jobs de importação de CSV (E10). Auditoria: quem, quando, layout, hash e contagens. O CONTEÚDO do
+// arquivo nunca vai para o banco: fica só na memória do processo enquanto o job está aberto (LGPD); o
+// relatório por linha nunca guarda o conteúdo da linha.
 export const IMPORT_JOB_STATUSES = [
   'validating',
   'validated',
@@ -443,7 +443,8 @@ export const importJobs = sqliteTable(
     updatedAt: integer('updated_at').notNull(),
     fileSha256: text('file_sha256').notNull(),
     fileBytes: integer('file_bytes').notNull(),
-    content: blob('content', { mode: 'buffer' }),
+    // Papéis e códigos de filial do token da simulação (JSON): a confirmação exige o mesmo escopo.
+    actorScope: text('actor_scope').notNull(),
     totalRows: integer('total_rows').notNull().default(0),
     processedRows: integer('processed_rows').notNull().default(0),
     errorRows: integer('error_rows').notNull().default(0),

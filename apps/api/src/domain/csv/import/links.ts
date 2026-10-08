@@ -9,12 +9,21 @@ import {
 import { MAX_ASSIGNMENT_ITEMS } from '../../distribution/schemas.js';
 import { DomainError, invalid, notFound } from '../../shared/errors.js';
 import type { Row } from '../layouts.js';
-import { assertUnchangedSinceValidation, branchIdByCode, code, failOf, ok, required } from './common.js';
+import {
+  assertUnchangedSinceValidation,
+  branchIdByCode,
+  code,
+  failOf,
+  ok,
+  required,
+  scopedBranchId,
+} from './common.js';
 import { cnpjKey } from './master.js';
 import { findPortfolio, portfolioKey } from './portfolios.js';
 import type { Importer, RowFail, RowResult, Unit } from './types.js';
 
 const UNIT_FAILED = 'Carteira não gravada: outra linha dela tem erro';
+const NO_CUSTOMER = Number.MAX_SAFE_INTEGER;
 
 interface Cell {
   row: Row;
@@ -84,7 +93,7 @@ export const linkImporter: Importer = {
     // 1. Carteira (a mesma para todas as linhas da unidade).
     let portfolio;
     try {
-      const branchId = branchIdByCode(ctx.db, code(first, 'filial_codigo'), 'filial_codigo');
+      const branchId = scopedBranchId(ctx.db, ctx.actor, code(first, 'filial_codigo'), 'filial_codigo');
       const found = findPortfolio(ctx.db, branchId, required(first, 'carteira'));
       for (const r of unit.rows) assertUnchangedSinceValidation(ctx, r.line, found);
       if (!found) throw notFound();
@@ -109,10 +118,11 @@ export const linkImporter: Importer = {
           .from(customers)
           .where(eq(customers.cnpj, cnpj))
           .get();
-        if (!customer) throw invalid('Cliente não encontrado: cnpj');
         cells.push({
           row: r,
-          customerId: customer.id,
+          // CNPJ sem cadastro segue com um id que nunca existe: o E6 responde por ele exatamente como por um
+          // cliente de outra filial ("não é membro efetivo"), e a simulação não revela o que existe.
+          customerId: customer?.id ?? NO_CUSTOMER,
           subgroupId: lookupId(ctx.db, productSubgroups, code(r, 'subgrupo_codigo'), 'subgrupo_codigo'),
           sellerId: lookupId(ctx.db, sellers, code(r, 'vendedor_codigo'), 'vendedor_codigo'),
         });

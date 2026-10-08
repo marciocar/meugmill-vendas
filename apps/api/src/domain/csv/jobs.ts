@@ -1,5 +1,8 @@
 import { createHash } from 'node:crypto';
-import { and, asc, desc, eq, gt, inArray, lt, sql } from 'drizzle-orm';
+import Database from 'better-sqlite3';
+import { and, asc, desc, eq, gt, gte, inArray, lt, lte, sql } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import * as schema from '../../db/schema.js';
 import { importJobLines, importJobs, type ImportJob, type ImportJobLine } from '../../db/schema.js';
 import { createBranchService } from '../branches/service.js';
 import {
@@ -17,7 +20,7 @@ import { writeTx, type Db, type ServiceOptions } from '../shared/db.js';
 import { DomainError, invalid, notFound } from '../shared/errors.js';
 import { decodeCursor, encodeCursor, resolveLimit, type Page } from '../shared/pagination.js';
 import { assertRolesWellFormed } from '../visibility/profiles.js';
-import { parseCsv } from './codec.js';
+import { CsvReader } from './codec.js';
 import { IMPORTERS } from './import/registry.js';
 import type {
   Expected,
@@ -47,12 +50,22 @@ export const DEFAULT_CHUNK_ROWS = 200;
 export const DEFAULT_CHUNK_MS = 50;
 /** Prazo para confirmar uma simulação. */
 export const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
+/** Varredura de simulações vencidas (libera a memória do arquivo mesmo sem ninguém ler o job). */
+export const SWEEP_INTERVAL_MS = 10 * 60 * 1000;
 /** Jobs abertos (simulando, simulados ou gravando) por usuário. */
 export const MAX_OPEN_JOBS = 5;
+/** Soma dos arquivos de jobs abertos guardados na memória do processo. */
+export const MAX_OPEN_BYTES = 128 * 1024 * 1024;
+/** Caracteres lidos do arquivo entre duas cessões de vez. */
+const PARSE_SLICE = 1_000_000;
+/** Linhas pré-validadas, gravadas no relatório ou carregadas entre duas cessões de vez. */
+const ROW_SLICE = 10_000;
 
 const OPEN_STATUSES = ['validating', 'validated', 'applying'] as const;
 
 export interface ImportJobService {
+  /** Só o admin importa (403 caso contrário). A rota chama antes de ler o corpo. */
+  assertCanImport(actor: Actor): void;
   /** Cria o job (`validating`) e agenda a simulação. Só admin. */
   submit(actor: Actor, layout: string, content: Buffer): ImportJobResponse;
   get(actor: Actor, id: number): ImportJobResponse;
@@ -60,12 +73,21 @@ export interface ImportJobService {
   list(actor: Actor, params?: ImportJobListParams): Page<ImportJobResponse>;
   /** Relatório por linha, em ordem de linha. */
   lines(actor: Actor, id: number, params?: ImportLineListParams): Page<ImportLineResponse>;
-  /** Confirma um job `validated` sem erros e agenda a gravação. */
+  /** Confirma um job `validated` sem erros, com o mesmo escopo de token da simulação, e agenda a gravação. */
   confirm(actor: Actor, id: number): ImportJobResponse;
-  /** Cancela um job `validated` ou `invalid`; apaga o conteúdo. */
+  /** Cancela um job `validated` ou `invalid`; descarta o arquivo. */
   cancel(actor: Actor, id: number): ImportJobResponse;
-  /** Na subida: job no meio vira `interrupted` e simulação vencida vira `expired`. Devolve quantos mudou. */
+  /**
+   * Na subida: o arquivo de um job aberto se perdeu com o processo. Job aberto vira `interrupted` (ou
+   * `expired`, se já venceu). Devolve quantos mudou.
+   */
   recover(): number;
+  /** Simulações vencidas viram `expired` e o arquivo sai da memória. Devolve quantas. */
+  sweep(): number;
+  /** Liga a varredura periódica (timer sem segurar o processo). */
+  start(): void;
+  /** Para a varredura e faz o job em curso parar no próximo bloco (vira `interrupted`). */
+  stop(): void;
   /** Resolve quando a fila esvazia (testes e desligamento). */
   idle(): Promise<void>;
 }
@@ -80,15 +102,30 @@ export interface ImportJobOptions extends ServiceOptions {
 
 const MALFORMED = 'Número de campos diferente do cabeçalho';
 const DUPLICATE = 'Chave repetida no arquivo';
-const UNIT_ROLLBACK = Symbol('unit-rollback');
-const SIMULATION_ROLLBACK = Symbol('simulation-rollback');
+const CHANGED_RESULT = 'Resultado diferente do simulado: simule de novo';
+const SCOPE_CHANGED = 'O perfil ou as filiais do token mudaram desde a simulação: simule de novo';
 
 class UnitRollback extends Error {
-  readonly tag = UNIT_ROLLBACK;
   constructor(readonly results: Map<number, RowResult>) {
     super('unit rollback');
   }
 }
+
+class Stopped extends Error {
+  constructor() {
+    super('import stopped');
+  }
+}
+
+interface ActorScope {
+  roles: string[];
+  branchCodes: string[];
+}
+
+const scopeOf = (actor: Actor): ActorScope => ({
+  roles: [...new Set(actor.roles)].sort(),
+  branchCodes: [...new Set(actor.branchCodes)].sort(),
+});
 
 function toResponse(row: ImportJob): ImportJobResponse {
   return {
@@ -114,56 +151,84 @@ function toResponse(row: ImportJob): ImportJobResponse {
 const yieldLoop = () => new Promise<void>((resolve) => setImmediate(resolve));
 
 /**
- * Importação de CSV (E10). A simulação roda as escritas reais dos serviços de domínio numa transação
- * desfeita; a confirmação grava em blocos, conferindo que cada alvo não mudou desde a simulação.
- * Uma fila serial por processo (SQLite, instância única).
+ * Importação de CSV (E10).
+ *
+ * - **Simulação**: roda as escritas reais dos serviços de domínio numa CÓPIA do banco em memória
+ *   (`serialize`), bloco a bloco e de forma cumulativa: cada bloco vê o efeito dos anteriores, como na
+ *   gravação, e o banco real não fica travado. A cópia é descartada no fim.
+ * - **Confirmação**: grava no banco real em blocos (dados + relatório na mesma transação), conferindo
+ *   que cada alvo não mudou e que o resultado de cada linha é o simulado.
+ * - **Arquivo**: só na memória do processo, enquanto o job está aberto. Nunca vai para o banco.
+ * - Uma fila serial por processo (SQLite, instância única).
  */
 export function createImportJobService(db: Db, opts: ImportJobOptions = {}): ImportJobService {
   const now = opts.now ?? Date.now;
   const chunkRows = opts.chunkRows ?? DEFAULT_CHUNK_ROWS;
   const chunkMs = opts.chunkMs ?? DEFAULT_CHUNK_MS;
   const ttlMs = opts.ttlMs ?? DEFAULT_TTL_MS;
+  const contents = new Map<number, Buffer>();
   let tail: Promise<void> = Promise.resolve();
+  let stopping = false;
+  let timer: NodeJS.Timeout | undefined;
 
-  const services: Services = {
-    branches: createBranchService(db, opts),
-    productSubgroups: createProductSubgroupService(db, opts),
-    retailNetworks: createRetailNetworkService(db, opts),
-    economicGroups: createEconomicGroupService(db, opts),
-    sellers: createSellerService(db, opts),
-    customers: createCustomerService(db, opts),
-    portfolios: createPortfolioService(db, opts),
-    distribution: createDistributionService(db, opts),
-    links: createLinkService(db, opts),
-  };
+  const buildServices = (conn: Db): Services => ({
+    branches: createBranchService(conn, opts),
+    productSubgroups: createProductSubgroupService(conn, opts),
+    retailNetworks: createRetailNetworkService(conn, opts),
+    economicGroups: createEconomicGroupService(conn, opts),
+    sellers: createSellerService(conn, opts),
+    customers: createCustomerService(conn, opts),
+    portfolios: createPortfolioService(conn, opts),
+    distribution: createDistributionService(conn, opts),
+    links: createLinkService(conn, opts),
+  });
+  const services = buildServices(db);
 
   const load = (id: number): ImportJob | undefined =>
     db.select().from(importJobs).where(eq(importJobs.id, id)).get();
 
-  const patch = (id: number, values: Partial<ImportJob>): void => {
-    db.update(importJobs)
+  const patch = (conn: Db, id: number, values: Partial<ImportJob>): void => {
+    conn
+      .update(importJobs)
       .set({ ...values, updatedAt: now() })
       .where(eq(importJobs.id, id))
       .run();
   };
 
-  /** Simulação vencida vira `expired` (e perde o conteúdo) na primeira leitura depois do prazo. */
-  const expireIfDue = (row: ImportJob): ImportJob => {
-    if (row.status !== 'validated' || row.expiresAt === null || row.expiresAt > now()) return row;
-    patch(row.id, { status: 'expired', content: null, finishedAt: now() });
-    return load(row.id) as ImportJob;
+  /** Fim do job: estado terminal e o arquivo sai da memória. */
+  const finish = (id: number, values: Partial<ImportJob>): void => {
+    contents.delete(id);
+    patch(db, id, { ...values, finishedAt: now() });
+  };
+
+  const sweep = (): number => {
+    const due = db
+      .select({ id: importJobs.id })
+      .from(importJobs)
+      .where(and(eq(importJobs.status, 'validated'), lte(importJobs.expiresAt, now())))
+      .all();
+    for (const { id } of due) finish(id, { status: 'expired' });
+    return due.length;
   };
 
   const findOwn = (actor: Actor, id: number): ImportJob => {
     const row = load(id);
     if (!row || row.createdBy !== actor.sub) throw notFound();
-    return expireIfDue(row);
+    if (row.status === 'validated' && row.expiresAt !== null && row.expiresAt <= now()) {
+      finish(id, { status: 'expired' });
+      return load(id) as ImportJob;
+    }
+    return row;
   };
 
   const enqueue = (jobId: number, task: () => Promise<void>): void => {
     tail = tail.then(task).catch((err: unknown) => {
+      if (err instanceof Stopped) {
+        finish(jobId, { status: 'interrupted' });
+        return;
+      }
       try {
-        patch(jobId, { status: 'failed', content: null, finishedAt: now() });
+        finish(jobId, { status: 'failed' });
       } finally {
         opts.onJobError?.(jobId, err);
       }
@@ -172,11 +237,25 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
 
   // ---- processamento ----
 
+  /** Lê o arquivo em fatias, cedendo a vez entre elas. Erro de arquivo sobe como DomainError. */
+  async function readRows(layout: LayoutId, content: Buffer): Promise<Row[]> {
+    const reader = new CsvReader(content);
+    while (!reader.step(PARSE_SLICE)) await yieldLoop();
+    const doc = reader.result();
+    await yieldLoop();
+    return bindRows(LAYOUTS[layout], doc);
+  }
+
   /** Linhas mal formadas e chaves repetidas falham antes de tocar o banco. */
-  function prevalidate(importer: Importer, rows: Row[]): { pre: Map<number, RowFail>; good: Row[] } {
+  async function prevalidate(
+    importer: Importer,
+    rows: Row[],
+  ): Promise<{ pre: Map<number, RowFail>; good: Row[] }> {
     const pre = new Map<number, RowFail>();
-    const byKey = new Map<string, Row[]>();
-    for (const r of rows) {
+    const byKey = new Map<string, number[]>();
+    for (let i = 0; i < rows.length; i++) {
+      if (i > 0 && i % ROW_SLICE === 0) await yieldLoop();
+      const r = rows[i] as Row;
       if (r.malformed) {
         pre.set(r.line, { ok: false, code: 'malformed_row', message: MALFORMED });
         continue;
@@ -184,18 +263,19 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
       const key = importer.keyOf(r);
       if (key === null) continue;
       const list = byKey.get(key);
-      if (list) list.push(r);
-      else byKey.set(key, [r]);
+      if (list) list.push(r.line);
+      else byKey.set(key, [r.line]);
     }
-    for (const list of byKey.values()) {
-      if (list.length < 2) continue;
-      for (const r of list) pre.set(r.line, { ok: false, code: 'duplicate_key', message: DUPLICATE });
+    for (const lines of byKey.values()) {
+      if (lines.length < 2) continue;
+      for (const line of lines) pre.set(line, { ok: false, code: 'duplicate_key', message: DUPLICATE });
     }
     return { pre, good: rows.filter((r) => !pre.has(r.line)) };
   }
 
-  /** Uma unidade num savepoint: qualquer linha com erro desfaz a unidade inteira. */
+  /** Uma unidade num savepoint: qualquer linha com erro (ou diferente do simulado) desfaz a unidade inteira. */
   function runUnit(
+    conn: Db,
     importer: Importer,
     base: Omit<ImportContext, 'stats'>,
     unit: Unit,
@@ -205,8 +285,16 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
     const ctx: ImportContext = { ...base, stats: unitStats };
     let results: Map<number, RowResult>;
     try {
-      results = db.transaction(() => {
+      results = conn.transaction(() => {
         const r = importer.apply(ctx, unit);
+        if (base.expected) {
+          for (const [line, res] of r) {
+            const exp = base.expected.get(line);
+            if (res.ok && (!exp || exp.action !== res.action || exp.activation !== res.activation)) {
+              r.set(line, { ok: false, code: 'changed_since_validation', message: CHANGED_RESULT });
+            }
+          }
+        }
         if ([...r.values()].some((x) => !x.ok)) throw new UnitRollback(r);
         return r;
       });
@@ -259,12 +347,12 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
           target: [importJobLines.jobId, importJobLines.line],
           set: {
             status: sql`excluded.status`,
-            action: sql`excluded.action`,
-            activation: sql`excluded.activation`,
+            // A confirmação mantém a ação, o alvo e a versão vistos na simulação quando a linha falha.
+            action: sql`coalesce(excluded.action, ${importJobLines.action})`,
+            activation: sql`case when excluded.status = 'applied' then excluded.activation else ${importJobLines.activation} end`,
             errorCode: sql`excluded.error_code`,
             message: sql`excluded.message`,
-            warning: sql`excluded.warning`,
-            // A confirmação mantém o alvo visto na simulação.
+            warning: sql`coalesce(excluded.warning, ${importJobLines.warning})`,
             targetId: sql`coalesce(excluded.target_id, ${importJobLines.targetId})`,
             targetVersion: sql`coalesce(excluded.target_version, ${importJobLines.targetVersion})`,
           },
@@ -273,116 +361,188 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
     }
   }
 
-  /** Lê e confere o arquivo do job. Erro de arquivo devolve a mensagem e a linha. */
-  function readRows(job: ImportJob): Row[] {
-    if (!job.content) throw new Error('job sem conteúdo');
-    return bindRows(LAYOUTS[job.layout as LayoutId], parseCsv(job.content));
+  /** Grava um mapa grande no relatório em fatias, cedendo a vez entre elas. */
+  async function saveLinesSliced(
+    jobId: number,
+    results: Map<number, RowResult>,
+    phase: 'simulate' | 'apply',
+  ) {
+    const entries = [...results.entries()];
+    for (let i = 0; i < entries.length; i += ROW_SLICE) {
+      saveLines(jobId, new Map(entries.slice(i, i + ROW_SLICE)), phase);
+      await yieldLoop();
+    }
+  }
+
+  /** O que a simulação viu e previu, por linha, carregado em fatias. */
+  async function loadExpected(jobId: number, maxLine: number): Promise<Map<number, Expected>> {
+    const out = new Map<number, Expected>();
+    for (let from = 0; from <= maxLine; from += ROW_SLICE) {
+      const rows = db
+        .select({
+          line: importJobLines.line,
+          targetId: importJobLines.targetId,
+          targetVersion: importJobLines.targetVersion,
+          action: importJobLines.action,
+          activation: importJobLines.activation,
+        })
+        .from(importJobLines)
+        .where(
+          and(
+            eq(importJobLines.jobId, jobId),
+            gte(importJobLines.line, from),
+            lt(importJobLines.line, from + ROW_SLICE),
+          ),
+        )
+        .all();
+      for (const l of rows) {
+        out.set(l.line, {
+          targetId: l.targetId,
+          targetVersion: l.targetVersion,
+          action: l.action as Expected['action'],
+          activation: l.activation as Expected['activation'],
+        });
+      }
+      await yieldLoop();
+    }
+    return out;
+  }
+
+  /** Cópia do banco em memória para a simulação (descartada no fim). */
+  function snapshot(): { conn: Db; close: () => void } {
+    // O `drizzle()` do better-sqlite3 expõe a conexão em `$client` (fora do tipo `Db`).
+    const client = (db as unknown as { $client?: Database.Database }).$client;
+    if (!client) throw new Error('conexão SQLite indisponível para a simulação');
+    const image = client.serialize();
+    // Bytes 18 e 19 do cabeçalho = versão de escrita e leitura. O banco real roda em WAL (2), que não
+    // existe num banco em memória: voltar para o journal clássico (1), ou a cópia não abre transação.
+    image[18] = 1;
+    image[19] = 1;
+    const copy = new Database(image);
+    copy.pragma('foreign_keys = ON');
+    return { conn: drizzle(copy, { schema }), close: () => copy.close() };
   }
 
   async function process(jobId: number, actor: Actor, phase: 'simulate' | 'apply'): Promise<void> {
     const job = load(jobId);
     const expectedStatus = phase === 'simulate' ? 'validating' : 'applying';
+    const content = contents.get(jobId);
     if (!job || job.status !== expectedStatus) return;
-    const importer = IMPORTERS[job.layout as LayoutId];
+    if (!content) throw new Error('arquivo do job ausente');
+    const layout = job.layout as LayoutId;
+    const importer = IMPORTERS[layout];
 
     let rows: Row[];
     try {
-      rows = readRows(job);
+      rows = await readRows(layout, content);
     } catch (err) {
       if (!(err instanceof DomainError) || phase === 'apply') throw err;
       const line = err.detail?.line;
-      patch(jobId, {
+      finish(jobId, {
         status: 'invalid',
-        content: null,
         fileError: err.message,
         fileErrorLine: typeof line === 'number' ? line : null,
-        finishedAt: now(),
       });
       return;
     }
 
-    let expected: Map<number, Expected> | undefined;
-    if (phase === 'apply') {
-      expected = new Map(
-        db
-          .select({
-            line: importJobLines.line,
-            targetId: importJobLines.targetId,
-            targetVersion: importJobLines.targetVersion,
-          })
-          .from(importJobLines)
-          .where(eq(importJobLines.jobId, jobId))
-          .all()
-          .map((l) => [l.line, { targetId: l.targetId, targetVersion: l.targetVersion }]),
-      );
-    }
-
-    const { pre, good } = prevalidate(importer, rows);
+    const lastLine = rows.length > 0 ? (rows[rows.length - 1] as Row).line : 0;
+    const expected = phase === 'apply' ? await loadExpected(jobId, lastLine) : undefined;
+    const { pre, good } = await prevalidate(importer, rows);
     const counts: Record<string, number> = {};
     let errors = tally(counts, pre);
-    saveLines(jobId, pre, phase);
-    patch(jobId, { totalRows: rows.length, processedRows: pre.size, errorRows: errors, counts: '{}' });
+    await saveLinesSliced(jobId, pre, phase);
+    patch(db, jobId, { totalRows: rows.length, processedRows: pre.size, errorRows: errors, counts: '{}' });
+    await yieldLoop();
 
     const units = importer.units ? importer.units(good) : good.map((r) => ({ rows: [r] }));
-    const base = { db, actor, services, ...(expected ? { expected } : {}) };
+    const sim = phase === 'simulate' ? snapshot() : undefined;
+    const conn = sim?.conn ?? db;
+    const base = {
+      db: conn,
+      actor,
+      services: sim ? buildServices(sim.conn) : services,
+      ...(expected ? { expected } : {}),
+    };
     let processed = pre.size;
-    let next = 0;
-    while (next < units.length) {
-      const results = new Map<number, RowResult>();
-      const stats: Record<string, number> = {};
-      const runChunk = () => {
-        const started = performance.now();
-        let size = 0;
-        while (next < units.length) {
-          const unit = units[next] as Unit;
-          if (size > 0 && (size + unit.rows.length > chunkRows || performance.now() - started >= chunkMs))
-            break;
-          for (const [line, r] of runUnit(importer, base, unit, stats)) results.set(line, r);
-          size += unit.rows.length;
-          next++;
-        }
-      };
-      if (phase === 'simulate') {
-        try {
+    try {
+      let next = 0;
+      while (next < units.length) {
+        if (stopping) throw new Stopped();
+        const results = new Map<number, RowResult>();
+        const stats: Record<string, number> = {};
+        const runChunk = () => {
+          const started = performance.now();
+          let size = 0;
+          while (next < units.length) {
+            const unit = units[next] as Unit;
+            if (size > 0 && (size + unit.rows.length > chunkRows || performance.now() - started >= chunkMs))
+              break;
+            for (const [line, r] of runUnit(conn, importer, base, unit, stats)) results.set(line, r);
+            size += unit.rows.length;
+            next++;
+          }
+        };
+        const record = () => {
+          errors += tally(counts, results);
+          for (const [k, v] of Object.entries(stats)) counts[k] = (counts[k] ?? 0) + v;
+          processed += results.size;
+          saveLines(jobId, results, phase);
+          patch(db, jobId, { processedRows: processed, errorRows: errors, counts: JSON.stringify(counts) });
+        };
+        if (sim) {
+          // Simulação: o bloco fica gravado só na cópia (cumulativo); o relatório vai para o banco real.
+          writeTx(sim.conn, runChunk);
+          writeTx(db, record);
+        } else {
+          // Gravação: dados e relatório do bloco na MESMA transação.
           writeTx(db, () => {
             runChunk();
-            throw SIMULATION_ROLLBACK;
+            record();
           });
-        } catch (err) {
-          if (err !== SIMULATION_ROLLBACK) throw err;
         }
-      } else {
-        writeTx(db, runChunk);
+        await yieldLoop();
       }
-      errors += tally(counts, results);
-      for (const [k, v] of Object.entries(stats)) counts[k] = (counts[k] ?? 0) + v;
-      processed += results.size;
-      saveLines(jobId, results, phase);
-      patch(jobId, { processedRows: processed, errorRows: errors, counts: JSON.stringify(counts) });
-      await yieldLoop();
+    } finally {
+      sim?.close();
     }
 
-    const at = now();
     if (phase === 'simulate') {
-      patch(jobId, {
-        status: errors > 0 ? 'invalid' : 'validated',
-        validatedAt: at,
-        ...(errors > 0 ? { content: null, finishedAt: at, expiresAt: null } : { expiresAt: at + ttlMs }),
-      });
+      const at = now();
+      if (errors > 0) {
+        finish(jobId, { status: 'invalid', validatedAt: at, expiresAt: null });
+      } else {
+        patch(db, jobId, { status: 'validated', validatedAt: at, expiresAt: at + ttlMs });
+      }
     } else {
-      patch(jobId, { status: errors > 0 ? 'partially_applied' : 'applied', content: null, finishedAt: at });
+      finish(jobId, { status: errors > 0 ? 'partially_applied' : 'applied' });
     }
   }
 
   // ---- API do serviço ----
 
+  const assertCanImport = (actor: Actor): void => {
+    assertRolesWellFormed(actor, opts);
+    requireAdmin(actor);
+  };
+
   return {
+    assertCanImport,
+
     submit(actor, layout, content) {
-      assertRolesWellFormed(actor, opts);
-      requireAdmin(actor);
+      assertCanImport(actor);
       if (!isLayoutId(layout)) throw invalid('Layout inválido');
       if (content.length === 0) throw invalid('Arquivo vazio');
       if (content.length > MAX_FILE_BYTES) throw invalid('Arquivo maior que o permitido');
+      sweep();
+      let openBytes = 0;
+      for (const c of contents.values()) openBytes += c.length;
+      if (openBytes + content.length > MAX_OPEN_BYTES) {
+        throw new DomainError(
+          'too_many_imports',
+          'Importações demais em aberto no serviço: tente mais tarde',
+        );
+      }
       const at = now();
       const id = writeTx(db, (tx) => {
         const open = tx
@@ -406,11 +566,12 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
             updatedAt: at,
             fileSha256: createHash('sha256').update(content).digest('hex'),
             fileBytes: content.length,
-            content,
+            actorScope: JSON.stringify(scopeOf(actor)),
           })
           .returning({ id: importJobs.id })
           .get().id;
       });
+      contents.set(id, content);
       enqueue(id, () => process(id, actor, 'simulate'));
       return toResponse(load(id) as ImportJob);
     },
@@ -422,6 +583,7 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
 
     list(actor, params = {}) {
       assertRolesWellFormed(actor, opts);
+      sweep();
       const limit = resolveLimit(params.limit);
       const before = decodeCursor(params.cursor);
       const rows = db
@@ -435,8 +597,7 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
         )
         .orderBy(desc(importJobs.id))
         .limit(limit + 1)
-        .all()
-        .map(expireIfDue);
+        .all();
       const items = rows.slice(0, limit).map(toResponse);
       const last = items[items.length - 1];
       return { items, nextCursor: rows.length > limit && last ? encodeCursor(last.id) : null };
@@ -481,14 +642,17 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
       assertRolesWellFormed(actor, opts);
       requireAdmin(actor);
       const row = findOwn(actor, id);
-      if (row.status !== 'validated' || row.errorRows > 0) {
+      if (row.status !== 'validated' || row.errorRows > 0 || !contents.has(id)) {
         throw new DomainError(
           'import_not_ready',
           'Só uma simulação concluída e sem erros pode ser confirmada',
         );
       }
-      const at = now();
-      patch(id, { status: 'applying', confirmedBy: actor.sub, confirmedAt: at, processedRows: 0 });
+      // A simulação vale para o escopo do token dela: outro escopo muda o resultado (ex.: `linked` × `update`).
+      if (row.actorScope !== JSON.stringify(scopeOf(actor))) {
+        throw new DomainError('import_not_ready', SCOPE_CHANGED);
+      }
+      patch(db, id, { status: 'applying', confirmedBy: actor.sub, confirmedAt: now(), processedRows: 0 });
       enqueue(id, () => process(id, actor, 'apply'));
       return toResponse(load(id) as ImportJob);
     },
@@ -499,23 +663,43 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
       if (row.status !== 'validated' && row.status !== 'invalid') {
         throw new DomainError('import_not_ready', 'Só uma simulação concluída pode ser cancelada');
       }
-      if (row.status === 'validated') patch(id, { status: 'cancelled', content: null, finishedAt: now() });
+      if (row.status === 'validated') finish(id, { status: 'cancelled' });
       return toResponse(load(id) as ImportJob);
     },
 
     recover() {
       const at = now();
-      const interrupted = db
-        .update(importJobs)
-        .set({ status: 'interrupted', content: null, finishedAt: at, updatedAt: at })
-        .where(inArray(importJobs.status, ['validating', 'applying']))
-        .run().changes;
       const expired = db
         .update(importJobs)
-        .set({ status: 'expired', content: null, finishedAt: at, updatedAt: at })
-        .where(and(eq(importJobs.status, 'validated'), lt(importJobs.expiresAt, at + 1)))
+        .set({ status: 'expired', finishedAt: at, updatedAt: at })
+        .where(and(eq(importJobs.status, 'validated'), lte(importJobs.expiresAt, at)))
         .run().changes;
-      return interrupted + expired;
+      const interrupted = db
+        .update(importJobs)
+        .set({ status: 'interrupted', finishedAt: at, updatedAt: at })
+        .where(inArray(importJobs.status, [...OPEN_STATUSES]))
+        .run().changes;
+      return expired + interrupted;
+    },
+
+    sweep,
+
+    start() {
+      if (timer) return;
+      timer = setInterval(() => {
+        try {
+          sweep();
+        } catch (err) {
+          opts.onJobError?.(0, err);
+        }
+      }, SWEEP_INTERVAL_MS);
+      timer.unref();
+    },
+
+    stop() {
+      stopping = true;
+      if (timer) clearInterval(timer);
+      timer = undefined;
     },
 
     idle: () => tail,

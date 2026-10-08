@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOM,
+  CsvReader,
   MAX_DATA_ROWS,
   csvField,
   csvLine,
@@ -77,10 +78,38 @@ describe('escrita', () => {
     expect(doc.records[0]?.values).toEqual(values);
   });
 
+  it('valor que já começa com apóstrofo + fórmula volta igual', () => {
+    for (const v of ["'=SOMA(A1)", "''+1", "'normal", '=1']) {
+      const doc = parseCsv(`a\r\n${csvLine([v])}`);
+      expect(doc.records[0]?.values).toEqual([v]);
+    }
+    expect(csvField("'=SOMA")).toBe("''=SOMA");
+  });
+
+  it('campo gigante é recusado durante a leitura, sem ler o resto', () => {
+    const big = `a\n${'x'.repeat(8_000_000)}\n`;
+    const t0 = performance.now();
+    expect(fileErr(() => parseCsv(big)).message).toBe('Campo maior que o permitido');
+    expect(performance.now() - t0).toBeLessThan(1000);
+    const bigQuoted = `a\n"${'x'.repeat(8_000_000)}"\n`;
+    expect(fileErr(() => parseCsv(bigQuoted)).message).toBe('Campo maior que o permitido');
+  });
+
+  it('a leitura em fatias dá o mesmo documento', () => {
+    const text = `a;b\r\n${Array.from({ length: 500 }, (_, i) => `${i};"v${i}\nx"`).join('\r\n')}\r\n`;
+    const reader = new CsvReader(text);
+    let steps = 0;
+    while (!reader.step(100)) steps++;
+    expect(steps).toBeGreaterThan(10);
+    expect(reader.result()).toEqual(parseCsv(text));
+  });
+
   it('lista com |', () => {
     expect(splitList(' F01 | |F02|')).toEqual(['F01', 'F02']);
     expect(splitList('')).toEqual([]);
     expect(joinList(['F01', 'F02'])).toBe('F01|F02');
+    // Um item com | não voltaria igual: a exportação falha em vez de gerar arquivo ambíguo.
+    expect(fileErr(() => joinList(['A|B'])).message).toBe('Valor com | não pode sair em lista');
   });
 });
 

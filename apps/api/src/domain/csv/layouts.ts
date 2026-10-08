@@ -374,18 +374,26 @@ export function bindRows(layout: LayoutSpec, doc: CsvDocument): Row[] {
     if (c.required && !index.has(c.name)) throw fileError('Coluna obrigatória ausente no cabeçalho', 1);
   }
   const width = doc.header.length;
-  return doc.records.map((r) => {
-    const malformed = r.values.length !== width;
-    return {
-      line: r.line,
-      malformed,
-      get: (column: string) => {
-        const i = index.get(column);
-        return i === undefined || malformed ? '' : (r.values[i] ?? '').trim();
-      },
-      has: (column: string) => index.has(column),
-    };
-  });
+  return doc.records.map((r) => new BoundRow(r.line, r.values, index, r.values.length !== width));
+}
+
+/** Linha ligada ao cabeçalho (métodos no protótipo: barato para 100 mil linhas). */
+class BoundRow implements Row {
+  constructor(
+    readonly line: number,
+    private readonly values: string[],
+    private readonly index: ReadonlyMap<string, number>,
+    readonly malformed: boolean,
+  ) {}
+
+  get(column: string): string {
+    const i = this.index.get(column);
+    return i === undefined || this.malformed ? '' : (this.values[i] ?? '').trim();
+  }
+
+  has(column: string): boolean {
+    return this.index.has(column);
+  }
 }
 
 /** Cabeçalho da exportação: todas as colunas, na ordem do layout. */

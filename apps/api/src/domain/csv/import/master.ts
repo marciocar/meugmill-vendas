@@ -152,8 +152,12 @@ export const sellerImporter: Importer = {
       }
       let current = getIfVisible(() => svc.get(ctx.actor, found.id));
       if (!current) {
-        for (const b of branchIds) svc.linkSellerToBranchByCode(ctx.actor, c, b);
-        return ok('linked', found, null, LINKED_OUTSIDE_SCOPE);
+        let linked = { id: found.id, version: found.version };
+        for (const b of branchIds) linked = svc.linkSellerToBranchByCode(ctx.actor, c, b);
+        // O `ativo` vale para o vínculo com as filiais do usuário (agora no escopo dele).
+        if (wantActive) return ok('linked', found, null, LINKED_OUTSIDE_SCOPE);
+        svc.deactivate(ctx.actor, linked.id, linked.version);
+        return ok('linked', found, 'deactivate', LINKED_OUTSIDE_SCOPE);
       }
       const patch = {
         ...(current.name !== name ? { name } : {}),
@@ -226,8 +230,12 @@ export const customerImporter: Importer = {
       }
       let current: CustomerResponse | null = getIfVisible(() => svc.get(ctx.actor, found.id));
       if (!current) {
-        for (const b of branchIds) svc.linkCustomerToBranchByCnpj(ctx.actor, cnpj, b);
-        return ok('linked', found, null, LINKED_OUTSIDE_SCOPE);
+        let linked = { id: found.id, version: found.version };
+        for (const b of branchIds) linked = svc.linkCustomerToBranchByCnpj(ctx.actor, cnpj, b);
+        // O `ativo` vale para o vínculo com as filiais do usuário (agora no escopo dele).
+        if (wantActive) return ok('linked', found, null, LINKED_OUTSIDE_SCOPE);
+        svc.deactivate(ctx.actor, linked.id, linked.version);
+        return ok('linked', found, 'deactivate', LINKED_OUTSIDE_SCOPE);
       }
       const c = current;
       const patch = {
