@@ -23,13 +23,13 @@ import {
 } from '../shared/audit.js';
 import { assertAllInScope, requireAdmin, resolveScopeIds, type Actor } from '../shared/authz.js';
 import { isUniqueViolation, writeTx, type Conn, type Db, type ServiceOptions } from '../shared/db.js';
-import { DomainError, notFound } from '../shared/errors.js';
+import { DomainError, invalid, notFound } from '../shared/errors.js';
 import { assertBranchesActive } from '../shared/links.js';
-import { searchKey } from '../shared/normalize.js';
 import { decodeCursor, resolveLimit, toPage, type Page } from '../shared/pagination.js';
-import { keyContains } from '../shared/sql.js';
+import { likeContains } from '../shared/sql.js';
 import { cleanText, parseInput } from '../shared/validate.js';
 import { requireAdminister, requireEdit } from './authz.js';
+import { portfolioNameKey } from './name-key.js';
 import {
   CreatePortfolioSchema,
   PortfolioListQuerySchema,
@@ -50,7 +50,7 @@ import {
   assertActiveNetworks,
   assertActiveType,
   assertNoDuplicates,
-  assertSellersLinkedToBranch,
+  assertSellersUsable,
   validateAssignments,
   validateRegions,
 } from './validate.js';
@@ -90,6 +90,14 @@ export interface PortfolioService {
 }
 
 const NAME_TAKEN = 'Já existe carteira com este nome na filial';
+const INACTIVE = 'Carteira inativa: reative antes de editar';
+
+/** Chave do nome; nome sem letra nem dígito (só pontuação) não identifica a carteira. */
+function nameKeyOf(name: string): string {
+  const key = portfolioNameKey(name);
+  if (key === '') throw invalid('Campo inválido: name');
+  return key;
+}
 
 /** Descrição: trim; vazio, ausente ou null viram null (preserva quebras de linha). */
 function cleanDescription(value: string | null | undefined): string | null {
@@ -97,8 +105,11 @@ function cleanDescription(value: string | null | undefined): string | null {
   return out === '' ? null : out;
 }
 
+/** O `sub` é opaco e sensível a caixa: só trim, sem colapsar espaços internos. */
 function cleanSub(value: string): string {
-  return cleanText(value, 'responsibleSub');
+  const out = value.trim();
+  if (out === '') throw invalid('Campo obrigatório: responsibleSub');
+  return out;
 }
 
 export function createPortfolioService(db: Db, opts: ServiceOptions = {}): PortfolioService {
@@ -221,13 +232,24 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
   }
 
   /**
-   * Passos comuns das escritas: carteira no escopo (404), permissão de edição (403),
-   * versão obrigatória (428) e igual à atual (409). Devolve a linha e a versão.
+   * Passos comuns das escritas, nesta ordem: carteira no escopo (404), permissão de edição (403),
+   * `beforeVersion` (permissões extras que dependem do corpo), versão presente (428), carteira
+   * ativa (409 `portfolio_inactive`) e versão igual à atual (409 `version_conflict`).
+   * A inativa vem antes da versão: com a versão velha, o 409 de versão mandaria recarregar e
+   * tentar de novo, e o erro certo (reativar) só apareceria depois.
    */
-  function openForEdit(conn: Conn, actor: Actor, id: number, expected: number | undefined): PortfolioRow {
+  function openForEdit(
+    conn: Conn,
+    actor: Actor,
+    id: number,
+    expected: number | undefined,
+    beforeVersion?: (row: PortfolioRow) => void,
+  ): PortfolioRow {
     const row = findScoped(conn, actor, id);
     requireEdit(actor, row);
+    beforeVersion?.(row);
     const version = requireVersion(expected);
+    if (!row.active) throw new DomainError('portfolio_inactive', INACTIVE);
     assertVersion(row.version, version);
     return row;
   }
@@ -239,6 +261,12 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
       const version = requireVersion(expected);
       if (row.active === active) return loadAggregate(tx, id); // idempotente
       assertVersion(row.version, version);
+      if (active) {
+        // Reativar revalida o que pode ter mudado enquanto estava inativa. Vendedores com vínculo
+        // inativo não bloqueiam: o E6/E7 tratam na ativação da carteira.
+        assertBranchesActive(tx, [row.branchId]);
+        assertActiveType(tx, row.portfolioTypeId);
+      }
       writeActive(tx, portfolios as unknown as AuditedTable, id, active, actor.sub, now());
       return loadAggregate(tx, id);
     });
@@ -256,6 +284,10 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
       if (scopeIds.length === 0) return { items: [], nextCursor: null };
       if (p.branchId !== undefined && !scopeIds.includes(p.branchId)) return { items: [], nextCursor: null };
       const q = p.q?.trim();
+      const qKey = q ? portfolioNameKey(q) : '';
+      if (q && qKey === '') return { items: [], nextCursor: null }; // só pontuação não casa nome algum
+      const responsibleSub = p.responsibleSub?.trim();
+      if (responsibleSub === '') throw invalid('Campo inválido: responsibleSub');
       const rows = db
         .select({
           id: portfolios.id,
@@ -282,8 +314,8 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
             after === undefined ? undefined : gt(portfolios.id, after),
             p.status === undefined ? undefined : eq(portfolios.status, p.status),
             p.active === undefined ? undefined : eq(portfolios.active, p.active),
-            p.responsibleSub === undefined ? undefined : eq(portfolios.responsibleSub, p.responsibleSub),
-            q ? keyContains(portfolios.nameKey, q) : undefined,
+            responsibleSub === undefined ? undefined : eq(portfolios.responsibleSub, responsibleSub),
+            qKey ? likeContains(portfolios.nameKey, qKey) : undefined,
           ),
         )
         .orderBy(asc(portfolios.id))
@@ -306,7 +338,7 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
         assertAllInScope([data.branchId], resolveScopeIds(tx, actor));
         assertBranchesActive(tx, [data.branchId]);
         assertActiveType(tx, data.portfolioTypeId);
-        const key = searchKey(name);
+        const key = nameKeyOf(name);
         if (nameTaken(tx, data.branchId, key)) throw new DomainError('conflict', NAME_TAKEN);
         const at = now();
         try {
@@ -336,14 +368,20 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
 
     update(actor, id, expectedVersion, patch) {
       return writeTx(db, (tx) => {
-        const row = openForEdit(tx, actor, id, expectedVersion);
-        const data = parseInput(UpdatePortfolioSchema, patch);
+        let data!: UpdatePortfolioInput;
+        const row = openForEdit(tx, actor, id, expectedVersion, (current) => {
+          data = parseInput(UpdatePortfolioSchema, patch);
+          // Só quem é admin transfere a carteira; reenviar o mesmo valor não conta como troca.
+          // Decidido antes da versão: quem não pode trocar recebe 403 mesmo com versão velha.
+          const moves =
+            (data.branchId !== undefined && data.branchId !== current.branchId) ||
+            (data.responsibleSub !== undefined && cleanSub(data.responsibleSub) !== current.responsibleSub);
+          if (moves) requireAdminister(actor);
+        });
         const branchId = data.branchId ?? row.branchId;
         const responsibleSub =
           data.responsibleSub === undefined ? row.responsibleSub : cleanSub(data.responsibleSub);
         const changesBranch = branchId !== row.branchId;
-        // Só quem é admin transfere a carteira; reenviar o mesmo valor não conta como troca.
-        if (changesBranch || responsibleSub !== row.responsibleSub) requireAdminister(actor);
         if (changesBranch) {
           assertAllInScope([branchId], resolveScopeIds(tx, actor));
           assertBranchesActive(tx, [branchId]);
@@ -353,12 +391,12 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
             .where(eq(portfolioSellers.portfolioId, id))
             .all()
             .map((r) => r.id);
-          assertSellersLinkedToBranch(tx, branchId, sellerIds);
+          assertSellersUsable(tx, branchId, sellerIds);
         }
         const typeId = data.portfolioTypeId ?? row.portfolioTypeId;
         if (typeId !== row.portfolioTypeId) assertActiveType(tx, typeId);
         const name = data.name === undefined ? row.name : cleanText(data.name, 'name');
-        const key = searchKey(name);
+        const key = data.name === undefined ? row.nameKey : nameKeyOf(name);
         if ((changesBranch || key !== row.nameKey) && nameTaken(tx, branchId, key, id)) {
           throw new DomainError('conflict', NAME_TAKEN);
         }

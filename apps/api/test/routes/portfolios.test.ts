@@ -36,6 +36,9 @@ beforeAll(async () => {
 });
 afterAll(() => fx.close());
 
+const branchId = (code: string): number =>
+  (fx.app.sqlite.prepare('select id from branches where code = ?').get(code) as { id: number }).id;
+
 let seq = 0;
 const call = async (
   method: 'GET' | 'POST' | 'PATCH' | 'PUT',
@@ -50,6 +53,13 @@ const call = async (
       ? await fx.headers({ ...who, ...(extra.ifMatch !== undefined ? { ifMatch: extra.ifMatch } : {}) })
       : {},
     ...(extra.body !== undefined ? { payload: extra.body as object } : {}),
+  });
+
+const post = async (id: number, action: string, who: TokenOptions, ifMatch?: string) =>
+  fx.app.inject({
+    method: 'POST',
+    url: `/v1/portfolios/${id}/${action}`,
+    headers: await fx.headers({ ...who, ...(ifMatch ? { ifMatch } : {}) }),
   });
 
 const newBody = (over: Record<string, unknown> = {}) => ({
@@ -196,6 +206,8 @@ describe('contrato HTTP portfolios', () => {
         ifMatch: '1',
       }),
       await call('PUT', `/${id}/sellers`, OTHER, { body: { assignments: [] }, ifMatch: '1' }),
+      await post(id, 'deactivate', OTHER, '1'),
+      await post(id, 'reactivate', OTHER, '1'),
     ]) {
       expect(res.statusCode).toBe(404);
       expect(res.json()).toEqual({ error: 'not_found' });
@@ -309,6 +321,29 @@ describe('contrato HTTP portfolios', () => {
     expect(res.json<{ error: string }>().error).toBe('validation_error');
   });
 
+  it('PATCH troca de filial como admin das duas filiais: 200, versão sobe e ETag acompanha', async () => {
+    const both: TokenOptions = { sub: 'adm-3', roles: ['admin'], branches: ['SER', 'CAR'] };
+    const carId = branchId('CAR');
+    const swapper = createSellerService(fx.db).create(adminOf('SER', 'CAR'), {
+      code: 'V-SWAP',
+      name: 'Vendedor Troca',
+      branchIds: [ser, carId],
+    }).id;
+    const id = await create();
+    const set = await call('PUT', `/${id}/sellers`, ADMIN, {
+      ifMatch: '1',
+      body: { assignments: [{ sellerId: swapper, productSubgroupId: subgroupId }] },
+    });
+    expect(set.statusCode).toBe(200);
+    // o responsável (sem poder de troca) com versão velha recebe 403, não 409
+    const stale = await call('PATCH', `/${id}`, OWNER, { ifMatch: '1', body: { responsibleSub: 'outro' } });
+    expect(stale.statusCode).toBe(403);
+    const res = await call('PATCH', `/${id}`, both, { ifMatch: '2', body: { branchId: carId } });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers.etag).toBe('"3"');
+    expect(res.json()).toMatchObject({ branch: { code: 'CAR' }, version: 3 });
+  });
+
   it('deactivate/reactivate: só admin, idempotentes, ETag', async () => {
     const id = await create();
     const send = async (action: string, ifMatch?: string, who: TokenOptions = ADMIN) =>
@@ -351,6 +386,84 @@ describe('contrato HTTP portfolios', () => {
     } while (cursor && pages < 10);
     expect(pages).toBe(2);
     expect(seen.size).toBe(3);
-    expect((await call('GET', `?branchId=${ser}&q=carteira`, READER)).statusCode).toBe(200);
+    await create({ name: 'Carteira Busca Z' });
+    const byName = await call('GET', `?branchId=${ser}&q=carteira`, READER);
+    expect(byName.statusCode).toBe(200);
+    const names = byName.json<{ items: { name: string; branch: { id: number } }[] }>().items;
+    expect(names.length).toBeGreaterThan(0);
+    for (const item of names) {
+      expect(item.name.toLowerCase()).toContain('carteira');
+      expect(item.branch.id).toBe(ser);
+    }
+    expect(names.map((i) => i.name)).toContain('Carteira Busca Z');
+  });
+
+  it('lista: active=false devolve só inativas, status inválido -> 400, duas filiais no token', async () => {
+    const both: TokenOptions = { sub: 'adm-3', roles: ['admin'], branches: ['SER', 'CAR'] };
+    const carId = branchId('CAR');
+    const mine = await create({ name: 'Lista Ativa X' });
+    const off = await create({ name: 'Lista Inativa X' });
+    expect((await post(off, 'deactivate', ADMIN, '1')).statusCode).toBe(200);
+    const created = await call('POST', '', both, {
+      body: newBody({ name: 'Lista Em CAR', branchId: carId, responsibleSub: 'lista-car' }),
+    });
+    expect(created.statusCode).toBe(201);
+    const carPortfolio = created.json<{ id: number }>().id;
+
+    const ids = async (query: string, who: TokenOptions) =>
+      (await call('GET', query, who)).json<{ items: { id: number; active: boolean }[] }>().items;
+    const inactive = await ids('?active=false&q=lista', READER);
+    expect(inactive.map((i) => i.id)).toEqual([off]);
+    expect(inactive.every((i) => !i.active)).toBe(true);
+    expect((await ids('?active=true&q=lista', READER)).map((i) => i.id)).toEqual([mine]);
+
+    expect((await ids('?q=lista', both)).map((i) => i.id)).toEqual([mine, off, carPortfolio]);
+    expect((await ids(`?q=lista&branchId=${carId}`, both)).map((i) => i.id)).toEqual([carPortfolio]);
+    // o responsável de uma carteira fora do escopo não aparece para quem não enxerga a filial
+    expect(await ids('?responsibleSub=lista-car', READER)).toEqual([]);
+    expect((await ids('?responsibleSub=lista-car', both)).map((i) => i.id)).toEqual([carPortfolio]);
+
+    const bad = await call('GET', '?status=foo', READER);
+    expect(bad.statusCode).toBe(400);
+    expect(bad.json<{ error: string }>().error).toBe('validation_error');
+  });
+
+  it('busca q ignora pontuação: "norte farmacias" acha "Norte — Farmácias"', async () => {
+    const id = await create({ name: 'Norte — Farmácias HTTP' });
+    const res = await call('GET', '?q=norte%20farmacias%20http', READER);
+    expect(res.json<{ items: { id: number }[] }>().items.map((i) => i.id)).toEqual([id]);
+    const dup = await call('POST', '', ADMIN, { body: newBody({ name: 'NORTE / FARMACIAS - HTTP' }) });
+    expect(dup.statusCode).toBe(409);
+    expect(dup.json()).toEqual({ error: 'conflict' });
+  });
+
+  it('carteira inativa: edição -> 409 portfolio_inactive; reativar libera', async () => {
+    const id = await create();
+    expect((await post(id, 'deactivate', ADMIN, '1')).statusCode).toBe(200);
+    const filters = { regions: [], retailNetworkIds: [], economicGroupIds: [] };
+    for (const res of [
+      await call('PATCH', `/${id}`, ADMIN, { body: { name: 'Z' }, ifMatch: '2' }),
+      await call('PUT', `/${id}/filters`, ADMIN, { body: filters, ifMatch: '1' }),
+      await call('PUT', `/${id}/sellers`, OWNER, { body: { assignments: [] }, ifMatch: '2' }),
+    ]) {
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toEqual({ error: 'portfolio_inactive' });
+    }
+    expect((await post(id, 'reactivate', ADMIN, '2')).statusCode).toBe(200);
+    expect(
+      (await call('PATCH', `/${id}`, ADMIN, { body: { name: 'Voltou' }, ifMatch: '3' })).statusCode,
+    ).toBe(200);
+  });
+
+  it('reativar com filial inativa -> 400; deactivate sem If-Match -> 428', async () => {
+    const id = await create();
+    expect((await post(id, 'deactivate', ADMIN)).statusCode).toBe(428);
+    expect((await post(id, 'deactivate', ADMIN, '1')).statusCode).toBe(200);
+    fx.app.sqlite.prepare('update branches set active = 0 where id = ?').run(ser);
+    const res = await post(id, 'reactivate', ADMIN, '2');
+    expect(res.statusCode).toBe(400);
+    expect(res.json<{ error: string }>().error).toBe('validation_error');
+    fx.app.sqlite.prepare('update branches set active = 1 where id = ?').run(ser);
+    expect((await post(id, 'reactivate', ADMIN, '2')).statusCode).toBe(200);
   });
 });

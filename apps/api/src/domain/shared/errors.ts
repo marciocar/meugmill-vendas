@@ -5,6 +5,7 @@ export type DomainErrorCode =
   | 'conflict'
   | 'customer_exists'
   | 'seller_exists'
+  | 'portfolio_inactive'
   | 'version_conflict'
   | 'precondition_required';
 
@@ -16,6 +17,7 @@ export const DOMAIN_ERROR_STATUS: Record<DomainErrorCode, number> = {
   conflict: 409,
   customer_exists: 409,
   seller_exists: 409,
+  portfolio_inactive: 409,
   version_conflict: 409,
   precondition_required: 428,
 };

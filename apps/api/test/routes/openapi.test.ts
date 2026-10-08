@@ -115,6 +115,8 @@ describe('OpenAPI v1', () => {
     for (const code of ['conflict', 'customer_exists', 'seller_exists', 'version_conflict']) {
       expect(description).toContain(code);
     }
+    const portfolio = doc.paths['/v1/portfolios/{id}']?.patch?.responses?.['409']?.description ?? '';
+    expect(portfolio).toContain('portfolio_inactive');
   });
 
   it('rotas autenticadas têm bearerAuth; health, ready e openapi não têm', () => {

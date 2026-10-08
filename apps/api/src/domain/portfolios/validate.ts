@@ -99,7 +99,9 @@ export function validateRegions(conn: Conn, input: RegionInput[]): RegionRow[] {
     }
     const label = trimCollapse(r.neighborhoodLabel ?? '');
     const key = neighborhoodKey(label);
-    if (label === '' || key === '') throw invalid('Região de bairro exige o nome do bairro');
+    // Sem letra nem dígito (só pontuação) não identifica bairro algum.
+    if (label === '' || key === '' || !/[\p{L}\p{N}]/u.test(key))
+      throw invalid('Região de bairro exige o nome do bairro');
     return {
       level: 'neighborhood',
       stateCode: r.stateCode,
@@ -152,6 +154,12 @@ function assertActiveSellers(conn: Conn, ids: number[]): void {
   if (n !== ids.length) throw invalid('Vendedor inexistente ou inativo');
 }
 
+/** Vendedores ativos globalmente E com vínculo ativo com a filial (ids sem duplicata). */
+export function assertSellersUsable(conn: Conn, branchId: number, sellerIds: number[]): void {
+  assertActiveSellers(conn, sellerIds);
+  assertSellersLinkedToBranch(conn, branchId, sellerIds);
+}
+
 /** Todo vendedor precisa de vínculo ATIVO com a filial (compatibilidade vendedor x filial). */
 export function assertSellersLinkedToBranch(conn: Conn, branchId: number, sellerIds: number[]): void {
   if (sellerIds.length === 0) return;
@@ -191,7 +199,6 @@ export function validateAssignments(
     'Vendedor e subgrupo duplicados',
   );
   const sellerIds = [...new Set(assignments.map((a) => a.sellerId))];
-  assertActiveSellers(conn, sellerIds);
-  assertSellersLinkedToBranch(conn, branchId, sellerIds);
+  assertSellersUsable(conn, branchId, sellerIds);
   assertActiveSubgroups(conn, [...new Set(assignments.map((a) => a.productSubgroupId))]);
 }

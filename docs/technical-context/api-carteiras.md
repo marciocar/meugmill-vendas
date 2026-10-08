@@ -1,6 +1,6 @@
 ---
 updated: 2026-10-08
-source: apps/api/src/routes/v1/portfolios.ts, apps/api/src/routes/v1/portfolio-types.ts, apps/api/src/domain/portfolios/, apps/api/src/domain/portfolio-types/, apps/api/src/domain/shared/normalize.ts, apps/api/src/domain/shared/authz.ts, scripts/smoke.sh, .claude/sessions/carteira-e3-cadastro-carteira/architecture.md, .claude/sessions/carteira-e3-cadastro-carteira/context.md
+source: apps/api/src/routes/v1/portfolios.ts, apps/api/src/domain/portfolios/name-key.ts, apps/api/src/routes/v1/portfolio-types.ts, apps/api/src/domain/portfolios/, apps/api/src/domain/portfolio-types/, apps/api/src/domain/shared/normalize.ts, apps/api/src/domain/shared/authz.ts, scripts/smoke.sh, .claude/sessions/carteira-e3-cadastro-carteira/architecture.md, .claude/sessions/carteira-e3-cadastro-carteira/context.md
 ---
 
 # API da carteira (v1)
@@ -26,8 +26,13 @@ Rotas: `GET /v1/portfolios` (lista resumida: `q`, `branchId`, `status`, `active`
 `POST .../deactivate` e `POST .../reactivate`. O tipo de carteira é um catálogo `code + name` em
 `/v1/portfolio-types` (mesmas rotas dos demais catálogos do E2). O tipo só classifica; não muda regra.
 
-O nome é único por filial, comparado pela chave normalizada (sem acento, sem caixa, espaços colapsados),
-inclusive entre carteiras inativas. Repetir o nome responde `409 conflict`.
+O nome é único por filial, comparado pela chave normalizada: sem acento, sem caixa e **sem pontuação**
+(qualquer sequência de caracteres que não sejam letras ou dígitos, como `—`, `-`, `–`, `/` e `,`, vira um
+único espaço). "Norte — Farmácias", "norte - farmacias" e "NORTE/FARMÁCIAS" são o mesmo nome. Vale também
+entre carteiras inativas, e repetir o nome responde `409 conflict`. Nome só com pontuação responde `400`.
+A busca `q` da lista usa a mesma normalização (`q=norte farmacias` acha "Norte — Farmácias").
+No boot, a API recalcula uma vez as chaves gravadas com a regra anterior (idempotente; se duas carteiras
+da mesma filial passarem a colidir, a segunda mantém a chave antiga).
 
 ## Ciclo de vida
 
@@ -37,6 +42,13 @@ Dois eixos independentes:
   junto com a gravação dos vínculos; até lá nenhuma rota muda o `status`.
 - `active` (inativação): `deactivate` e `reactivate`, idempotentes, com `If-Match`. Não há exclusão. Um
   rascunho pode ser inativado (abandonado) e uma carteira `active` também.
+- **Carteira inativa não é editável**: `PATCH`, `PUT /filters` e `PUT /sellers` respondem
+  `409 portfolio_inactive`. A checagem vem depois de 404 (escopo), 403 (permissão) e 428 (sem `If-Match`),
+  e **antes** da comparação de versão, para que quem tem a tela desatualizada saiba que o problema é a
+  carteira inativa, e não uma versão velha. Para editar, reative.
+- **Reativar revalida**: a filial da carteira precisa estar ativa e o tipo também; senão `400
+validation_error` e a carteira continua inativa. Vendedores com vínculo inativo **não** bloqueiam a
+  reativação (o E6/E7 tratam). Reativar uma carteira já ativa é no-op e não revalida.
 
 ## Autorização
 
@@ -48,6 +60,12 @@ Dois eixos independentes:
 | Trocar filial ou responsável             | Só `admin`; a nova filial também precisa estar no token           |
 | Inativar e reativar                      | Só `admin` da filial                                              |
 
+- **Ordem dos erros nas escritas**: 404 (escopo), 403 (permissão de editar; trocar filial ou responsável
+  também é decidido aqui, antes da versão), 428 (sem `If-Match`), 409 `portfolio_inactive`, 409
+  `version_conflict`, e por fim as validações de negócio (400).
+- **`responsibleSub` é opaco**: só recebe `trim` (sem colapsar espaços internos) e é comparado de forma
+  exata, com diferença entre maiúsculas e minúsculas, ao gravar, no filtro da lista e na permissão do
+  responsável.
 - **Fora do escopo = 404**: carteira de filial que não está no token responde `404 not_found`, igual a
   uma inexistente. Quem está no escopo mas não pode a operação recebe `403 forbidden`.
 - **Responsável só como `sub`**: a carteira guarda e devolve apenas o `sub` do usuário do IdP, sem nome nem
@@ -72,6 +90,7 @@ limpa a seção. Duplicata dentro do mesmo `PUT` responde `400`.
   ou alguma das redes, ou algum dos grupos); entre os critérios preenchidos vale **E**. O nível da região
   que casou servirá à prioridade bairro > cidade > estado no E5.
 - Redes e grupos econômicos precisam existir e estar ativos.
+- Bairro só com pontuação (sem letra nem dígito) responde `400`.
 - [INFERIDO] Carteira sem nenhum filtro é permitida, para quem monta só com inclusão manual (E4).
 
 ## Vendedores x subgrupos (`PUT /sellers`)
@@ -80,8 +99,10 @@ Corpo: `{ assignments: [{ sellerId, productSubgroupId }] }`. Substitui o conjunt
 pode ter vários subgrupos e um subgrupo vários vendedores (o E6 divide entre eles).
 
 - O vendedor precisa ter **vínculo ativo** com a filial da carteira, e o subgrupo precisa estar ativo.
-- **Troca de filial incompatível = 400**: o admin só troca a `branchId` (no `PATCH`) se todos os vendedores
-  do conjunto tiverem vínculo ativo com a filial nova.
+- O vendedor também precisa estar **ativo globalmente**.
+- **Troca de filial incompatível = 400**: o admin só troca a `branchId` (no `PATCH`) se a filial nova
+  estiver ativa e todos os vendedores do conjunto passarem na mesma validação (ativos e com vínculo ativo
+  com a filial nova).
 - A validação ocorre só na escrita; vendedor que perde o vínculo depois é tratado no E6/E7.
 
 ## Concorrência
@@ -133,7 +154,7 @@ Formato `{ "error": "<codigo>", "message"?: "..." }`, sem eco do valor enviado.
 | 401    | token ausente ou inválido                                                                                                       |
 | 403    | `forbidden` (sem papel para a operação)                                                                                         |
 | 404    | `not_found` (inexistente ou fora do escopo)                                                                                     |
-| 409    | `conflict` (nome já existe na filial), `version_conflict`                                                                       |
+| 409    | `conflict` (nome já existe na filial), `portfolio_inactive` (edição de carteira inativa), `version_conflict`                    |
 | 428    | `precondition_required`                                                                                                         |
 
 ## Contrato OpenAPI

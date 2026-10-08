@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createProductSubgroupService } from '../../src/domain/catalog/service.js';
 import { createPortfolioTypeService } from '../../src/domain/portfolio-types/service.js';
+import { portfolioNameKey, refreshPortfolioNameKeys } from '../../src/domain/portfolios/name-key.js';
 import { createPortfolioService, type PortfolioService } from '../../src/domain/portfolios/service.js';
 import { createSellerService } from '../../src/domain/sellers/service.js';
 import {
@@ -578,5 +579,346 @@ describe('carteira: inativar e reativar', () => {
     const on = svc.reactivate(adminSer, p.id, 2);
     expect(on).toMatchObject({ active: true, version: 3, deactivatedAt: null });
     expect(svc.reactivate(adminSer, p.id, 3).version).toBe(3);
+  });
+});
+
+describe('carteira: nome insensível a pontuação', () => {
+  it('portfolioNameKey junta caixa, acento, espaço e pontuação', () => {
+    expect(portfolioNameKey('  Norte — Farmácias ')).toBe('NORTE FARMACIAS');
+    expect(portfolioNameKey('norte/farmácias.')).toBe('NORTE FARMACIAS');
+    expect(portfolioNameKey('Zona 1 (Sul)')).toBe('ZONA 1 SUL');
+    expect(portfolioNameKey('---')).toBe('');
+  });
+
+  it('—, -, – e / colidem (409) na mesma filial, inclusive ao renomear', () => {
+    draft({ name: 'Norte — Farmácias' });
+    for (const name of ['Norte - Farmácias', 'norte – farmacias', 'NORTE / FARMÁCIAS', 'Norte,Farmácias!']) {
+      expect(
+        codeOf(() => draft({ name })),
+        name,
+      ).toBe('conflict');
+    }
+    const other = draft({ name: 'Outra' });
+    expect(codeOf(() => svc.update(adminSer, other.id, 1, { name: 'Norte-Farmácias' }))).toBe('conflict');
+    // palavras diferentes não colidem
+    expect(draft({ name: 'Norte Farmácias 2' }).name).toBe('Norte Farmácias 2');
+  });
+
+  it('nome só com pontuação -> 400 (criar e renomear)', () => {
+    expect(codeOf(() => draft({ name: ' — / — ' }))).toBe('validation_error');
+    const p = draft();
+    expect(codeOf(() => svc.update(adminSer, p.id, 1, { name: '...' }))).toBe('validation_error');
+  });
+
+  it('busca q ignora pontuação, acento e caixa', () => {
+    const p = draft({ name: 'Norte — Farmácias' });
+    draft({ name: 'Sul' });
+    expect(svc.list(readerSer, { q: 'norte farmacias' }).items.map((i) => i.id)).toEqual([p.id]);
+    expect(svc.list(readerSer, { q: 'Norte-Farmácias' }).items.map((i) => i.id)).toEqual([p.id]);
+    expect(svc.list(readerSer, { q: 'norte -' }).items.map((i) => i.id)).toEqual([p.id]);
+    expect(svc.list(readerSer, { q: '— —' }).items).toEqual([]); // só pontuação não casa nada
+  });
+
+  it('refresh no boot recalcula chaves antigas, é idempotente e ignora colisão', () => {
+    const a = draft({ name: 'Norte — Farmácias' });
+    const b = draft({ name: 'Sul B' });
+    const c = draft({ name: 'Sul C' });
+    const sql = fx.app.sqlite;
+    // simula o que havia gravado antes da correção (só searchKey); b e c colidem na forma nova
+    const set = sql.prepare('update portfolios set name = ?, name_key = ? where id = ?');
+    set.run('Norte — Farmácias', 'NORTE — FARMACIAS', a.id);
+    set.run('Sul - Lojas', 'SUL - LOJAS', b.id);
+    set.run('Sul / Lojas', 'SUL / LOJAS', c.id);
+    const keys = () =>
+      (
+        sql.prepare('select id, name_key from portfolios order by id').all() as {
+          id: number;
+          name_key: string;
+        }[]
+      ).map((r) => r.name_key);
+    expect(refreshPortfolioNameKeys(fx.db)).toBe(2); // a e b; c colidiria com b e fica como estava
+    expect(keys()).toEqual(['NORTE FARMACIAS', 'SUL LOJAS', 'SUL / LOJAS']);
+    expect(refreshPortfolioNameKeys(fx.db)).toBe(0);
+  });
+});
+
+describe('carteira: inativa não é editável', () => {
+  const offOf = () => {
+    const p = draft();
+    return svc.deactivate(adminSer, p.id, 1); // versão 2, inativa
+  };
+
+  it('PATCH, filters e sellers -> 409 portfolio_inactive, sem alterar nada', () => {
+    const p = offOf();
+    expect(codeOf(() => svc.update(adminSer, p.id, 2, { name: 'Z' }))).toBe('portfolio_inactive');
+    expect(codeOf(() => svc.replaceFilters(adminSer, p.id, 2, noFilters))).toBe('portfolio_inactive');
+    expect(codeOf(() => svc.replaceSellers(adminSer, p.id, 2, { assignments: [] }))).toBe(
+      'portfolio_inactive',
+    );
+    expect(codeOf(() => svc.update(owner, p.id, 2, { name: 'Z' }))).toBe('portfolio_inactive');
+    expect(svc.get(adminSer, p.id)).toEqual(p);
+  });
+
+  it('a inativa vem antes da versão velha; 404/403/428 vêm antes da inativa', () => {
+    const p = offOf();
+    expect(codeOf(() => svc.update(adminSer, p.id, 1, { name: 'Z' }))).toBe('portfolio_inactive');
+    expect(codeOf(() => svc.update(adminSer, p.id, undefined, { name: 'Z' }))).toBe('precondition_required');
+    expect(codeOf(() => svc.update(readerSer, p.id, 2, { name: 'Z' }))).toBe('forbidden');
+    expect(codeOf(() => svc.update(adminCar, p.id, 2, { name: 'Z' }))).toBe('not_found');
+    expect(codeOf(() => svc.update(owner, p.id, 2, { branchId: car }))).toBe('forbidden');
+  });
+
+  it('reativar e editar funciona', () => {
+    const p = offOf();
+    const on = svc.reactivate(adminSer, p.id, 2);
+    expect(on.version).toBe(3);
+    expect(svc.update(adminSer, p.id, 3, { name: 'Voltou' }).name).toBe('Voltou');
+  });
+
+  it('reativar com filial inativa -> 400 e continua inativa', () => {
+    const p = offOf();
+    fx.app.sqlite.prepare('update branches set active = 0 where id = ?').run(ser);
+    expect(codeOf(() => svc.reactivate(adminSer, p.id, 2))).toBe('validation_error');
+    expect(svc.get(adminSer, p.id)).toMatchObject({ active: false, version: 2 });
+    fx.app.sqlite.prepare('update branches set active = 1 where id = ?').run(ser);
+    expect(svc.reactivate(adminSer, p.id, 2).active).toBe(true);
+  });
+
+  it('reativar com tipo inativo -> 400 e continua inativa', () => {
+    const p = offOf();
+    createPortfolioTypeService(fx.db).deactivate(adminSer, typeId, 1);
+    expect(codeOf(() => svc.reactivate(adminSer, p.id, 2))).toBe('validation_error');
+    expect(svc.get(adminSer, p.id)).toMatchObject({ active: false, version: 2 });
+  });
+
+  it('vendedor com vínculo inativo não bloqueia a reativação', () => {
+    const p = draft();
+    svc.replaceSellers(adminSer, p.id, 1, { assignments: [{ sellerId, productSubgroupId: subgroupId }] });
+    svc.deactivate(adminSer, p.id, 2);
+    createSellerService(fx.db).deactivate(adminSer, sellerId, 1);
+    expect(svc.reactivate(adminSer, p.id, 3).active).toBe(true);
+  });
+
+  it('deactivate repetido com versão velha é idempotente; a primeira transição incrementa', () => {
+    const p = draft();
+    const first = svc.deactivate(adminSer, p.id, 1);
+    expect(first.version).toBe(2);
+    const again = svc.deactivate(adminSer, p.id, 1); // versão velha
+    expect(again).toEqual(first);
+    expect(svc.get(adminSer, p.id).version).toBe(2);
+    expect(codeOf(() => svc.deactivate(adminSer, p.id, undefined))).toBe('precondition_required');
+  });
+});
+
+describe('carteira: filiais, vendedores e responsável na troca', () => {
+  it('criar e trocar para filial inativa -> 400', () => {
+    const off = seedBranch(fx.db, 'OFF', { active: false });
+    const adm = adminOf('SER', 'OFF');
+    const input = { name: 'X', branchId: off, responsibleSub: 'r', portfolioTypeId: typeId };
+    expect(codeOf(() => svc.create(adm, input))).toBe('validation_error');
+    const p = draft();
+    expect(codeOf(() => svc.update(adm, p.id, 1, { branchId: off }))).toBe('validation_error');
+    expect(svc.get(adminSer, p.id).branch.code).toBe('SER');
+  });
+
+  it('trocar filial com vendedor inativo globalmente -> 400', () => {
+    const sellers = createSellerService(fx.db);
+    sellers.update(adminBoth, sellerId, 1, { branchIds: [ser, car] });
+    const p = draft();
+    svc.replaceSellers(adminSer, p.id, 1, { assignments: [{ sellerId, productSubgroupId: subgroupId }] });
+    sellers.deactivateGlobal(adminBoth, sellerId, 2);
+    expect(codeOf(() => svc.update(adminBoth, p.id, 2, { branchId: car }))).toBe('validation_error');
+    expect(svc.get(adminBoth, p.id).branch.code).toBe('SER');
+  });
+
+  it('responsibleSub: só trim, sensível a caixa e a espaços internos', () => {
+    const p = draft({ responsibleSub: '  Resp-1  ' });
+    expect(p.responsibleSub).toBe('Resp-1');
+    const lower = actor({ sub: 'resp-1', roles: ['vendedor'], branches: ['SER'] });
+    const exact = actor({ sub: 'Resp-1', roles: ['vendedor'], branches: ['SER'] });
+    expect(codeOf(() => svc.update(lower, p.id, 1, { name: 'Z' }))).toBe('forbidden');
+    expect(svc.update(exact, p.id, 1, { name: 'Z' }).version).toBe(2);
+    const spaced = draft({ name: 'Espaçada', responsibleSub: 'a  b' });
+    expect(spaced.responsibleSub).toBe('a  b');
+    expect(svc.list(readerSer, { responsibleSub: ' Resp-1 ' }).items.map((i) => i.id)).toEqual([p.id]);
+    expect(svc.list(readerSer, { responsibleSub: 'resp-1' }).items).toEqual([]);
+    expect(svc.list(readerSer, { responsibleSub: 'a b' }).items).toEqual([]);
+    expect(svc.list(readerSer, { responsibleSub: 'a  b' }).items.map((i) => i.id)).toEqual([spaced.id]);
+    expect(codeOf(() => svc.list(readerSer, { responsibleSub: '  ' }))).toBe('validation_error');
+    // reenviar o mesmo sub (com espaços nas bordas) não conta como troca
+    expect(svc.update(exact, p.id, 2, { responsibleSub: ' Resp-1 ' }).version).toBe(3);
+  });
+
+  it('responsável tentando trocar filial/responsável com versão velha recebe 403, não 409', () => {
+    const p = draft();
+    expect(codeOf(() => svc.update(owner, p.id, 99, { branchId: car }))).toBe('forbidden');
+    expect(codeOf(() => svc.update(owner, p.id, 99, { responsibleSub: 'outro' }))).toBe('forbidden');
+    expect(codeOf(() => svc.update(owner, p.id, undefined, { responsibleSub: 'outro' }))).toBe('forbidden');
+    expect(codeOf(() => svc.update(owner, p.id, 99, { name: 'Z' }))).toBe('version_conflict');
+  });
+
+  it('responsável com o sub certo mas sem a filial no token -> 404', () => {
+    const p = draft();
+    const stray = actor({ sub: 'resp-1', roles: ['vendedor'], branches: ['CAR'] });
+    expect(codeOf(() => svc.get(stray, p.id))).toBe('not_found');
+    expect(codeOf(() => svc.update(stray, p.id, 1, { name: 'Z' }))).toBe('not_found');
+    expect(codeOf(() => svc.replaceFilters(stray, p.id, 1, noFilters))).toBe('not_found');
+    expect(codeOf(() => svc.replaceSellers(stray, p.id, 1, { assignments: [] }))).toBe('not_found');
+  });
+});
+
+describe('carteira: bairros e limites nas bordas', () => {
+  const bairro = (label: string, municipalityCode = SERRA) => ({
+    level: 'neighborhood' as const,
+    stateCode: ES,
+    municipalityCode,
+    neighborhoodLabel: label,
+  });
+
+  it('"São Torquato" x "SAO TORQUATO" colidem; outro município não', () => {
+    const p = draft();
+    expect(
+      codeOf(() =>
+        svc.replaceFilters(adminSer, p.id, 1, {
+          ...noFilters,
+          regions: [bairro('São Torquato'), bairro('SAO TORQUATO')],
+        }),
+      ),
+    ).toBe('validation_error');
+    const ok = svc.replaceFilters(adminSer, p.id, 1, {
+      ...noFilters,
+      regions: [bairro('São Torquato'), bairro('SAO TORQUATO', VITORIA)],
+    });
+    expect(ok.filters.regions).toHaveLength(2);
+  });
+
+  it('bairro só com pontuação -> 400', () => {
+    const p = draft();
+    for (const label of ['...', ' - / - ']) {
+      expect(
+        codeOf(() => svc.replaceFilters(adminSer, p.id, 1, { ...noFilters, regions: [bairro(label)] })),
+        label,
+      ).toBe('validation_error');
+    }
+    expect(svc.get(adminSer, p.id).version).toBe(1);
+  });
+
+  it('200 redes e 200 grupos válidos passam', () => {
+    const p = draft();
+    const networkIds = Array.from({ length: 200 }, (_, i) => seedRetailNetwork(fx.db, `RN${i}`));
+    const groupIds = Array.from({ length: 200 }, (_, i) => seedEconomicGroup(fx.db, `GP${i}`));
+    const out = svc.replaceFilters(adminSer, p.id, 1, {
+      regions: [],
+      retailNetworkIds: networkIds,
+      economicGroupIds: groupIds,
+    });
+    expect(out.filters.retailNetworks).toHaveLength(200);
+    expect(out.filters.economicGroups).toHaveLength(200);
+  });
+
+  it('500 pares válidos passam e 501 -> 400', () => {
+    const p = draft();
+    const sellersSvc = createSellerService(fx.db);
+    const groupsSvc = createProductSubgroupService(fx.db);
+    const sellerIds = Array.from(
+      { length: 25 },
+      (_, i) => sellersSvc.create(adminSer, { code: `LV${i}`, name: `LV ${i}`, branchIds: [ser] }).id,
+    );
+    const subgroupIds = Array.from(
+      { length: 20 },
+      (_, i) => groupsSvc.create(adminSer, { code: `LS${i}`, name: `LS ${i}` }).id,
+    );
+    const pairs = sellerIds.flatMap((s) => subgroupIds.map((g) => ({ sellerId: s, productSubgroupId: g })));
+    expect(pairs).toHaveLength(500);
+    const out = svc.replaceSellers(adminSer, p.id, 1, { assignments: pairs });
+    expect(out.sellers).toHaveLength(500);
+    expect(
+      codeOf(() =>
+        svc.replaceSellers(adminSer, p.id, 2, {
+          assignments: [...pairs, { sellerId: sellerIds[0] as number, productSubgroupId: subgroupId }],
+        }),
+      ),
+    ).toBe('validation_error');
+    expect(svc.get(adminSer, p.id).version).toBe(2);
+  });
+});
+
+describe('carteira: isolamento entre as seções', () => {
+  const count = (table: string, id: number) =>
+    (
+      fx.app.sqlite.prepare(`select count(*) as n from ${table} where portfolio_id = ?`).get(id) as {
+        n: number;
+      }
+    ).n;
+
+  it('replaceFilters não mexe em vendedores e replaceSellers não mexe em filtros', () => {
+    const net = seedRetailNetwork(fx.db, 'R1');
+    const grp = seedEconomicGroup(fx.db, 'G1');
+    const p = draft();
+    svc.replaceSellers(adminSer, p.id, 1, {
+      assignments: [
+        { sellerId, productSubgroupId: subgroupId },
+        { sellerId, productSubgroupId: subgroupB },
+      ],
+    });
+    svc.replaceFilters(adminSer, p.id, 2, {
+      regions: [{ level: 'state', stateCode: ES }],
+      retailNetworkIds: [net],
+      economicGroupIds: [grp],
+    });
+    expect(count('portfolio_sellers', p.id)).toBe(2);
+    svc.replaceFilters(adminSer, p.id, 3, noFilters);
+    expect(count('portfolio_sellers', p.id)).toBe(2);
+
+    svc.replaceFilters(adminSer, p.id, 4, {
+      regions: [{ level: 'state', stateCode: ES }],
+      retailNetworkIds: [net],
+      economicGroupIds: [grp],
+    });
+    svc.replaceSellers(adminSer, p.id, 5, { assignments: [] });
+    expect(count('portfolio_regions', p.id)).toBe(1);
+    expect(count('portfolio_retail_networks', p.id)).toBe(1);
+    expect(count('portfolio_economic_groups', p.id)).toBe(1);
+  });
+
+  it('PUT filters com grupo inválido depois de rede válida preserva tudo e a versão', () => {
+    const net = seedRetailNetwork(fx.db, 'R1');
+    const net2 = seedRetailNetwork(fx.db, 'R2');
+    const p = draft();
+    const before = svc.replaceFilters(adminSer, p.id, 1, {
+      regions: [{ level: 'state', stateCode: ES }],
+      retailNetworkIds: [net],
+      economicGroupIds: [],
+    });
+    expect(
+      codeOf(() =>
+        svc.replaceFilters(adminSer, p.id, 2, {
+          regions: [{ level: 'state', stateCode: SP }],
+          retailNetworkIds: [net2],
+          economicGroupIds: [9999],
+        }),
+      ),
+    ).toBe('validation_error');
+    expect(svc.get(adminSer, p.id)).toEqual(before);
+  });
+});
+
+describe('carteira: lista com token de duas filiais', () => {
+  it('escopo, branchId, responsibleSub sem vazar e filtro de inativas', () => {
+    const a = draft({ name: 'Em SER', responsibleSub: 'x-1' });
+    const b = svc.create(adminBoth, {
+      name: 'Em CAR',
+      branchId: car,
+      responsibleSub: 'x-1',
+      portfolioTypeId: typeId,
+    });
+    expect(svc.list(adminBoth).items.map((i) => i.id)).toEqual([a.id, b.id]);
+    expect(svc.list(adminBoth, { branchId: car }).items.map((i) => i.id)).toEqual([b.id]);
+    expect(svc.list(adminBoth, { branchId: ser }).items.map((i) => i.id)).toEqual([a.id]);
+    expect(svc.list(adminBoth, { responsibleSub: 'x-1' }).items).toHaveLength(2);
+    // quem só enxerga SER não vê a de CAR pelo responsibleSub
+    expect(svc.list(adminSer, { responsibleSub: 'x-1' }).items.map((i) => i.id)).toEqual([a.id]);
+    svc.deactivate(adminBoth, b.id, 1);
+    expect(svc.list(adminBoth, { active: false }).items.map((i) => i.id)).toEqual([b.id]);
   });
 });
