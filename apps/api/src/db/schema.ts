@@ -281,6 +281,28 @@ export const portfolioSellers = sqliteTable(
   ],
 );
 
+// Ajustes manuais da prévia (E4): inclui cliente que não casa os filtros ou exclui um que casa.
+// A PK (carteira, cliente) garante a exclusão mútua entre inclusão e exclusão.
+export const portfolioCustomerOverrides = sqliteTable(
+  'portfolio_customer_overrides',
+  {
+    portfolioId: integer('portfolio_id')
+      .notNull()
+      .references(() => portfolios.id, { onDelete: 'cascade' }),
+    customerId: integer('customer_id')
+      .notNull()
+      .references(() => customers.id),
+    kind: text('kind', { enum: ['include', 'exclude'] }).notNull(),
+    createdAt: integer('created_at').notNull(),
+    createdBy: text('created_by').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.portfolioId, t.customerId] }),
+    index('portfolio_customer_overrides_customer_id_idx').on(t.customerId),
+    check('portfolio_customer_overrides_kind_check', sql`${t.kind} in ('include', 'exclude')`),
+  ],
+);
+
 export type State = typeof states.$inferSelect;
 export type NewState = typeof states.$inferInsert;
 export type Municipality = typeof municipalities.$inferSelect;
@@ -313,3 +335,5 @@ export type PortfolioEconomicGroup = typeof portfolioEconomicGroups.$inferSelect
 export type NewPortfolioEconomicGroup = typeof portfolioEconomicGroups.$inferInsert;
 export type PortfolioSeller = typeof portfolioSellers.$inferSelect;
 export type NewPortfolioSeller = typeof portfolioSellers.$inferInsert;
+export type PortfolioCustomerOverride = typeof portfolioCustomerOverrides.$inferSelect;
+export type NewPortfolioCustomerOverride = typeof portfolioCustomerOverrides.$inferInsert;
