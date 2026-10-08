@@ -1,4 +1,13 @@
-import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  Component,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { describeError } from './api/errors';
 
 /** Aviso de erro ou sucesso. Erro usa `role="alert"` para leitor de tela. */
@@ -205,3 +214,10 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { failed: 
     );
   }
 }
+
+/**
+ * Quantas vezes a aba atual foi reexibida. As abas visitadas ficam montadas; as listas incluem este número nas
+ * dependências para reler ao voltar (ex.: carteiras criadas por uma importação noutra aba).
+ */
+export const TabShownContext = createContext(0);
+export const useTabShown = (): number => useContext(TabShownContext);

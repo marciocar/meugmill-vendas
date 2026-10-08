@@ -58,7 +58,8 @@ Inativar e reativar ficam no cabeçalho do wizard, só para o admin da filial.
   o usuário anterior sai da tela. É uma troca consciente: na renovação do mesmo usuário com o `/v1/me`
   falhando, a tela também sai e a edição não salva se perde, porque a tela não sabe se o `sub` é o mesmo.
   Um 401 de uma requisição feita com um token que o host já trocou não emite `token-expired`.
-- **Abas.** As abas visitadas ficam montadas, só escondidas: trocar de aba não descarta o wizard.
+- **Abas.** As abas visitadas ficam montadas, só escondidas: trocar de aba não descarta o wizard. As
+  listas releem ao reexibir a aba (por exemplo, carteiras criadas por uma importação noutra aba).
 - **Permissão.** A tela esconde ou trava o que o perfil não pode: criar é só do admin; editar, do admin da
   filial ou do responsável; inativar e trocar filial ou responsável, só do admin da filial. A etapa 5 aparece
   para admin, supervisão, o responsável e o token sem perfil conhecido (`legacy`). A importação é só do admin. Mesmo assim, um 403 ou 404 da API é
@@ -69,8 +70,8 @@ Inativar e reativar ficam no cabeçalho do wizard, só para o admin da filial.
   nesta tela" e um botão para tentar de novo.
 - **CSV.** O arquivo vai cru (`Content-Type: text/csv`), sem ser lido no navegador, porque a API detecta a
   codificação pelos bytes. Acima de 16 MB, a tela recusa antes de enviar. O job é consultado a cada 1 s
-  enquanto está `validating` ou `applying`. Se uma consulta falha, inclusive a primeira, a tela tenta de novo com
-  espera crescente, até 15 s. O erro de confirmar ou cancelar fica na tela até a próxima ação. Uma simulação com o prazo vencido não oferece confirmar, mesmo antes de a varredura
+  enquanto está `validating` ou `applying`. Se uma consulta falha por rede ou 5xx, inclusive a primeira, a tela tenta
+  de novo com espera crescente, até 15 s. Em 401, 403 ou 404 ela para e mostra a mensagem. O erro de confirmar ou cancelar fica na tela até a próxima ação. Uma simulação com o prazo vencido não oferece confirmar, mesmo antes de a varredura
   da API marcá-la `expired`. O relatório abre nas linhas com erro primeiro.
 - **Exportação.** Um `fetch` com o Bearer baixa o arquivo, e um link temporário dentro do shadow root
   dispara o download. O token não vai na URL.

@@ -312,4 +312,21 @@ describe('telas de CSV: modos de falha', () => {
     await settle(1100);
     expect(el.shadowRoot?.querySelector('[data-testid="job-status"]')?.textContent).toBe('Gravada');
   });
+
+  it('erro permanente (404) na leitura do job não é tentado de novo', async () => {
+    let reads = 0;
+    routeFetch([
+      ['GET', /\/v1\/me$/, () => json(200, ADMIN)],
+      ['GET', /\/v1\/csv-layouts$/, () => json(200, LAYOUTS)],
+      ['GET', /\/v1\/imports$/, () => json(200, page([job({ status: 'applied' })]))],
+      ['GET', /\/v1\/imports\/11$/, () => (reads++, json(404, { error: 'not_found' }))],
+    ]);
+    const el = await mountWith();
+    await click(el, 'Importar e exportar');
+    await click(el, 'Ver');
+    const afterOpen = reads;
+    await settle(1100);
+    expect(reads).toBe(afterOpen);
+    expect(text(el)).not.toContain('Tentando de novo');
+  });
 });

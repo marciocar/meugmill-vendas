@@ -3,7 +3,7 @@ import { useApi } from '../api/client';
 import { describeError } from '../api/errors';
 import type { CsvLayout, ImportJob, LayoutId, Page } from '../api/types';
 import { isAdmin } from '../roles';
-import { Field, LoadMore, Notice, formatDateTime, useAsync, usePaged } from '../ui';
+import { Field, LoadMore, Notice, formatDateTime, useAsync, usePaged, useTabShown } from '../ui';
 import type { Me } from '../use-me';
 import { ImportJobPanel, STATUS_TEXT } from './ImportJobPanel';
 
@@ -188,7 +188,11 @@ function ImportForm({ layout, onSubmitted }: { layout: LayoutId; onSubmitted: (j
 
 function ImportHistory({ onOpen }: { onOpen: (id: number) => void }) {
   const api = useApi();
-  const jobs = usePaged((cursor) => api.get<Page<ImportJob>>('/v1/imports', { cursor, limit: 20 }), [api]);
+  const shown = useTabShown();
+  const jobs = usePaged(
+    (cursor) => api.get<Page<ImportJob>>('/v1/imports', { cursor, limit: 20 }),
+    [api, shown],
+  );
   if (!jobs.loading && jobs.items.length === 0 && !jobs.error) return null;
   return (
     <section>

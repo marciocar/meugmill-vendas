@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useApi } from '../api/client';
 import type { Page, Visibility, VisibleCustomer } from '../api/types';
-import { Field, LoadMore, Notice, formatCnpj, useAsync, useDebounced, usePaged } from '../ui';
+import { Field, LoadMore, Notice, formatCnpj, useAsync, useDebounced, usePaged, useTabShown } from '../ui';
 
 const MODE_TEXT: Record<Visibility['mode'], string> = {
   profiles: 'Visibilidade pelos seus perfis.',
@@ -14,10 +14,11 @@ export function MyCustomersView() {
   const api = useApi();
   const [q, setQ] = useState('');
   const query = useDebounced(q.trim());
-  const summary = useAsync(() => api.get<Visibility>('/v1/me/visibility'), [api]);
+  const shown = useTabShown();
+  const summary = useAsync(() => api.get<Visibility>('/v1/me/visibility'), [api, shown]);
   const paged = usePaged(
     (cursor) => api.get<Page<VisibleCustomer>>('/v1/me/customers', { q: query, cursor, limit: 50 }),
-    [api, query],
+    [api, query, shown],
   );
 
   return (

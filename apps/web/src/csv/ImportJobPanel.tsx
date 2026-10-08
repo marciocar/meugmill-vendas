@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useApi } from '../api/client';
+import { ApiError, useApi } from '../api/client';
 import { describeError } from '../api/errors';
 import type { ImportJob, ImportLine, ImportLineStatus, ImportStatus, Page } from '../api/types';
 import { Badge, Field, LoadMore, Notice, formatDateTime, usePaged } from '../ui';
@@ -71,6 +71,7 @@ export function ImportJobPanel({ jobId, onClose }: { jobId: number; onClose: () 
 
   // Falhas seguidas da consulta: o acompanhamento continua, com espera crescente (até 15 s).
   const [failures, setFailures] = useState(0);
+  const [stopped, setStopped] = useState(false);
   const fetchJob = useCallback(async () => {
     try {
       const next = await api.get<ImportJob>(`/v1/imports/${jobId}`);
@@ -78,8 +79,11 @@ export function ImportJobPanel({ jobId, onClose }: { jobId: number; onClose: () 
       setError(null);
       setFailures(0);
     } catch (err) {
-      setError(`${describeError(err)} Tentando de novo…`);
-      setFailures((n) => n + 1);
+      // Só falha passageira (rede, 5xx) é tentada de novo; 401/403/404 não mudam esperando.
+      const transient = err instanceof ApiError && (err.status === 0 || err.status >= 500);
+      setError(transient ? `${describeError(err)} Tentando de novo…` : describeError(err));
+      setFailures((n) => (transient ? n + 1 : 0));
+      if (!transient) setStopped(true);
     }
   }, [api, jobId]);
 
@@ -90,11 +94,11 @@ export function ImportJobPanel({ jobId, onClose }: { jobId: number; onClose: () 
   const running = job !== null && RUNNING.includes(job.status);
   // Também tenta de novo quando a primeira leitura falhou (ainda sem job).
   useEffect(() => {
-    if (!running && !(job === null && failures > 0)) return;
+    if (stopped || (!running && !(job === null && failures > 0))) return;
     const delay = Math.min(1000 * 2 ** Math.max(failures - 1, 0), 15000);
     const t = setTimeout(() => void fetchJob(), delay);
     return () => clearTimeout(t);
-  }, [running, job, failures, fetchJob]);
+  }, [running, job, failures, stopped, fetchJob]);
 
   // O filtro inicial do relatório segue o resultado da fase (erros primeiro).
   useEffect(() => {

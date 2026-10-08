@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useApi } from '../api/client';
 import type { Page, PortfolioSummary } from '../api/types';
 import { isAdmin } from '../roles';
-import { Badge, Field, LoadMore, Notice, useDebounced, usePaged } from '../ui';
+import { Badge, Field, LoadMore, Notice, useDebounced, usePaged, useTabShown } from '../ui';
 import type { Me } from '../use-me';
 import { Wizard } from './Wizard';
 
@@ -34,10 +34,11 @@ function PortfolioList({ me, onOpen }: { me: Me; onOpen: (id: number | null) => 
   const [status, setStatus] = useState('');
   const [active, setActive] = useState('true');
   const query = useDebounced(q.trim());
+  const shown = useTabShown();
   const paged = usePaged(
     (cursor) =>
       api.get<Page<PortfolioSummary>>('/v1/portfolios', { q: query, status, active, cursor, limit: 50 }),
-    [api, query, status, active],
+    [api, query, status, active, shown],
   );
 
   return (

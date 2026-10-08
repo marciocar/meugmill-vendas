@@ -427,4 +427,16 @@ describe('wizard: modos de falha da revisão adversarial', () => {
     await click(el, 'Carteiras');
     expect(field(el, 'Nome').value).toBe('Nome em edição');
   });
+
+  it('voltar à aba Carteiras relê a lista', async () => {
+    const { calls } = routeFetch([
+      ['GET', /\/v1\/me$/, () => json(200, ADMIN)],
+      ['GET', /\/v1\/portfolios$/, () => json(200, page([summaryRow]))],
+    ]);
+    const el = await mountWith();
+    const before = calls.filter((c) => c.path === '/v1/portfolios').length;
+    await click(el, 'Importar e exportar');
+    await click(el, 'Carteiras');
+    expect(calls.filter((c) => c.path === '/v1/portfolios').length).toBeGreaterThan(before);
+  });
 });
