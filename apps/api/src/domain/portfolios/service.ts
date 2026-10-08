@@ -8,6 +8,7 @@ import {
   portfolios,
   portfolioTypes,
 } from '../../db/schema.js';
+import { endAllActiveLinks } from '../links/write.js';
 import { assertVersion, requireVersion, writeActive, type AuditedTable } from '../shared/audit.js';
 import { assertAllInScope, requireAdmin, resolveScopeIds, type Actor } from '../shared/authz.js';
 import { isUniqueViolation, writeTx, type Conn, type Db, type ServiceOptions } from '../shared/db.js';
@@ -135,7 +136,11 @@ export function createPortfolioService(db: Db, opts: ServiceOptions = {}): Portf
         assertBranchesActive(tx, [row.branchId]);
         assertActiveType(tx, row.portfolioTypeId);
       }
-      writeActive(tx, portfolios as unknown as AuditedTable, id, active, actor.sub, now());
+      const at = now();
+      // Carteira inativa não mantém clientes presos: encerra os vínculos (E7) na mesma transação.
+      // Reativar não os recria; é preciso finalizar de novo.
+      if (!active) endAllActiveLinks(tx, id, actor.sub, at);
+      writeActive(tx, portfolios as unknown as AuditedTable, id, active, actor.sub, at);
       return loadAggregateBase(tx, id);
     });
   }

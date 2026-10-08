@@ -287,7 +287,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -303,7 +303,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -517,7 +517,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -533,7 +533,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -728,7 +728,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -744,7 +744,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -969,7 +969,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -985,7 +985,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -1189,7 +1189,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -1205,7 +1205,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -1409,7 +1409,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -1425,7 +1425,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -1710,7 +1710,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -1726,7 +1726,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -2031,7 +2031,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -2047,7 +2047,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -2235,7 +2235,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -2251,7 +2251,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -2501,7 +2501,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -2517,7 +2517,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -2830,7 +2830,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -2846,7 +2846,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -3105,7 +3105,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -3121,7 +3121,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -3380,7 +3380,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -3396,7 +3396,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -3655,7 +3655,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -3671,7 +3671,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -3930,7 +3930,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -3946,7 +3946,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -4172,7 +4172,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -4188,7 +4188,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -4393,7 +4393,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -4409,7 +4409,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -4600,7 +4600,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -4616,7 +4616,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -4835,7 +4835,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -4851,7 +4851,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -5051,7 +5051,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -5067,7 +5067,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -5267,7 +5267,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -5283,7 +5283,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -5494,7 +5494,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -5510,7 +5510,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -5664,7 +5664,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -5680,7 +5680,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -5949,7 +5949,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -5965,7 +5965,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -6170,7 +6170,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -6186,7 +6186,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -6377,7 +6377,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -6393,7 +6393,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -6612,7 +6612,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -6628,7 +6628,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -6828,7 +6828,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -6844,7 +6844,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -7044,7 +7044,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -7060,7 +7060,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -7387,7 +7387,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -7403,7 +7403,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -7862,7 +7862,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -7878,7 +7878,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -8320,7 +8320,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -8336,7 +8336,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -8810,7 +8810,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -8826,7 +8826,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -9144,7 +9144,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -9160,7 +9160,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -9659,7 +9659,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -9675,7 +9675,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -9927,7 +9927,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -9943,7 +9943,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -10382,7 +10382,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -10398,7 +10398,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -10907,7 +10907,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -10923,7 +10923,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -11445,7 +11445,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -11461,7 +11461,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -11725,7 +11725,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -11741,7 +11741,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -12211,7 +12211,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -12227,7 +12227,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -12636,7 +12636,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -12652,7 +12652,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -13091,7 +13091,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -13107,7 +13107,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -13584,7 +13584,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -13600,7 +13600,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -13826,7 +13826,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -13842,7 +13842,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -14047,7 +14047,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -14063,7 +14063,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -14254,7 +14254,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -14270,7 +14270,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -14489,7 +14489,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -14505,7 +14505,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -14705,7 +14705,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -14721,7 +14721,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -14921,7 +14921,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -14937,7 +14937,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -15163,7 +15163,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -15179,7 +15179,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -15384,7 +15384,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -15400,7 +15400,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -15591,7 +15591,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -15607,7 +15607,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -15826,7 +15826,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -15842,7 +15842,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -16042,7 +16042,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -16058,7 +16058,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -16258,7 +16258,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -16274,7 +16274,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -16528,7 +16528,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -16544,7 +16544,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -16788,7 +16788,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -16804,7 +16804,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -16991,7 +16991,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -17007,7 +17007,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -17226,7 +17226,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -17242,7 +17242,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -17496,7 +17496,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -17512,7 +17512,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -17740,7 +17740,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -17756,7 +17756,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -17984,7 +17984,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -18000,7 +18000,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -18228,7 +18228,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -18244,7 +18244,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {
@@ -18472,7 +18472,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict.",
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
                   "properties": {
                     "error": {
                       "type": "string"
@@ -18488,7 +18488,7 @@
                 }
               }
             },
-            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, version_conflict."
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
           },
           "428": {
             "content": {

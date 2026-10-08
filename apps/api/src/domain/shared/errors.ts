@@ -6,6 +6,9 @@ export type DomainErrorCode =
   | 'customer_exists'
   | 'seller_exists'
   | 'portfolio_inactive'
+  | 'portfolio_incomplete'
+  | 'portfolio_has_conflicts'
+  | 'link_conflict'
   | 'version_conflict'
   | 'precondition_required';
 
@@ -18,6 +21,9 @@ export const DOMAIN_ERROR_STATUS: Record<DomainErrorCode, number> = {
   customer_exists: 409,
   seller_exists: 409,
   portfolio_inactive: 409,
+  portfolio_incomplete: 409,
+  portfolio_has_conflicts: 409,
+  link_conflict: 409,
   version_conflict: 409,
   precondition_required: 428,
 };
@@ -28,11 +34,17 @@ export const DOMAIN_ERROR_STATUS: Record<DomainErrorCode, number> = {
  */
 export class DomainError extends Error {
   readonly code: DomainErrorCode;
+  /**
+   * Detalhe estruturado opcional (contagens e ids de carteiras; nunca dados de clientes nem valores
+   * enviados pelo cliente). As rotas decidem se o expõem.
+   */
+  readonly detail: Readonly<Record<string, number | readonly number[]>> | undefined;
 
-  constructor(code: DomainErrorCode, message: string) {
+  constructor(code: DomainErrorCode, message: string, detail?: DomainError['detail']) {
     super(message);
     this.name = 'DomainError';
     this.code = code;
+    this.detail = detail;
   }
 
   get status(): number {
