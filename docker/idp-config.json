@@ -10,9 +10,63 @@
           "match": "smoke-admin",
           "claims": {
             "sub": "admin-01",
-            "aud": ["carteira-api"],
-            "roles": ["admin"],
-            "branch_ids": ["filial-01"]
+            "aud": [
+              "carteira-api"
+            ],
+            "roles": [
+              "admin"
+            ],
+            "branch_ids": [
+              "filial-01"
+            ]
+          }
+        },
+        {
+          "requestParam": "client_id",
+          "match": "smoke-vendedor",
+          "claims": {
+            "sub": "vend-01",
+            "aud": [
+              "carteira-api"
+            ],
+            "roles": [
+              "vendedor"
+            ],
+            "branch_ids": [
+              "filial-01"
+            ]
+          }
+        },
+        {
+          "requestParam": "client_id",
+          "match": "smoke-gestor",
+          "claims": {
+            "sub": "gest-01",
+            "aud": [
+              "carteira-api"
+            ],
+            "roles": [
+              "gestor"
+            ],
+            "branch_ids": [
+              "filial-01"
+            ]
+          }
+        },
+        {
+          "requestParam": "client_id",
+          "match": "smoke-supervisao",
+          "claims": {
+            "sub": "sup-01",
+            "aud": [
+              "carteira-api"
+            ],
+            "roles": [
+              "supervisao"
+            ],
+            "branch_ids": [
+              "filial-01"
+            ]
           }
         },
         {
@@ -20,9 +74,15 @@
           "match": "*",
           "claims": {
             "sub": "vendedor-01",
-            "aud": ["carteira-api"],
-            "roles": ["vendedor"],
-            "branch_ids": ["filial-01"]
+            "aud": [
+              "carteira-api"
+            ],
+            "roles": [
+              "vendedor"
+            ],
+            "branch_ids": [
+              "filial-01"
+            ]
           }
         }
       ]

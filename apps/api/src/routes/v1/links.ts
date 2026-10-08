@@ -18,6 +18,7 @@ import {
   sendDomainError,
   setEtag,
   withEtag,
+  serviceOptions,
 } from './http.js';
 
 const tags = ['links'];
@@ -193,5 +194,5 @@ export function registerLinkRoutes(app: FastifyInstance, opts: { service: LinkSe
 
 /** Plugin: vínculos da carteira e outbox de eventos. */
 export async function linkRoutes(app: FastifyInstance): Promise<void> {
-  registerLinkRoutes(app, { service: createLinkService(app.db) });
+  registerLinkRoutes(app, { service: createLinkService(app.db, serviceOptions(app)) });
 }

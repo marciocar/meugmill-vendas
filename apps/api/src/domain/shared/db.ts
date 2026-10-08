@@ -9,6 +9,18 @@ export type Conn = Db | Tx;
 export interface ServiceOptions {
   /** Relógio injetável (epoch ms); default `Date.now`. */
   now?: () => number;
+  /**
+   * Aviso de acesso em modo `legacy` (E8): o ator não tem nenhum perfil conhecido e lê como antes.
+   * Recebe só o nome do recurso lido; nunca `sub`, papéis, filiais nem dado de negócio.
+   */
+  onLegacyAccess?: (resource: string) => void;
+  /**
+   * Modo do token sem perfil conhecido (E8): `allow` (default) lê como antes; `deny` não lê nada amplo
+   * (trata como vendedor sem vínculos). Vem de `VISIBILITY_LEGACY`.
+   */
+  visibilityLegacy?: 'allow' | 'deny';
+  /** Aviso de papel "quase conhecido" (ex.: "Admin"), recusado com 403. Sem `sub` nem papéis. */
+  onRoleMismatch?: () => void;
 }
 
 /** Violação de UNIQUE/PK do better-sqlite3 (rede de segurança além do pré-check). */

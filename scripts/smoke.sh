@@ -527,6 +527,92 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -H "$auth_admin" "${WEB_URL}/api/v
 [ "$code" = "200" ] || fail "GET ${WEB_URL}/api/v1/portfolios/{id}/assignments/summary (proxy) esperado 200, recebido ${code}"
 ok "proxy /api da demo -> /assignments/summary 200"
 
+# Visibilidade (E8): a carteira como regra de acesso. Ainda com os vínculos ativos da distribuição.
+# Liga o login vend-01 ao vendedor 1 (limpando antes o de execuções anteriores, para ser idempotente).
+idp_token() { # idp_token <client_id> -> access_token
+  curl -s -X POST "${IDP_URL}/default/token" \
+    -d grant_type=client_credentials -d "client_id=$1" -d client_secret=smoke -d scope=openid \
+    | sed -n 's/.*"access_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'
+}
+patch_user_sub() { # patch_user_sub <id> <userSub-json> -> código HTTP (corpo em $body)
+  local version
+  version=$(curl -s -D - -o /dev/null -H "$auth_admin" "${API_URL}/v1/sellers/$1" \
+    | tr -d '\r' | sed -n 's/^[Ee][Tt][Aa][Gg]:[[:space:]]*"\([0-9]*\)".*/\1/p' | head -n1)
+  curl -s -o "$body" -w '%{http_code}' -X PATCH "${API_URL}/v1/sellers/$1" \
+    -H "$auth_admin" -H 'Content-Type: application/json' -H "If-Match: \"${version}\"" \
+    -d "{\"userSub\":$2}" || true
+}
+holder_ids=""
+cursor=""
+for _ in $(seq 1 100); do
+  code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" -G "${API_URL}/v1/sellers" \
+    --data-urlencode "limit=200" ${cursor:+--data-urlencode "cursor=${cursor}"} || true)
+  [ "$code" = "200" ] || fail "GET /v1/sellers esperado 200, recebido ${code}: $(cat "$body")"
+  holder_ids="${holder_ids} $(json_get 'j.items.filter(s=>s.userSub==="vend-01").map(s=>s.id).join(" ")')"
+  cursor=$(json_get 'j.nextCursor')
+  [ -n "$cursor" ] || break
+done
+for holder in $holder_ids; do
+  [ "$holder" = "$seller_id" ] && continue
+  code=$(patch_user_sub "$holder" null)
+  [ "$code" = "200" ] || fail "PATCH userSub=null do vendedor ${holder} esperado 200, recebido ${code}: $(cat "$body")"
+done
+code=$(patch_user_sub "$seller_id" '"vend-01"')
+[ "$code" = "200" ] || fail "PATCH userSub=vend-01 esperado 200, recebido ${code}: $(cat "$body")"
+[ "$(json_get 'j.userSub')" = "vend-01" ] || fail "vendedor sem userSub após o PATCH: $(cat "$body")"
+ok "userSub vend-01 ligado ao vendedor ${seller_id} (admin)"
+
+# Clientes de cada vendedor na carteira da distribuição, pela leitura do admin.
+mine_ids=""
+other_ids=""
+for pair in "${seller_id}:mine" "${seller2_id}:other"; do
+  code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" \
+    "${API_URL}/v1/portfolios/${pf_dist}/assignments?sellerId=${pair%%:*}&limit=200" || true)
+  [ "$code" = "200" ] || fail "GET /assignments (vendedor ${pair%%:*}) esperado 200, recebido ${code}: $(cat "$body")"
+  list=$(json_get 'j.items.map(i=>i.customer.id).join(",")')
+  if [ "${pair##*:}" = "mine" ]; then mine_ids=$list; else other_ids=$list; fi
+done
+[ -n "$mine_ids" ] && [ -n "$other_ids" ] || fail "cada vendedor deveria ter clientes atribuídos (${mine_ids} / ${other_ids})"
+mine_one=${mine_ids%%,*}
+other_one=${other_ids%%,*}
+
+seller_token=$(idp_token smoke-vendedor)
+[ -n "$seller_token" ] || fail "resposta do IdP sem access_token do vendedor"
+auth_seller="Authorization: Bearer ${seller_token}"
+code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_seller" "${API_URL}/v1/me/customers?limit=200" || true)
+[ "$code" = "200" ] || fail "GET /v1/me/customers (vendedor) esperado 200, recebido ${code}: $(cat "$body")"
+for id in ${mine_ids//,/ }; do
+  [ "$(json_get "j.items.some(i=>i.id===${id})")" = "true" ] \
+    || fail "/me/customers do vendedor deveria conter o cliente ${id}: $(cat "$body")"
+done
+for id in ${other_ids//,/ }; do
+  [ "$(json_get "j.items.some(i=>i.id===${id})")" = "false" ] \
+    || fail "/me/customers do vendedor NÃO deveria conter o cliente ${id} do outro vendedor"
+done
+ok "GET /v1/me/customers (vendedor) -> só os clientes dele na carteira da distribuição"
+
+code=$(curl -s -o "$body" -w '%{http_code}' -X POST "${API_URL}/v1/visibility/check" \
+  -H "$auth_seller" -H 'Content-Type: application/json' \
+  -d "{\"customerIds\":[${mine_one},${other_one}]}" || true)
+[ "$code" = "200" ] || fail "POST /v1/visibility/check esperado 200, recebido ${code}: $(cat "$body")"
+[ "$(json_get 'JSON.stringify(j.visible)')" = "[${mine_one}]" ] \
+  || fail "check esperava só o cliente ${mine_one}: $(cat "$body")"
+ok "POST /v1/visibility/check -> só o cliente do vendedor"
+
+supervision_token=$(idp_token smoke-supervisao)
+[ -n "$supervision_token" ] || fail "resposta do IdP sem access_token da supervisão"
+code=$(curl -s -o "$body" -w '%{http_code}' -H "Authorization: Bearer ${supervision_token}" "${API_URL}/v1/me/visibility" || true)
+[ "$code" = "200" ] || fail "GET /v1/me/visibility (supervisão) esperado 200, recebido ${code}: $(cat "$body")"
+code=$(curl -s -o "$body" -w '%{http_code}' -X POST "${API_URL}/v1/product-subgroups" \
+  -H "Authorization: Bearer ${supervision_token}" -H 'Content-Type: application/json' \
+  -d "{\"code\":\"SMK-S-${epoch}\",\"name\":\"Escrita da supervisão\"}" || true)
+[ "$code" = "403" ] || fail "escrita da supervisão esperada 403, recebido ${code}: $(cat "$body")"
+ok "supervisão: GET /v1/me/visibility -> 200 e escrita -> 403"
+
+code=$(curl -s -o /dev/null -w '%{http_code}' -H "$auth_seller" "${WEB_URL}/api/v1/me/customers" || true)
+[ "$code" = "200" ] || fail "GET ${WEB_URL}/api/v1/me/customers (proxy) esperado 200, recebido ${code}"
+ok "proxy /api da demo -> /v1/me/customers 200 com token de vendedor"
+
 code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/portfolios/${pf_dist}" || true)
 [ "$code" = "200" ] || fail "GET /v1/portfolios/${pf_dist} esperado 200, recebido ${code}"
 deactivate_portfolio "$pf_dist" "$(json_get 'j.version')"

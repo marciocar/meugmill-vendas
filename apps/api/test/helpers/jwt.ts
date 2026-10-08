@@ -33,7 +33,11 @@ export interface RoutesFixture {
  * Monta um app de teste com observabilidade, banco em memória e auth (chave local, sem JWKS remota)
  * e registra SÓ o plugin de rotas recebido sob `prefix` (default `/v1`), sem depender de `app.ts`.
  */
-export async function makeRoutesFixture(routes: FastifyPluginAsync, prefix = '/v1'): Promise<RoutesFixture> {
+export async function makeRoutesFixture(
+  routes: FastifyPluginAsync,
+  prefix = '/v1',
+  env: NodeJS.ProcessEnv = {},
+): Promise<RoutesFixture> {
   const { publicKey, privateKey } = await generateKeyPair('RS256');
   const config = loadConfig({
     LOG_LEVEL: 'info',
@@ -41,6 +45,7 @@ export async function makeRoutesFixture(routes: FastifyPluginAsync, prefix = '/v
     DATABASE_PATH: ':memory:',
     OIDC_ISSUER: ISSUER,
     OIDC_AUDIENCE: AUDIENCE,
+    ...env,
   });
   const logs: string[] = [];
   const app = Fastify({

@@ -1,4 +1,5 @@
-import { and, asc, eq, gt, or, sql } from 'drizzle-orm';
+import { withRoleGuard } from '../visibility/profiles.js';
+import { and, asc, eq, gt, sql, type SQL } from 'drizzle-orm';
 import { customers, economicGroups, retailNetworks } from '../../db/schema.js';
 import { assertVersion, requireVersion, type AuditedTable } from '../shared/audit.js';
 import { assertAllInScope, intersects, requireAdmin, resolveScopeIds, type Actor } from '../shared/authz.js';
@@ -28,7 +29,9 @@ import {
   type Page,
 } from '../shared/pagination.js';
 import type { CrudService, SharedActiveService } from '../shared/service.js';
-import { keyContains, likeContains } from '../shared/sql.js';
+import { canReadBroadly } from '../visibility/profiles.js';
+import { visibleCustomersSql } from '../visibility/sql.js';
+import { customerSearchClause } from './search.js';
 import { cleanOptionalText, cleanText, parseInput } from '../shared/validate.js';
 import {
   CreateCustomerSchema,
@@ -121,6 +124,15 @@ export function createCustomerService(db: Db, opts: ServiceOptions = {}): Custom
   const respond = (conn: Conn, id: number, scopeIds: number[]): CustomerResponse =>
     toResponses(conn, [findRaw(conn, id)], scopeIds)[0] as CustomerResponse;
 
+  /**
+   * Restrição de leitura do E8: quem não lê amplo (admin, supervisão ou legacy) só enxerga os clientes
+   * visíveis pelos seus perfis. Sem restrição, devolve `undefined`.
+   */
+  const restrictToVisible = (actor: Actor): SQL | undefined =>
+    canReadBroadly(actor, opts, 'customers')
+      ? undefined
+      : sql`${customers.id} in (select customer_id from (${visibleCustomersSql(actor, false)}))`;
+
   const findRaw = (conn: Conn, id: number): CustomerRow =>
     conn.select().from(customers).where(eq(customers.id, id)).get() as CustomerRow;
   const findVisible = (conn: Conn, id: number, scopeIds: number[]): CustomerRow => {
@@ -177,67 +189,146 @@ export function createCustomerService(db: Db, opts: ServiceOptions = {}): Custom
     return active ? effective : sql`not ${effective}`;
   };
 
-  return {
-    list(actor, params: ListParams = {}): Page<CustomerResponse> {
-      const p = parseInput(ListQuerySchema, params);
-      const limit = resolveLimit(p.limit);
-      const after = decodeCursor(p.cursor);
-      const scopeIds = resolveScopeIds(db, actor);
-      if (scopeIds.length === 0) return { items: [], nextCursor: null };
-      const q = p.q?.trim();
-      const digits = q ? normalizeCnpj(q) : '';
-      const rows = db
-        .select()
-        .from(customers)
-        .where(
-          and(
-            customerLinks.visibleClause(customers.id, scopeIds),
-            after === undefined ? undefined : gt(customers.id, after),
-            activeFilter(p.active, scopeIds),
-            q
-              ? or(
-                  keyContains(customers.legalNameKey, q),
-                  keyContains(customers.tradeNameKey, q),
-                  digits ? likeContains(customers.cnpj, digits) : undefined,
-                )
-              : undefined,
-          ),
-        )
-        .orderBy(asc(customers.id))
-        .limit(limit + 1)
-        .all();
-      return toPage(toResponses(db, rows, scopeIds), limit, (r) => r.id);
-    },
+  return withRoleGuard(
+    {
+      list(actor, params: ListParams = {}): Page<CustomerResponse> {
+        const p = parseInput(ListQuerySchema, params);
+        const limit = resolveLimit(p.limit);
+        const after = decodeCursor(p.cursor);
+        const scopeIds = resolveScopeIds(db, actor);
+        if (scopeIds.length === 0) return { items: [], nextCursor: null };
+        const rows = db
+          .select()
+          .from(customers)
+          .where(
+            and(
+              customerLinks.visibleClause(customers.id, scopeIds),
+              after === undefined ? undefined : gt(customers.id, after),
+              activeFilter(p.active, scopeIds),
+              customerSearchClause(p.q),
+              restrictToVisible(actor),
+            ),
+          )
+          .orderBy(asc(customers.id))
+          .limit(limit + 1)
+          .all();
+        return toPage(toResponses(db, rows, scopeIds), limit, (r) => r.id);
+      },
 
-    get(actor, id) {
-      const scopeIds = resolveScopeIds(db, actor);
-      const row = findVisible(db, id, scopeIds);
-      return toResponses(db, [row], scopeIds)[0] as CustomerResponse;
-    },
-
-    create(actor, input) {
-      requireAdmin(actor);
-      const data = parseInput(CreateCustomerSchema, input);
-      const cnpj = requireValidCnpj(data.cnpj);
-      const legalName = cleanText(data.legalName, 'legalName');
-      const tradeName = cleanOptionalText(data.tradeName);
-      const neighborhood = cleanText(data.neighborhood, 'neighborhood');
-      return writeTx(db, (tx) => {
-        const scopeIds = resolveScopeIds(tx, actor);
-        assertAllInScope(data.branchIds, scopeIds);
-        if (tx.select({ id: customers.id }).from(customers).where(eq(customers.cnpj, cnpj)).get()) {
-          throw new DomainError('customer_exists', CUSTOMER_EXISTS);
+      get(actor, id) {
+        const scopeIds = resolveScopeIds(db, actor);
+        const row = findVisible(db, id, scopeIds);
+        // Fora dos visíveis é como inexistente (sem distinguir).
+        const restriction = restrictToVisible(actor);
+        if (
+          restriction &&
+          !db
+            .select({ id: customers.id })
+            .from(customers)
+            .where(and(eq(customers.id, id), restriction))
+            .get()
+        ) {
+          throw notFound();
         }
-        const geo = resolveGeo(tx, data.municipalityCode, data.stateCode);
-        if (data.retailNetworkId != null) requireActiveReference(tx, 'retailNetwork', data.retailNetworkId);
-        if (data.economicGroupId != null) requireActiveReference(tx, 'economicGroup', data.economicGroupId);
-        assertBranchesActive(tx, data.branchIds);
-        const at = now();
-        try {
-          const row = tx
-            .insert(customers)
-            .values({
-              cnpj,
+        return toResponses(db, [row], scopeIds)[0] as CustomerResponse;
+      },
+
+      create(actor, input) {
+        requireAdmin(actor);
+        const data = parseInput(CreateCustomerSchema, input);
+        const cnpj = requireValidCnpj(data.cnpj);
+        const legalName = cleanText(data.legalName, 'legalName');
+        const tradeName = cleanOptionalText(data.tradeName);
+        const neighborhood = cleanText(data.neighborhood, 'neighborhood');
+        return writeTx(db, (tx) => {
+          const scopeIds = resolveScopeIds(tx, actor);
+          assertAllInScope(data.branchIds, scopeIds);
+          if (tx.select({ id: customers.id }).from(customers).where(eq(customers.cnpj, cnpj)).get()) {
+            throw new DomainError('customer_exists', CUSTOMER_EXISTS);
+          }
+          const geo = resolveGeo(tx, data.municipalityCode, data.stateCode);
+          if (data.retailNetworkId != null) requireActiveReference(tx, 'retailNetwork', data.retailNetworkId);
+          if (data.economicGroupId != null) requireActiveReference(tx, 'economicGroup', data.economicGroupId);
+          assertBranchesActive(tx, data.branchIds);
+          const at = now();
+          try {
+            const row = tx
+              .insert(customers)
+              .values({
+                cnpj,
+                legalName,
+                legalNameKey: searchKey(legalName),
+                tradeName,
+                tradeNameKey: tradeName === null ? null : searchKey(tradeName),
+                ...geo,
+                neighborhood,
+                neighborhoodKey: neighborhoodKey(neighborhood),
+                retailNetworkId: data.retailNetworkId ?? null,
+                economicGroupId: data.economicGroupId ?? null,
+                createdAt: at,
+                updatedAt: at,
+                createdBy: actor.sub,
+                updatedBy: actor.sub,
+              })
+              .returning()
+              .get();
+            customerLinks.add(tx, row.id, data.branchIds, actor.sub, at);
+            return toResponses(tx, [row], scopeIds)[0] as CustomerResponse;
+          } catch (err) {
+            if (isUniqueViolation(err)) throw new DomainError('customer_exists', CUSTOMER_EXISTS);
+            throw err;
+          }
+        });
+      },
+
+      update(actor, id, expectedVersion, patch) {
+        requireAdmin(actor);
+        const version = requireVersion(expectedVersion);
+        const data = parseInput(UpdateCustomerSchema, patch);
+        return writeTx(db, (tx) => {
+          const scopeIds = resolveScopeIds(tx, actor);
+          const row = findVisible(tx, id, scopeIds);
+          assertVersion(row.version, version);
+
+          // Dados compartilhados (valem para todas as filiais) exigem cobertura total do registro.
+          // Só conta como alteração o que muda de fato: reenviar o mesmo valor não exige nada.
+          const legalName =
+            data.legalName === undefined ? row.legalName : cleanText(data.legalName, 'legalName');
+          const tradeName = data.tradeName === undefined ? row.tradeName : cleanOptionalText(data.tradeName);
+          const neighborhood =
+            data.neighborhood === undefined ? row.neighborhood : cleanText(data.neighborhood, 'neighborhood');
+          const sharedChanged =
+            legalName !== row.legalName ||
+            tradeName !== row.tradeName ||
+            neighborhood !== row.neighborhood ||
+            (data.municipalityCode !== undefined && data.municipalityCode !== row.municipalityCode) ||
+            (data.stateCode !== undefined && data.stateCode !== row.stateCode) ||
+            (data.retailNetworkId !== undefined && data.retailNetworkId !== row.retailNetworkId) ||
+            (data.economicGroupId !== undefined && data.economicGroupId !== row.economicGroupId);
+          if (sharedChanged && !coversAllBranches(customerLinks.branchIdsOf(tx, id), scopeIds)) {
+            throw forbidden('Alterar dados compartilhados exige todas as filiais do cadastro no token');
+          }
+
+          const geo =
+            data.municipalityCode !== undefined || data.stateCode !== undefined
+              ? resolveGeo(tx, data.municipalityCode ?? row.municipalityCode, data.stateCode)
+              : { municipalityCode: row.municipalityCode, stateCode: row.stateCode };
+          // Referência só é revalidada quando muda (cliente antigo com rede inativada continua editável).
+          if (data.retailNetworkId != null && data.retailNetworkId !== row.retailNetworkId) {
+            requireActiveReference(tx, 'retailNetwork', data.retailNetworkId);
+          }
+          if (data.economicGroupId != null && data.economicGroupId !== row.economicGroupId) {
+            requireActiveReference(tx, 'economicGroup', data.economicGroupId);
+          }
+          const at = now();
+          if (data.branchIds !== undefined) {
+            const plan = planLinkChange(customerLinks, tx, id, data.branchIds, scopeIds);
+            customerLinks.remove(tx, id, plan.toRemove);
+            endLinksWhere(tx, { customerId: id, branchIds: plan.toRemove }, actor.sub, at);
+            customerLinks.add(tx, id, plan.toAdd, actor.sub, at);
+          }
+          tx.update(customers)
+            .set({
               legalName,
               legalNameKey: searchKey(legalName),
               tradeName,
@@ -245,116 +336,49 @@ export function createCustomerService(db: Db, opts: ServiceOptions = {}): Custom
               ...geo,
               neighborhood,
               neighborhoodKey: neighborhoodKey(neighborhood),
-              retailNetworkId: data.retailNetworkId ?? null,
-              economicGroupId: data.economicGroupId ?? null,
-              createdAt: at,
+              retailNetworkId:
+                data.retailNetworkId === undefined ? row.retailNetworkId : data.retailNetworkId,
+              economicGroupId:
+                data.economicGroupId === undefined ? row.economicGroupId : data.economicGroupId,
+              version: row.version + 1,
               updatedAt: at,
-              createdBy: actor.sub,
               updatedBy: actor.sub,
             })
-            .returning()
-            .get();
-          customerLinks.add(tx, row.id, data.branchIds, actor.sub, at);
-          return toResponses(tx, [row], scopeIds)[0] as CustomerResponse;
-        } catch (err) {
-          if (isUniqueViolation(err)) throw new DomainError('customer_exists', CUSTOMER_EXISTS);
-          throw err;
-        }
-      });
+            .where(eq(customers.id, id))
+            .run();
+          return respond(tx, id, scopeIds);
+        });
+      },
+
+      deactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, false, 'link'),
+      reactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, true, 'link'),
+      deactivateGlobal: (actor, id, expectedVersion) =>
+        transition(actor, id, expectedVersion, false, 'global'),
+      reactivateGlobal: (actor, id, expectedVersion) =>
+        transition(actor, id, expectedVersion, true, 'global'),
+
+      linkCustomerToBranchByCnpj(actor, rawCnpj, branchId) {
+        requireAdmin(actor);
+        const cnpj = requireValidCnpj(rawCnpj);
+        return writeTx(db, (tx) => {
+          const scopeIds = resolveScopeIds(tx, actor);
+          assertAllInScope([branchId], scopeIds);
+          const row = tx.select().from(customers).where(eq(customers.cnpj, cnpj)).get();
+          if (!row) throw notFound();
+          if (customerLinks.branchIdsOf(tx, row.id).includes(branchId)) {
+            return { id: row.id, version: row.version };
+          }
+          assertBranchesActive(tx, [branchId]);
+          const at = now();
+          customerLinks.add(tx, row.id, [branchId], actor.sub, at);
+          tx.update(customers)
+            .set({ version: row.version + 1, updatedAt: at, updatedBy: actor.sub })
+            .where(eq(customers.id, row.id))
+            .run();
+          return { id: row.id, version: row.version + 1 };
+        });
+      },
     },
-
-    update(actor, id, expectedVersion, patch) {
-      requireAdmin(actor);
-      const version = requireVersion(expectedVersion);
-      const data = parseInput(UpdateCustomerSchema, patch);
-      return writeTx(db, (tx) => {
-        const scopeIds = resolveScopeIds(tx, actor);
-        const row = findVisible(tx, id, scopeIds);
-        assertVersion(row.version, version);
-
-        // Dados compartilhados (valem para todas as filiais) exigem cobertura total do registro.
-        // Só conta como alteração o que muda de fato: reenviar o mesmo valor não exige nada.
-        const legalName =
-          data.legalName === undefined ? row.legalName : cleanText(data.legalName, 'legalName');
-        const tradeName = data.tradeName === undefined ? row.tradeName : cleanOptionalText(data.tradeName);
-        const neighborhood =
-          data.neighborhood === undefined ? row.neighborhood : cleanText(data.neighborhood, 'neighborhood');
-        const sharedChanged =
-          legalName !== row.legalName ||
-          tradeName !== row.tradeName ||
-          neighborhood !== row.neighborhood ||
-          (data.municipalityCode !== undefined && data.municipalityCode !== row.municipalityCode) ||
-          (data.stateCode !== undefined && data.stateCode !== row.stateCode) ||
-          (data.retailNetworkId !== undefined && data.retailNetworkId !== row.retailNetworkId) ||
-          (data.economicGroupId !== undefined && data.economicGroupId !== row.economicGroupId);
-        if (sharedChanged && !coversAllBranches(customerLinks.branchIdsOf(tx, id), scopeIds)) {
-          throw forbidden('Alterar dados compartilhados exige todas as filiais do cadastro no token');
-        }
-
-        const geo =
-          data.municipalityCode !== undefined || data.stateCode !== undefined
-            ? resolveGeo(tx, data.municipalityCode ?? row.municipalityCode, data.stateCode)
-            : { municipalityCode: row.municipalityCode, stateCode: row.stateCode };
-        // Referência só é revalidada quando muda (cliente antigo com rede inativada continua editável).
-        if (data.retailNetworkId != null && data.retailNetworkId !== row.retailNetworkId) {
-          requireActiveReference(tx, 'retailNetwork', data.retailNetworkId);
-        }
-        if (data.economicGroupId != null && data.economicGroupId !== row.economicGroupId) {
-          requireActiveReference(tx, 'economicGroup', data.economicGroupId);
-        }
-        const at = now();
-        if (data.branchIds !== undefined) {
-          const plan = planLinkChange(customerLinks, tx, id, data.branchIds, scopeIds);
-          customerLinks.remove(tx, id, plan.toRemove);
-          endLinksWhere(tx, { customerId: id, branchIds: plan.toRemove }, actor.sub, at);
-          customerLinks.add(tx, id, plan.toAdd, actor.sub, at);
-        }
-        tx.update(customers)
-          .set({
-            legalName,
-            legalNameKey: searchKey(legalName),
-            tradeName,
-            tradeNameKey: tradeName === null ? null : searchKey(tradeName),
-            ...geo,
-            neighborhood,
-            neighborhoodKey: neighborhoodKey(neighborhood),
-            retailNetworkId: data.retailNetworkId === undefined ? row.retailNetworkId : data.retailNetworkId,
-            economicGroupId: data.economicGroupId === undefined ? row.economicGroupId : data.economicGroupId,
-            version: row.version + 1,
-            updatedAt: at,
-            updatedBy: actor.sub,
-          })
-          .where(eq(customers.id, id))
-          .run();
-        return respond(tx, id, scopeIds);
-      });
-    },
-
-    deactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, false, 'link'),
-    reactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, true, 'link'),
-    deactivateGlobal: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, false, 'global'),
-    reactivateGlobal: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, true, 'global'),
-
-    linkCustomerToBranchByCnpj(actor, rawCnpj, branchId) {
-      requireAdmin(actor);
-      const cnpj = requireValidCnpj(rawCnpj);
-      return writeTx(db, (tx) => {
-        const scopeIds = resolveScopeIds(tx, actor);
-        assertAllInScope([branchId], scopeIds);
-        const row = tx.select().from(customers).where(eq(customers.cnpj, cnpj)).get();
-        if (!row) throw notFound();
-        if (customerLinks.branchIdsOf(tx, row.id).includes(branchId)) {
-          return { id: row.id, version: row.version };
-        }
-        assertBranchesActive(tx, [branchId]);
-        const at = now();
-        customerLinks.add(tx, row.id, [branchId], actor.sub, at);
-        tx.update(customers)
-          .set({ version: row.version + 1, updatedAt: at, updatedBy: actor.sub })
-          .where(eq(customers.id, row.id))
-          .run();
-        return { id: row.id, version: row.version + 1 };
-      });
-    },
-  };
+    opts,
+  );
 }

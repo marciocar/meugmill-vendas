@@ -9,6 +9,7 @@ import { linkRoutes } from './links.js';
 import { portfolioRoutes } from './portfolios.js';
 import { portfolioTypeRoutes } from './portfolio-types.js';
 import { sellerRoutes } from './sellers.js';
+import { visibilityRoutes } from './visibility.js';
 
 /**
  * Agregador das rotas v1 de dados mestres: catálogos, filiais, geo, vendedores, clientes e carteiras.
@@ -25,4 +26,5 @@ export async function v1Routes(app: FastifyInstance): Promise<void> {
   await app.register(eligibilityRoutes);
   await app.register(distributionRoutes);
   await app.register(linkRoutes);
+  await app.register(visibilityRoutes);
 }

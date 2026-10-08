@@ -7,7 +7,7 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "test:perf": "PERF_ASSERT=1 vitest run --no-file-parallelism test/domain/conflicts-volume.test.ts test/domain/eligibility-query.test.ts test/domain/distribution-volume.test.ts test/domain/links-volume.test.ts",
+    "test:perf": "PERF_ASSERT=1 vitest run --no-file-parallelism test/domain/conflicts-volume.test.ts test/domain/eligibility-query.test.ts test/domain/distribution-volume.test.ts test/domain/links-volume.test.ts test/domain/visibility-volume.test.ts",
     "db:generate": "drizzle-kit generate",
     "dev": "tsx watch src/server.ts",
     "openapi:export": "tsx scripts/export-openapi.ts",

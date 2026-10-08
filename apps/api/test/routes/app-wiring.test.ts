@@ -18,6 +18,8 @@ const PATHS = [
   '/v1/portfolio-types',
   '/v1/portfolios',
   '/v1/link-events',
+  '/v1/me/visibility',
+  '/v1/me/customers',
 ];
 
 // Rotas aninhadas da carteira: 401 sem token; 404 (carteira inexistente) com token de leitor.
@@ -48,7 +50,7 @@ describe('buildApp: rotas v1 registradas', () => {
     });
     app = buildApp(config, { keyGetter: jwks });
     await app.ready();
-    const jwt = await new SignJWT({ roles: ['vendedor'], branch_ids: [] })
+    const jwt = await new SignJWT({ roles: ['supervisao'], branch_ids: [] })
       .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
       .setIssuer(ISSUER)
       .setAudience(AUDIENCE)
@@ -90,9 +92,18 @@ describe('buildApp: rotas v1 registradas', () => {
     expect(res.statusCode).toBe(404);
   });
 
+  it('POST /v1/visibility/check: 401 sem token e 200 com token de leitor', async () => {
+    const url = '/v1/visibility/check';
+    const payload = { customerIds: [1] };
+    expect((await app.inject({ method: 'POST', url, payload })).statusCode).toBe(401);
+    const res = await app.inject({ method: 'POST', url, payload, headers: auth });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ visible: [] });
+  });
+
   it('/v1/me segue respondendo 200', async () => {
     const res = await app.inject({ method: 'GET', url: '/v1/me', headers: auth });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ sub: 'leitor-1', roles: ['vendedor'] });
+    expect(res.json()).toMatchObject({ sub: 'leitor-1', roles: ['supervisao'] });
   });
 });

@@ -1,3 +1,4 @@
+import { withRoleGuard } from '../visibility/profiles.js';
 import { and, asc, eq, gt, or } from 'drizzle-orm';
 import { economicGroups, productSubgroups, retailNetworks } from '../../db/schema.js';
 import {
@@ -64,89 +65,92 @@ export function createCatalogService(db: Db, table: CatalogTable, opts: ServiceO
     });
   }
 
-  return {
-    list(_actor: Actor, params: ListParams = {}): Page<CatalogResponse> {
-      const p = parseInput(ListQuerySchema, params);
-      const limit = resolveLimit(p.limit);
-      const after = decodeCursor(p.cursor);
-      const q = p.q?.trim();
-      const rows = db
-        .select()
-        .from(table)
-        .where(
-          and(
-            after === undefined ? undefined : gt(table.id, after),
-            p.active === undefined ? undefined : eq(table.active, p.active),
-            q ? or(likeContains(table.code, q), keyContains(table.nameKey, q)) : undefined,
-          ),
-        )
-        .orderBy(asc(table.id))
-        .limit(limit + 1)
-        .all();
-      return toPage(rows.map(toResponse), limit, (r) => r.id);
-    },
+  return withRoleGuard(
+    {
+      list(_actor: Actor, params: ListParams = {}): Page<CatalogResponse> {
+        const p = parseInput(ListQuerySchema, params);
+        const limit = resolveLimit(p.limit);
+        const after = decodeCursor(p.cursor);
+        const q = p.q?.trim();
+        const rows = db
+          .select()
+          .from(table)
+          .where(
+            and(
+              after === undefined ? undefined : gt(table.id, after),
+              p.active === undefined ? undefined : eq(table.active, p.active),
+              q ? or(likeContains(table.code, q), keyContains(table.nameKey, q)) : undefined,
+            ),
+          )
+          .orderBy(asc(table.id))
+          .limit(limit + 1)
+          .all();
+        return toPage(rows.map(toResponse), limit, (r) => r.id);
+      },
 
-    get(_actor, id) {
-      return toResponse(mustFind(db, id));
-    },
+      get(_actor, id) {
+        return toResponse(mustFind(db, id));
+      },
 
-    create(actor, input) {
-      requireAdmin(actor);
-      const data = parseInput(CreateCatalogSchema, input);
-      const code = cleanCode(data.code);
-      const name = cleanText(data.name, 'name');
-      return writeTx(db, (tx) => {
-        if (tx.select({ id: table.id }).from(table).where(eq(table.code, code)).get()) {
-          throw new DomainError('conflict', 'Código já cadastrado');
-        }
-        const at = now();
-        try {
-          const row = tx
-            .insert(table)
-            .values({
-              code,
+      create(actor, input) {
+        requireAdmin(actor);
+        const data = parseInput(CreateCatalogSchema, input);
+        const code = cleanCode(data.code);
+        const name = cleanText(data.name, 'name');
+        return writeTx(db, (tx) => {
+          if (tx.select({ id: table.id }).from(table).where(eq(table.code, code)).get()) {
+            throw new DomainError('conflict', 'Código já cadastrado');
+          }
+          const at = now();
+          try {
+            const row = tx
+              .insert(table)
+              .values({
+                code,
+                name,
+                nameKey: searchKey(name),
+                createdAt: at,
+                updatedAt: at,
+                createdBy: actor.sub,
+                updatedBy: actor.sub,
+              })
+              .returning()
+              .get();
+            return toResponse(row);
+          } catch (err) {
+            if (isUniqueViolation(err)) throw new DomainError('conflict', 'Código já cadastrado');
+            throw err;
+          }
+        });
+      },
+
+      update(actor, id, expectedVersion, patch) {
+        requireAdmin(actor);
+        const version = requireVersion(expectedVersion);
+        const data = parseInput(UpdateCatalogSchema, patch);
+        const name = cleanText(data.name, 'name');
+        return writeTx(db, (tx) => {
+          const row = mustFind(tx, id);
+          assertVersion(row.version, version);
+          tx.update(table)
+            .set({
               name,
               nameKey: searchKey(name),
-              createdAt: at,
-              updatedAt: at,
-              createdBy: actor.sub,
+              version: row.version + 1,
+              updatedAt: now(),
               updatedBy: actor.sub,
             })
-            .returning()
-            .get();
-          return toResponse(row);
-        } catch (err) {
-          if (isUniqueViolation(err)) throw new DomainError('conflict', 'Código já cadastrado');
-          throw err;
-        }
-      });
-    },
+            .where(eq(table.id, id))
+            .run();
+          return toResponse(mustFind(tx, id));
+        });
+      },
 
-    update(actor, id, expectedVersion, patch) {
-      requireAdmin(actor);
-      const version = requireVersion(expectedVersion);
-      const data = parseInput(UpdateCatalogSchema, patch);
-      const name = cleanText(data.name, 'name');
-      return writeTx(db, (tx) => {
-        const row = mustFind(tx, id);
-        assertVersion(row.version, version);
-        tx.update(table)
-          .set({
-            name,
-            nameKey: searchKey(name),
-            version: row.version + 1,
-            updatedAt: now(),
-            updatedBy: actor.sub,
-          })
-          .where(eq(table.id, id))
-          .run();
-        return toResponse(mustFind(tx, id));
-      });
+      deactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, false),
+      reactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, true),
     },
-
-    deactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, false),
-    reactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, true),
-  };
+    opts,
+  );
 }
 
 export const createProductSubgroupService = (db: Db, opts?: ServiceOptions): CatalogService =>

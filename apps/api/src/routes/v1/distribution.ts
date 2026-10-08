@@ -19,6 +19,7 @@ import {
   sendDomainError,
   setEtag,
   withEtag,
+  serviceOptions,
 } from './http.js';
 
 const tags = ['portfolios'];
@@ -206,5 +207,8 @@ export function registerDistributionRoutes(
 
 /** Plugin: distribuição das atribuições da carteira. */
 export async function distributionRoutes(app: FastifyInstance): Promise<void> {
-  registerDistributionRoutes(app, { prefix: '/portfolios', service: createDistributionService(app.db) });
+  registerDistributionRoutes(app, {
+    prefix: '/portfolios',
+    service: createDistributionService(app.db, serviceOptions(app)),
+  });
 }

@@ -206,7 +206,7 @@ describe('ajustes: escrita e permissões', () => {
   it('leitor lê, mas não grava (403); admin e responsável gravam; outro vendedor não', () => {
     const c = customer();
     expect(codeOf(() => put(readerSer, [], [c]))).toBe('forbidden');
-    expect(codeOf(() => put(stranger, [], [c]))).toBe('forbidden');
+    expect(codeOf(() => put(stranger, [], [c]))).toBe('not_found'); // não lê a carteira (E8)
     expect(() => svc.getOverrides(readerSer, pid)).not.toThrow();
     expect(put(owner, [], [c]).overridesExclude).toBe(1);
     expect(put(adminSer, [], []).overridesExclude).toBe(0);

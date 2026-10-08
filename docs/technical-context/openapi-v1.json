@@ -8508,6 +8508,750 @@
         ]
       }
     },
+    "/v1/me/customers": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "maxLength": 100,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "productSubgroupId",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "cnpj": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "integer"
+                          },
+                          "legalName": {
+                            "type": "string"
+                          },
+                          "municipalityCode": {
+                            "type": "integer"
+                          },
+                          "neighborhood": {
+                            "type": "string"
+                          },
+                          "stateCode": {
+                            "type": "integer"
+                          },
+                          "tradeName": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "via": {
+                            "items": {
+                              "properties": {
+                                "portfolioId": {
+                                  "type": "integer"
+                                },
+                                "productSubgroupId": {
+                                  "type": "integer"
+                                },
+                                "profile": {
+                                  "anyOf": [
+                                    {
+                                      "anyOf": [
+                                        {
+                                          "enum": [
+                                            "vendedor"
+                                          ],
+                                          "type": "string"
+                                        },
+                                        {
+                                          "enum": [
+                                            "gestor"
+                                          ],
+                                          "type": "string"
+                                        },
+                                        {
+                                          "enum": [
+                                            "admin"
+                                          ],
+                                          "type": "string"
+                                        },
+                                        {
+                                          "enum": [
+                                            "supervisao"
+                                          ],
+                                          "type": "string"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "enum": [
+                                        "legacy"
+                                      ],
+                                      "type": "string"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "productSubgroupId",
+                                "portfolioId",
+                                "profile"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "cnpj",
+                          "legalName",
+                          "tradeName",
+                          "stateCode",
+                          "municipalityCode",
+                          "neighborhood",
+                          "via"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "nextCursor": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "nextCursor",
+                    "total"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          }
+                        ]
+                      },
+                      "description": "Contagens e ids de carteiras que explicam o conflito (nunca dados de clientes).",
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          }
+                        ]
+                      },
+                      "description": "Contagens e ids de carteiras que explicam o conflito (nunca dados de clientes).",
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          }
+                        ]
+                      },
+                      "description": "Contagens e ids de carteiras que explicam o conflito (nunca dados de clientes).",
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          }
+                        ]
+                      },
+                      "description": "Contagens e ids de carteiras que explicam o conflito (nunca dados de clientes).",
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
+                  "properties": {
+                    "detail": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          }
+                        ]
+                      },
+                      "description": "Contagens e ids de carteiras que explicam o conflito (nunca dados de clientes).",
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
+          },
+          "428": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          }
+                        ]
+                      },
+                      "description": "Contagens e ids de carteiras que explicam o conflito (nunca dados de clientes).",
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "visibility"
+        ]
+      }
+    },
+    "/v1/me/visibility": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "byProfile": {
+                      "additionalProperties": {
+                        "type": "integer"
+                      },
+                      "type": "object"
+                    },
+                    "mode": {
+                      "anyOf": [
+                        {
+                          "enum": [
+                            "profiles"
+                          ],
+                          "type": "string"
+                        },
+                        {
+                          "enum": [
+                            "legacy"
+                          ],
+                          "type": "string"
+                        },
+                        {
+                          "enum": [
+                            "denied"
+                          ],
+                          "type": "string"
+                        }
+                      ],
+                      "description": "`legacy`: sem perfil conhecido, lê a filial (VISIBILITY_LEGACY=allow). `denied`: sem perfil conhecido e VISIBILITY_LEGACY=deny, não lê nada amplo."
+                    },
+                    "profiles": {
+                      "items": {
+                        "anyOf": [
+                          {
+                            "enum": [
+                              "vendedor"
+                            ],
+                            "type": "string"
+                          },
+                          {
+                            "enum": [
+                              "gestor"
+                            ],
+                            "type": "string"
+                          },
+                          {
+                            "enum": [
+                              "admin"
+                            ],
+                            "type": "string"
+                          },
+                          {
+                            "enum": [
+                              "supervisao"
+                            ],
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "type": "array"
+                    },
+                    "seller": {
+                      "nullable": true,
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "code"
+                      ],
+                      "type": "object"
+                    },
+                    "visibleCustomers": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "profiles",
+                    "mode",
+                    "seller",
+                    "visibleCustomers",
+                    "byProfile"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          }
+                        ]
+                      },
+                      "description": "Contagens e ids de carteiras que explicam o conflito (nunca dados de clientes).",
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          }
+                        ]
+                      },
+                      "description": "Contagens e ids de carteiras que explicam o conflito (nunca dados de clientes).",
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          }
+                        ]
+                      },
+                      "description": "Contagens e ids de carteiras que explicam o conflito (nunca dados de clientes).",
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          }
+                        ]
+                      },
+                      "description": "Contagens e ids de carteiras que explicam o conflito (nunca dados de clientes).",
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
+                  "properties": {
+                    "detail": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          }
+                        ]
+                      },
+                      "description": "Contagens e ids de carteiras que explicam o conflito (nunca dados de clientes).",
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
+          },
+          "428": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          }
+                        ]
+                      },
+                      "description": "Contagens e ids de carteiras que explicam o conflito (nunca dados de clientes).",
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "visibility"
+        ]
+      }
+    },
     "/v1/portfolio-types": {
       "get": {
         "parameters": [
@@ -11110,11 +11854,11 @@
                       "type": "string"
                     },
                     "overridesExclude": {
-                      "description": "Clientes excluídos manualmente da prévia.",
+                      "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "overridesInclude": {
-                      "description": "Clientes incluídos manualmente na prévia.",
+                      "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "responsibleSub": {
@@ -11222,8 +11966,6 @@
                     "status",
                     "filters",
                     "sellers",
-                    "overridesInclude",
-                    "overridesExclude",
                     "finalizedAt",
                     "active",
                     "deactivatedAt",
@@ -11676,11 +12418,11 @@
                       "type": "string"
                     },
                     "overridesExclude": {
-                      "description": "Clientes excluídos manualmente da prévia.",
+                      "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "overridesInclude": {
-                      "description": "Clientes incluídos manualmente na prévia.",
+                      "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "responsibleSub": {
@@ -11788,8 +12530,6 @@
                     "status",
                     "filters",
                     "sellers",
-                    "overridesInclude",
-                    "overridesExclude",
                     "finalizedAt",
                     "active",
                     "deactivatedAt",
@@ -12274,11 +13014,11 @@
                       "type": "string"
                     },
                     "overridesExclude": {
-                      "description": "Clientes excluídos manualmente da prévia.",
+                      "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "overridesInclude": {
-                      "description": "Clientes incluídos manualmente na prévia.",
+                      "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "responsibleSub": {
@@ -12386,8 +13126,6 @@
                     "status",
                     "filters",
                     "sellers",
-                    "overridesInclude",
-                    "overridesExclude",
                     "finalizedAt",
                     "active",
                     "deactivatedAt",
@@ -13333,11 +14071,11 @@
                       "type": "string"
                     },
                     "overridesExclude": {
-                      "description": "Clientes excluídos manualmente da prévia.",
+                      "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "overridesInclude": {
-                      "description": "Clientes incluídos manualmente na prévia.",
+                      "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "responsibleSub": {
@@ -13445,8 +14183,6 @@
                     "status",
                     "filters",
                     "sellers",
-                    "overridesInclude",
-                    "overridesExclude",
                     "finalizedAt",
                     "active",
                     "deactivatedAt",
@@ -14266,11 +15002,11 @@
                       "type": "string"
                     },
                     "overridesExclude": {
-                      "description": "Clientes excluídos manualmente da prévia.",
+                      "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "overridesInclude": {
-                      "description": "Clientes incluídos manualmente na prévia.",
+                      "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "responsibleSub": {
@@ -14378,8 +15114,6 @@
                     "status",
                     "filters",
                     "sellers",
-                    "overridesInclude",
-                    "overridesExclude",
                     "finalizedAt",
                     "active",
                     "deactivatedAt",
@@ -14883,11 +15617,11 @@
                           "type": "string"
                         },
                         "overridesExclude": {
-                          "description": "Clientes excluídos manualmente da prévia.",
+                          "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                           "type": "integer"
                         },
                         "overridesInclude": {
-                          "description": "Clientes incluídos manualmente na prévia.",
+                          "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                           "type": "integer"
                         },
                         "responsibleSub": {
@@ -14995,8 +15729,6 @@
                         "status",
                         "filters",
                         "sellers",
-                        "overridesInclude",
-                        "overridesExclude",
                         "finalizedAt",
                         "active",
                         "deactivatedAt",
@@ -15545,11 +16277,11 @@
                       "type": "string"
                     },
                     "overridesExclude": {
-                      "description": "Clientes excluídos manualmente da prévia.",
+                      "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "overridesInclude": {
-                      "description": "Clientes incluídos manualmente na prévia.",
+                      "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "responsibleSub": {
@@ -15657,8 +16389,6 @@
                     "status",
                     "filters",
                     "sellers",
-                    "overridesInclude",
-                    "overridesExclude",
                     "finalizedAt",
                     "active",
                     "deactivatedAt",
@@ -16135,11 +16865,11 @@
                           "type": "string"
                         },
                         "overridesExclude": {
-                          "description": "Clientes excluídos manualmente da prévia.",
+                          "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                           "type": "integer"
                         },
                         "overridesInclude": {
-                          "description": "Clientes incluídos manualmente na prévia.",
+                          "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                           "type": "integer"
                         },
                         "responsibleSub": {
@@ -16247,8 +16977,6 @@
                         "status",
                         "filters",
                         "sellers",
-                        "overridesInclude",
-                        "overridesExclude",
                         "finalizedAt",
                         "active",
                         "deactivatedAt",
@@ -17919,11 +18647,11 @@
                       "type": "string"
                     },
                     "overridesExclude": {
-                      "description": "Clientes excluídos manualmente da prévia.",
+                      "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "overridesInclude": {
-                      "description": "Clientes incluídos manualmente na prévia.",
+                      "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "responsibleSub": {
@@ -18031,8 +18759,6 @@
                     "status",
                     "filters",
                     "sellers",
-                    "overridesInclude",
-                    "overridesExclude",
                     "finalizedAt",
                     "active",
                     "deactivatedAt",
@@ -19009,11 +19735,11 @@
                       "type": "string"
                     },
                     "overridesExclude": {
-                      "description": "Clientes excluídos manualmente da prévia.",
+                      "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "overridesInclude": {
-                      "description": "Clientes incluídos manualmente na prévia.",
+                      "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "responsibleSub": {
@@ -19121,8 +19847,6 @@
                     "status",
                     "filters",
                     "sellers",
-                    "overridesInclude",
-                    "overridesExclude",
                     "finalizedAt",
                     "active",
                     "deactivatedAt",
@@ -19610,11 +20334,11 @@
                       "type": "string"
                     },
                     "overridesExclude": {
-                      "description": "Clientes excluídos manualmente da prévia.",
+                      "description": "Clientes excluídos manualmente da prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "overridesInclude": {
-                      "description": "Clientes incluídos manualmente na prévia.",
+                      "description": "Clientes incluídos manualmente na prévia. Omitido para quem não lê amplo nem é o responsável.",
                       "type": "integer"
                     },
                     "responsibleSub": {
@@ -19722,8 +20446,6 @@
                     "status",
                     "filters",
                     "sellers",
-                    "overridesInclude",
-                    "overridesExclude",
                     "finalizedAt",
                     "active",
                     "deactivatedAt",
@@ -23981,6 +24703,11 @@
                           "updatedAt": {
                             "type": "integer"
                           },
+                          "userSub": {
+                            "maxLength": 200,
+                            "nullable": true,
+                            "type": "string"
+                          },
                           "version": {
                             "type": "integer"
                           }
@@ -24280,6 +25007,11 @@
                     "maxLength": 120,
                     "minLength": 1,
                     "type": "string"
+                  },
+                  "userSub": {
+                    "maxLength": 200,
+                    "nullable": true,
+                    "type": "string"
                   }
                 },
                 "required": [
@@ -24347,6 +25079,11 @@
                     },
                     "updatedAt": {
                       "type": "integer"
+                    },
+                    "userSub": {
+                      "maxLength": 200,
+                      "nullable": true,
+                      "type": "string"
                     },
                     "version": {
                       "type": "integer"
@@ -24990,6 +25727,11 @@
                     "updatedAt": {
                       "type": "integer"
                     },
+                    "userSub": {
+                      "maxLength": 200,
+                      "nullable": true,
+                      "type": "string"
+                    },
                     "version": {
                       "type": "integer"
                     }
@@ -25299,6 +26041,11 @@
                     "maxLength": 120,
                     "minLength": 1,
                     "type": "string"
+                  },
+                  "userSub": {
+                    "maxLength": 200,
+                    "nullable": true,
+                    "type": "string"
                   }
                 },
                 "type": "object"
@@ -25361,6 +26108,11 @@
                     },
                     "updatedAt": {
                       "type": "integer"
+                    },
+                    "userSub": {
+                      "maxLength": 200,
+                      "nullable": true,
+                      "type": "string"
                     },
                     "version": {
                       "type": "integer"
@@ -25708,6 +26460,11 @@
                     "updatedAt": {
                       "type": "integer"
                     },
+                    "userSub": {
+                      "maxLength": 200,
+                      "nullable": true,
+                      "type": "string"
+                    },
                     "version": {
                       "type": "integer"
                     }
@@ -26053,6 +26810,11 @@
                     },
                     "updatedAt": {
                       "type": "integer"
+                    },
+                    "userSub": {
+                      "maxLength": 200,
+                      "nullable": true,
+                      "type": "string"
                     },
                     "version": {
                       "type": "integer"
@@ -26400,6 +27162,11 @@
                     "updatedAt": {
                       "type": "integer"
                     },
+                    "userSub": {
+                      "maxLength": 200,
+                      "nullable": true,
+                      "type": "string"
+                    },
                     "version": {
                       "type": "integer"
                     }
@@ -26746,6 +27513,11 @@
                     "updatedAt": {
                       "type": "integer"
                     },
+                    "userSub": {
+                      "maxLength": 200,
+                      "nullable": true,
+                      "type": "string"
+                    },
                     "version": {
                       "type": "integer"
                     }
@@ -27012,6 +27784,295 @@
         ],
         "tags": [
           "sellers"
+        ]
+      }
+    },
+    "/v1/visibility/check": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "customerIds": {
+                    "items": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "maxItems": 1000,
+                    "type": "array",
+                    "uniqueItems": true
+                  }
+                },
+                "required": [
+                  "customerIds"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "visible": {
+                      "items": {
+                        "type": "integer"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "visible"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          }
+                        ]
+                      },
+                      "description": "Contagens e ids de carteiras que explicam o conflito (nunca dados de clientes).",
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          }
+                        ]
+                      },
+                      "description": "Contagens e ids de carteiras que explicam o conflito (nunca dados de clientes).",
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          }
+                        ]
+                      },
+                      "description": "Contagens e ids de carteiras que explicam o conflito (nunca dados de clientes).",
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          }
+                        ]
+                      },
+                      "description": "Contagens e ids de carteiras que explicam o conflito (nunca dados de clientes).",
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict.",
+                  "properties": {
+                    "detail": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          }
+                        ]
+                      },
+                      "description": "Contagens e ids de carteiras que explicam o conflito (nunca dados de clientes).",
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Conflito: conflict, customer_exists, seller_exists, portfolio_inactive, portfolio_incomplete, portfolio_has_conflicts, link_conflict, version_conflict."
+          },
+          "428": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "detail": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          }
+                        ]
+                      },
+                      "description": "Contagens e ids de carteiras que explicam o conflito (nunca dados de clientes).",
+                      "type": "object"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "tags": [
+          "visibility"
         ]
       }
     }

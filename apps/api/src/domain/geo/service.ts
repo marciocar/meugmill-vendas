@@ -1,3 +1,4 @@
+import { withRoleGuard } from '../visibility/profiles.js';
 import { asc, eq } from 'drizzle-orm';
 import { municipalities, states } from '../../db/schema.js';
 import type { Actor } from '../shared/authz.js';
@@ -43,35 +44,38 @@ export function createGeoService(db: Db): GeoService {
     return index;
   };
 
-  return {
-    listStates() {
-      return db
-        .select({ ibgeCode: states.ibgeCode, uf: states.uf, name: states.name })
-        .from(states)
-        .orderBy(asc(states.uf))
-        .all();
-    },
+  return withRoleGuard(
+    {
+      listStates() {
+        return db
+          .select({ ibgeCode: states.ibgeCode, uf: states.uf, name: states.name })
+          .from(states)
+          .orderBy(asc(states.uf))
+          .all();
+      },
 
-    listMunicipalities(_actor, query = {}) {
-      const p = parseInput(MunicipalityQuerySchema, query);
-      const limit = resolveLimit(p.limit);
-      const after = decodeCursor(p.cursor) ?? 0;
-      let stateCode: number | undefined;
-      if (p.uf !== undefined) {
-        const state = findStateByUf(db, p.uf.toUpperCase());
-        if (!state) return { items: [], nextCursor: null };
-        stateCode = state.ibgeCode;
-      }
-      const needle = p.q ? neighborhoodKey(p.q) : '';
-      const rows: MunicipalityResponse[] = [];
-      for (const m of load()) {
-        if (m.ibgeCode <= after) continue;
-        if (stateCode !== undefined && m.stateCode !== stateCode) continue;
-        if (needle !== '' && !m.key.includes(needle)) continue;
-        rows.push({ ibgeCode: m.ibgeCode, name: m.name, stateCode: m.stateCode, uf: m.uf });
-        if (rows.length > limit) break;
-      }
-      return toPage(rows, limit, (r) => r.ibgeCode);
+      listMunicipalities(_actor, query = {}) {
+        const p = parseInput(MunicipalityQuerySchema, query);
+        const limit = resolveLimit(p.limit);
+        const after = decodeCursor(p.cursor) ?? 0;
+        let stateCode: number | undefined;
+        if (p.uf !== undefined) {
+          const state = findStateByUf(db, p.uf.toUpperCase());
+          if (!state) return { items: [], nextCursor: null };
+          stateCode = state.ibgeCode;
+        }
+        const needle = p.q ? neighborhoodKey(p.q) : '';
+        const rows: MunicipalityResponse[] = [];
+        for (const m of load()) {
+          if (m.ibgeCode <= after) continue;
+          if (stateCode !== undefined && m.stateCode !== stateCode) continue;
+          if (needle !== '' && !m.key.includes(needle)) continue;
+          rows.push({ ibgeCode: m.ibgeCode, name: m.name, stateCode: m.stateCode, uf: m.uf });
+          if (rows.length > limit) break;
+        }
+        return toPage(rows, limit, (r) => r.ibgeCode);
+      },
     },
-  };
+    undefined,
+  );
 }

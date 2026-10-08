@@ -13,13 +13,17 @@ declare module 'fastify' {
   interface FastifyInstance {
     db: BetterSQLite3Database<typeof schema>;
     sqlite: Database.Database;
+    /** Modo legacy da visibilidade (`VISIBILITY_LEGACY`). */
+    visibilityLegacy: 'allow' | 'deny';
   }
 }
 
 // apps/api/drizzle fica dois níveis acima tanto de src/plugins quanto de dist/plugins.
 const MIGRATIONS_FOLDER = fileURLToPath(new URL('../../drizzle', import.meta.url));
 
-export const dbPlugin = fp<{ config: Pick<AppConfig, 'DATABASE_PATH'> }>(
+export const dbPlugin = fp<{
+  config: Pick<AppConfig, 'DATABASE_PATH'> & Partial<Pick<AppConfig, 'VISIBILITY_LEGACY'>>;
+}>(
   async (app, opts) => {
     const path = opts.config.DATABASE_PATH;
     const inMemory = path === ':memory:';
@@ -39,6 +43,7 @@ export const dbPlugin = fp<{ config: Pick<AppConfig, 'DATABASE_PATH'> }>(
 
       app.decorate('sqlite', sqlite);
       app.decorate('db', db);
+      app.decorate('visibilityLegacy', opts.config.VISIBILITY_LEGACY ?? 'allow');
     } catch (err) {
       sqlite.close();
       throw err;

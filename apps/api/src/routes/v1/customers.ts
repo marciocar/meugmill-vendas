@@ -8,7 +8,7 @@ import {
 import { createCustomerService, type CustomerService } from '../../domain/customers/service.js';
 import { registerCrudRoutes } from './crud.js';
 import { LinkResultSchema } from '../../domain/shared/links.js';
-import { actorOf, ERROR_RESPONSES, sendDomainError, setEtag, withEtag } from './http.js';
+import { actorOf, ERROR_RESPONSES, sendDomainError, setEtag, withEtag, serviceOptions } from './http.js';
 
 /**
  * CNPJ no path: numérico ou alfanumérico, com ou sem máscara (a máscara chega codificada, `%2F`).
@@ -66,5 +66,8 @@ export function registerCustomerRoutes(
 
 /** Plugin: clientes. */
 export async function customerRoutes(app: FastifyInstance): Promise<void> {
-  registerCustomerRoutes(app, { prefix: '/customers', service: createCustomerService(app.db) });
+  registerCustomerRoutes(app, {
+    prefix: '/customers',
+    service: createCustomerService(app.db, serviceOptions(app)),
+  });
 }

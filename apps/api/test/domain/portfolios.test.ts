@@ -240,8 +240,8 @@ describe('carteira: update e autorização por dono', () => {
   it('admin troca o responsável', () => {
     const p = draft();
     expect(svc.update(adminSer, p.id, 1, { responsibleSub: ' novo-resp ' }).responsibleSub).toBe('novo-resp');
-    // o antigo responsável perde o poder de edição
-    expect(codeOf(() => svc.update(owner, p.id, 2, { name: 'Z' }))).toBe('forbidden');
+    // o antigo responsável perde a leitura e a edição: not_found (não revela a carteira)
+    expect(codeOf(() => svc.update(owner, p.id, 2, { name: 'Z' }))).toBe('not_found');
   });
 
   it('renomear com conflito -> conflict; o mesmo nome em si mesmo é permitido', () => {
@@ -736,7 +736,7 @@ describe('carteira: filiais, vendedores e responsável na troca', () => {
     expect(p.responsibleSub).toBe('Resp-1');
     const lower = actor({ sub: 'resp-1', roles: ['vendedor'], branches: ['SER'] });
     const exact = actor({ sub: 'Resp-1', roles: ['vendedor'], branches: ['SER'] });
-    expect(codeOf(() => svc.update(lower, p.id, 1, { name: 'Z' }))).toBe('forbidden');
+    expect(codeOf(() => svc.update(lower, p.id, 1, { name: 'Z' }))).toBe('not_found');
     expect(svc.update(exact, p.id, 1, { name: 'Z' }).version).toBe(2);
     const spaced = draft({ name: 'Espaçada', responsibleSub: 'a  b' });
     expect(spaced.responsibleSub).toBe('a  b');

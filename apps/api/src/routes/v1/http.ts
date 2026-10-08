@@ -1,6 +1,7 @@
 import { Type, type TSchema } from '@sinclair/typebox';
-import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { toActor, type Actor } from '../../domain/shared/authz.js';
+import type { ServiceOptions } from '../../domain/shared/db.js';
 import { DOMAIN_ERROR_STATUS, DomainError, invalid } from '../../domain/shared/errors.js';
 
 /**
@@ -93,3 +94,21 @@ export const ERROR_RESPONSES = {
 
 /** `:id` de rota: inteiro positivo. */
 export const IdParamsSchema = Type.Object({ id: Type.Integer({ minimum: 1 }) });
+
+/**
+ * Opções dos serviços de domínio: liga o aviso de acesso `legacy` (E8) ao logger da app.
+ * Loga só o nome do recurso, nunca `sub`, papéis, filiais nem dado de negócio.
+ */
+export function serviceOptions(app: FastifyInstance): ServiceOptions {
+  return {
+    visibilityLegacy: app.visibilityLegacy,
+    onRoleMismatch: () => {
+      app.log.warn(
+        'role_case_mismatch: papel parecido com um perfil conhecido, mas com caixa ou espaços diferentes',
+      );
+    },
+    onLegacyAccess: (resource) => {
+      app.log.warn({ resource }, 'legacy_access: token sem perfil de visibilidade lê toda a filial');
+    },
+  };
+}
