@@ -1,0 +1,8 @@
+# Comandos que validam o E3 (rodar a partir da raiz)
+pnpm install --frozen-lockfile
+pnpm lint && pnpm typecheck
+pnpm test                      # 395 testes na API + 22 no web
+pnpm --filter @meugmill/api openapi:export
+docker build -f docker/api.Dockerfile -t carteira-api:local .
+docker compose up -d --no-build
+bash scripts/smoke.sh          # inclui o fluxo do wizard: rascunho → filtros → vendedores → resumo

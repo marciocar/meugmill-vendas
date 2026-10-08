@@ -7,6 +7,7 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import fp from 'fastify-plugin';
 import type { AppConfig } from '../config.js';
 import * as schema from '../db/schema.js';
+import { refreshPortfolioNameKeys } from '../domain/portfolios/name-key.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -33,6 +34,8 @@ export const dbPlugin = fp<{ config: Pick<AppConfig, 'DATABASE_PATH'> }>(
 
       const db = drizzle(sqlite, { schema });
       migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+      // Carteiras gravadas com a normalização anterior do nome (idempotente, sem custo quando em dia).
+      refreshPortfolioNameKeys(db);
 
       app.decorate('sqlite', sqlite);
       app.decorate('db', db);

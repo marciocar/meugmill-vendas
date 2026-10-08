@@ -1,4 +1,14 @@
-import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
+import {
+  check,
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+  unique,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
 
 // Tabela técnica mínima: prova a cadeia de migration.
 export const serviceMeta = sqliteTable('service_meta', {
@@ -155,6 +165,122 @@ export const customerBranches = sqliteTable(
   ],
 );
 
+export const portfolioTypes = sqliteTable('portfolio_types', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  code: text('code').notNull().unique(),
+  name: text('name').notNull(),
+  nameKey: text('name_key').notNull().default(''),
+  ...auditColumns(),
+});
+
+export const portfolios = sqliteTable(
+  'portfolios',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    branchId: integer('branch_id')
+      .notNull()
+      .references(() => branches.id),
+    name: text('name').notNull(),
+    // Unicidade do nome por filial é sobre a chave normalizada (ver searchKey).
+    nameKey: text('name_key').notNull().default(''),
+    description: text('description'),
+    // `sub` do token do responsável.
+    responsibleSub: text('responsible_sub').notNull(),
+    portfolioTypeId: integer('portfolio_type_id')
+      .notNull()
+      .references(() => portfolioTypes.id),
+    // Ciclo do wizard; independente de `active` (inativação).
+    status: text('status', { enum: ['draft', 'active'] })
+      .notNull()
+      .default('draft'),
+    ...auditColumns(),
+  },
+  (t) => [
+    unique('portfolios_branch_id_name_key_unique').on(t.branchId, t.nameKey),
+    index('portfolios_responsible_sub_idx').on(t.responsibleSub),
+    index('portfolios_portfolio_type_id_idx').on(t.portfolioTypeId),
+    check('portfolios_status_check', sql`${t.status} in ('draft', 'active')`),
+  ],
+);
+
+export const portfolioRegions = sqliteTable(
+  'portfolio_regions',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    portfolioId: integer('portfolio_id')
+      .notNull()
+      .references(() => portfolios.id, { onDelete: 'cascade' }),
+    level: text('level', { enum: ['state', 'municipality', 'neighborhood'] }).notNull(),
+    stateCode: integer('state_code')
+      .notNull()
+      .references(() => states.ibgeCode),
+    municipalityCode: integer('municipality_code').references(() => municipalities.ibgeCode),
+    neighborhoodKey: text('neighborhood_key'),
+    neighborhoodLabel: text('neighborhood_label'),
+    // Chave canônica da região, derivada pelo banco: duplicatas de UF/município também colidam.
+    regionKey: text('region_key').generatedAlwaysAs(
+      sql`"level" || ':' || "state_code" || ':' || coalesce("municipality_code", 0) || ':' || coalesce("neighborhood_key", '')`,
+      { mode: 'stored' },
+    ),
+  },
+  (t) => [
+    check(
+      'portfolio_regions_level_check',
+      sql`(${t.level} = 'state' and ${t.municipalityCode} is null and ${t.neighborhoodKey} is null and ${t.neighborhoodLabel} is null)
+        or (${t.level} = 'municipality' and ${t.municipalityCode} is not null and ${t.neighborhoodKey} is null and ${t.neighborhoodLabel} is null)
+        or (${t.level} = 'neighborhood' and ${t.municipalityCode} is not null and ${t.neighborhoodKey} is not null and ${t.neighborhoodKey} <> '' and ${t.neighborhoodLabel} is not null)`,
+    ),
+    // Colunas anuláveis não colidem em UNIQUE no SQLite; `region_key` (gerada) as normaliza.
+    uniqueIndex('portfolio_regions_portfolio_id_region_key_unique').on(t.portfolioId, t.regionKey),
+  ],
+);
+
+export const portfolioRetailNetworks = sqliteTable(
+  'portfolio_retail_networks',
+  {
+    portfolioId: integer('portfolio_id')
+      .notNull()
+      .references(() => portfolios.id, { onDelete: 'cascade' }),
+    retailNetworkId: integer('retail_network_id')
+      .notNull()
+      .references(() => retailNetworks.id),
+  },
+  (t) => [primaryKey({ columns: [t.portfolioId, t.retailNetworkId] })],
+);
+
+export const portfolioEconomicGroups = sqliteTable(
+  'portfolio_economic_groups',
+  {
+    portfolioId: integer('portfolio_id')
+      .notNull()
+      .references(() => portfolios.id, { onDelete: 'cascade' }),
+    economicGroupId: integer('economic_group_id')
+      .notNull()
+      .references(() => economicGroups.id),
+  },
+  (t) => [primaryKey({ columns: [t.portfolioId, t.economicGroupId] })],
+);
+
+export const portfolioSellers = sqliteTable(
+  'portfolio_sellers',
+  {
+    portfolioId: integer('portfolio_id')
+      .notNull()
+      .references(() => portfolios.id, { onDelete: 'cascade' }),
+    sellerId: integer('seller_id')
+      .notNull()
+      .references(() => sellers.id),
+    productSubgroupId: integer('product_subgroup_id')
+      .notNull()
+      .references(() => productSubgroups.id),
+  },
+  (t) => [
+    primaryKey({ columns: [t.portfolioId, t.sellerId, t.productSubgroupId] }),
+    index('portfolio_sellers_seller_id_idx').on(t.sellerId),
+    index('portfolio_sellers_product_subgroup_id_idx').on(t.productSubgroupId),
+  ],
+);
+
 export type State = typeof states.$inferSelect;
 export type NewState = typeof states.$inferInsert;
 export type Municipality = typeof municipalities.$inferSelect;
@@ -175,3 +301,15 @@ export type Customer = typeof customers.$inferSelect;
 export type NewCustomer = typeof customers.$inferInsert;
 export type CustomerBranch = typeof customerBranches.$inferSelect;
 export type NewCustomerBranch = typeof customerBranches.$inferInsert;
+export type PortfolioType = typeof portfolioTypes.$inferSelect;
+export type NewPortfolioType = typeof portfolioTypes.$inferInsert;
+export type Portfolio = typeof portfolios.$inferSelect;
+export type NewPortfolio = typeof portfolios.$inferInsert;
+export type PortfolioRegion = typeof portfolioRegions.$inferSelect;
+export type NewPortfolioRegion = typeof portfolioRegions.$inferInsert;
+export type PortfolioRetailNetwork = typeof portfolioRetailNetworks.$inferSelect;
+export type NewPortfolioRetailNetwork = typeof portfolioRetailNetworks.$inferInsert;
+export type PortfolioEconomicGroup = typeof portfolioEconomicGroups.$inferSelect;
+export type NewPortfolioEconomicGroup = typeof portfolioEconomicGroups.$inferInsert;
+export type PortfolioSeller = typeof portfolioSellers.$inferSelect;
+export type NewPortfolioSeller = typeof portfolioSellers.$inferInsert;
