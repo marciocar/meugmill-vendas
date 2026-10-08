@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { loadAssignmentGrid } from '../../src/domain/distribution/grid.js';
 import { createDistributionService } from '../../src/domain/distribution/service.js';
 import { balancedStrategy } from '../../src/domain/distribution/strategies/balanced.js';
 import { createPortfolioService } from '../../src/domain/portfolios/service.js';
@@ -222,6 +223,40 @@ describe('grade e status', () => {
   });
 });
 
+describe('loadAssignmentGrid', () => {
+  it('devolve a grade inteira, coerente com listAssignments paginado completo (inclui stale fora da grade)', () => {
+    const { p, g1, g2, A, C, cs } = basic();
+    const near = customer({ municipality: SERRA });
+    svc().replaceAssignments(admin(), p, 1, {
+      set: [
+        { customerId: cs[0] as number, productSubgroupId: g1, sellerId: A },
+        { customerId: cs[1] as number, productSubgroupId: g2, sellerId: C },
+        { customerId: near, productSubgroupId: g1, sellerId: A },
+      ],
+    });
+    byCity(portfolio('Rival'), SERRA); // near perde a disputa: stale fora da grade
+    sqlite().prepare('update sellers set active = 0 where id = ?').run(C); // (cs[1], g2) stale
+    const s = svc();
+    const paged: { c: number; g: number; s: number | null; st: string }[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = s.listAssignments(admin(), p, { limit: 3, ...(cursor ? { cursor } : {}) });
+      for (const i of page.items) {
+        paged.push({ c: i.customer.id, g: i.productSubgroup.id, s: i.seller?.id ?? null, st: i.status });
+      }
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
+    const full = loadAssignmentGrid(fx.db, p);
+    expect(full.map((x) => ({ c: x.customerId, g: x.subgroupId, s: x.sellerId, st: x.status }))).toEqual(
+      paged,
+    );
+    expect(full).toHaveLength(s.listAssignments(admin(), p).total);
+    expect(full.filter((x) => x.status === 'stale').map((x) => x.customerId)).toEqual([cs[1], near]);
+    expect(full.find((x) => x.customerId === near)?.inGrid).toBe(false);
+    expect(() => loadAssignmentGrid(fx.db, 999_999)).toThrow();
+  });
+});
+
 describe('edição manual', () => {
   it('set exige membro efetivo, subgrupo da carteira, par na carteira e vendedor válido (sem eco)', () => {
     const { p, g1, g2, A, B, C, cs } = basic();
@@ -270,18 +305,75 @@ describe('edição manual', () => {
   it('clear remove (inclusive stale) e é idempotente; versão sobe uma vez por chamada', () => {
     const { p, g1, A, cs } = basic();
     const c = cs[0] as number;
+    const c2 = cs[1] as number;
     const out = svc().replaceAssignments(admin(), p, 1, {
-      set: [{ customerId: c, productSubgroupId: g1, sellerId: A }],
+      set: [
+        { customerId: c, productSubgroupId: g1, sellerId: A },
+        { customerId: c2, productSubgroupId: g1, sellerId: A },
+      ],
     });
     expect(out.version).toBe(2);
+    // Célula stale: o vendedor é inativado e a linha continua gravada.
+    sqlite().prepare('update sellers set active = 0 where id = ?').run(A);
+    expect(svc().listAssignments(admin(), p, { status: 'stale' }).total).toBe(2);
+    expect(stored(p)).toHaveLength(2);
     const cleared = svc().replaceAssignments(admin(), p, 2, {
       clear: [{ customerId: c, productSubgroupId: g1 }],
     });
     expect(cleared.version).toBe(3);
-    expect(stored(p)).toEqual([]);
+    expect(stored(p)).toEqual([{ c: c2, g: g1, s: A }]); // a stale c sumiu
+    expect(svc().listAssignments(admin(), p, { status: 'stale' }).total).toBe(1);
+    // Cliente que perde a disputa: a célula stale também sai com clear.
+    const near = customer({ municipality: SERRA });
+    sqlite().prepare('update sellers set active = 1 where id = ?').run(A);
+    svc().replaceAssignments(admin(), p, 3, {
+      set: [{ customerId: near, productSubgroupId: g1, sellerId: A }],
+    });
+    byCity(portfolio('Rival'), SERRA);
     expect(
-      svc().replaceAssignments(admin(), p, 3, { clear: [{ customerId: c, productSubgroupId: g1 }] }).version,
-    ).toBe(4);
+      svc()
+        .listAssignments(admin(), p, { status: 'stale' })
+        .items.map((i) => i.customer.id),
+    ).toEqual([near]);
+    svc().replaceAssignments(admin(), p, 4, { clear: [{ customerId: near, productSubgroupId: g1 }] });
+    expect(stored(p).some((r) => r.c === near)).toBe(false);
+    expect(
+      svc().replaceAssignments(admin(), p, 5, { clear: [{ customerId: near, productSubgroupId: g1 }] })
+        .version,
+    ).toBe(6);
+  });
+
+  it('set de cliente existente só de outra filial ou com vínculo inativo: mesma mensagem do inexistente, com índice', () => {
+    const { p, g1, A, cs } = basic();
+    const msg = (customerId: number, at = 0): string => {
+      try {
+        svc().replaceAssignments(admin(), p, version(p), {
+          set: [
+            ...Array.from({ length: at }, (_, i) => ({
+              customerId: cs[i] as number,
+              productSubgroupId: g1,
+              sellerId: A,
+            })),
+            { customerId, productSubgroupId: g1, sellerId: A },
+          ],
+        });
+      } catch (e) {
+        return (e as Error).message;
+      }
+      return 'ok';
+    };
+    const other = seedBranch(fx.db, 'OUT');
+    const foreign = customer();
+    sqlite().prepare('update customer_branches set branch_id = ? where customer_id = ?').run(other, foreign);
+    const off = customer();
+    sqlite().prepare('update customer_branches set active = 0 where customer_id = ?').run(off);
+    const missing = msg(999_999);
+    expect(missing).toBe('set[0]: Cliente não é membro efetivo da carteira');
+    expect(msg(foreign)).toBe(missing);
+    expect(msg(off)).toBe(missing);
+    expect(msg(999_999, 3)).toBe('set[3]: Cliente não é membro efetivo da carteira');
+    expect(missing).not.toMatch(new RegExp(`${foreign}|${off}|999999`));
+    expect(stored(p)).toEqual([]);
   });
 
   it('célula repetida, em set e clear, vazio e acima de 5.000 itens são validation_error', () => {
@@ -437,10 +529,43 @@ describe('distribute', () => {
       ].sort(),
     );
     expect(svc().summary(admin(), p).totals).toMatchObject({ unassigned: 0, stale: 0, assigned: 24 });
-    // Segunda execução: nada a preencher, versão sobe de novo.
-    const again = svc().distribute(admin(), p, version(p), {});
+    // Contagem final por vendedor (código A, B / A, C), válidas preservadas incluídas.
+    expect(out.finalCounts).toEqual({
+      [g1]: [
+        { sellerId: A, count: 6 },
+        { sellerId: B, count: 6 },
+      ],
+      [g2]: [
+        { sellerId: A, count: 6 },
+        { sellerId: C, count: 6 },
+      ],
+    });
+    // Segunda execução: nada a preencher, a versão (e o ETag) não muda.
+    const v = version(p);
+    const again = svc().distribute(admin(), p, v, {});
     expect(again.distributed).toEqual({ [g1]: 0, [g2]: 0 });
+    expect(again.aggregate.version).toBe(v);
+    expect(again.finalCounts).toEqual(out.finalCounts);
+    expect(version(p)).toBe(v);
     expect(stored(p)).toEqual(rows);
+  });
+
+  it('finalCounts soma as válidas preservadas às gravadas agora (equilíbrio só sobre as preenchidas)', () => {
+    const { p, g1, g2, A, B, C, cs } = basic();
+    // A recebe 3 válidas manuais em g1; o equilíbrio de g1 só vale para o que falta (1 cliente).
+    svc().replaceAssignments(admin(), p, 1, {
+      set: cs.slice(0, 3).map((c) => ({ customerId: c, productSubgroupId: g1, sellerId: A })),
+    });
+    const out = svc().distribute(admin(), p, 2, { productSubgroupIds: [g1] });
+    expect(out.distributed).toEqual({ [g1]: 1 });
+    expect(out.finalCounts).toEqual({
+      [g1]: [
+        { sellerId: A, count: 3 },
+        { sellerId: B, count: 1 },
+      ],
+    });
+    expect(out.finalCounts[g2]).toBeUndefined();
+    void C;
   });
 
   it('partindo do zero a diferença máxima entre vendedores é 1', () => {
@@ -499,6 +624,7 @@ describe('distribute', () => {
     expect(stored(p).every((r) => r.g === g2)).toBe(true);
     const all = s.distribute(admin(), p, 2);
     expect(all.skippedSubgroupIds).toEqual([g3]);
+    expect(all.finalCounts[g3]).toBeUndefined();
     expect(all.distributed).toEqual({ [g1]: cs.length, [g2]: 0 });
   });
 
@@ -527,6 +653,7 @@ describe('permissões, versão e atomicidade', () => {
     expect(codeOf(() => svc().replaceAssignments(adminOf('XXX'), p, 1, { set }))).toBe('not_found');
     expect(svc().replaceAssignments(resp(), p, 1, { set }).version).toBe(2);
     expect(svc().distribute(resp(), p, 2).aggregate.version).toBe(3);
+    expect(svc().distribute(resp(), p, 3).aggregate.version).toBe(3); // nada a preencher: versão intacta
   });
 
   it('carteira inativa 409, sem versão 428, versão velha 409 (nessa ordem)', () => {

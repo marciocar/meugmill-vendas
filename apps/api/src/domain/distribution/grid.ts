@@ -1,8 +1,9 @@
 import { eq, sql } from 'drizzle-orm';
-import { portfolioSellers, sellerBranches, sellers } from '../../db/schema.js';
+import { portfolioSellers, portfolios, sellerBranches, sellers } from '../../db/schema.js';
 import { effectiveMembers } from '../conflicts/members.js';
 import type { PortfolioRow } from '../portfolios/access.js';
 import type { Conn } from '../shared/db.js';
+import { notFound } from '../shared/errors.js';
 
 export type CellStatus = 'assigned' | 'unassigned' | 'stale';
 
@@ -70,10 +71,13 @@ export function isValidAssignment(
   subgroupId: number,
   sellerId: number,
 ): boolean {
-  return grid.members.has(customerId) && grid.usable.get(subgroupId)?.has(sellerId) === true;
+  return invalidReason(grid, customerId, subgroupId, sellerId) === null;
 }
 
-/** Por que a atribuição não vale (mensagens fixas, sem eco do que foi enviado). */
+/**
+ * Por que a atribuição não vale (mensagens fixas, sem eco do que foi enviado); null quando vale.
+ * É a única implementação da regra: `isValidAssignment` deriva daqui.
+ */
 export function invalidReason(
   grid: Grid,
   customerId: number,
@@ -148,4 +152,18 @@ export function* cells(grid: Grid, stored: StoredAssignment[]): Generator<Cell, 
     }
     i = j;
   }
+}
+
+/**
+ * Grade inteira, sem paginação: todas as células (inclusive `stale` fora da grade) com status e vendedor,
+ * em ordem de (cliente, subgrupo). Feita para o E7 finalizar a carteira sem percorrer páginas.
+ *
+ * CUSTO: refaz a disputa do E5 (membros efetivos) uma vez e materializa todas as células em memória
+ * (O(membros x subgrupos)). Chame UMA vez por finalização e DENTRO da transação de escrita do E7, para
+ * que a leitura e a escrita enxerguem o mesmo retrato.
+ */
+export function loadAssignmentGrid(conn: Conn, portfolioId: number): Cell[] {
+  const portfolio = conn.select().from(portfolios).where(eq(portfolios.id, portfolioId)).get();
+  if (!portfolio) throw notFound();
+  return [...cells(loadGrid(conn, portfolio), loadStored(conn, portfolioId))];
 }

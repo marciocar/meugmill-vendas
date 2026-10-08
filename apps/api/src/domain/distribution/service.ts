@@ -31,6 +31,13 @@ export interface DistributeResult {
   distributed: Record<number, number>;
   /** Subgrupos pedidos (ou todos) ignorados por não terem vendedor utilizável. */
   skippedSubgroupIds: number[];
+  /**
+   * Contagem FINAL por vendedor em cada subgrupo distribuído (não ignorado): as atribuições válidas
+   * preservadas + as gravadas nesta execução; todos os vendedores utilizáveis, contagem 0 inclusive,
+   * por código. O equilíbrio só vale sobre as células preenchidas nesta execução: as válidas
+   * preservadas não são movidas, então a diferença final pode passar de 1.
+   */
+  finalCounts: Record<number, { sellerId: number; count: number }[]>;
 }
 
 export interface DistributionService {
@@ -44,7 +51,10 @@ export interface DistributionService {
     expectedVersion: number | undefined,
     input: ReplaceAssignmentsInput,
   ): PortfolioResponse;
-  /** Preenche só as células sem atribuição válida (`unassigned` e `stale`). */
+  /**
+   * Preenche só as células sem atribuição válida (`unassigned` e `stale`). Só incrementa a versão quando
+   * grava alguma linha; sem nada a fazer devolve o agregado atual.
+   */
   distribute(
     actor: Actor,
     id: number,
@@ -128,90 +138,100 @@ export function createDistributionService(
       const p = parseInput(AssignmentListQuerySchema, params);
       const limit = resolveLimit(p.limit ?? DEFAULT_LIMIT);
       const after = decodeCursor(p.cursor);
-      const portfolio = findScoped(db, actor, id);
-      const grid = loadGrid(db, portfolio);
-      const stored = loadStored(db, id);
+      // Retrato único: grade, gravadas e dados de exibição na mesma transação de leitura.
+      return db.transaction((db) => {
+        const portfolio = findScoped(db, actor, id);
+        const grid = loadGrid(db, portfolio);
+        const stored = loadStored(db, id);
 
-      let total = 0;
-      let more = false;
-      const page: { customerId: number; subgroupId: number; sellerId: number | null; status: CellStatus }[] =
-        [];
-      for (const c of cells(grid, stored)) {
-        if (p.productSubgroupId !== undefined && c.subgroupId !== p.productSubgroupId) continue;
-        if (p.sellerId !== undefined && c.sellerId !== p.sellerId) continue;
-        if (p.status !== undefined && c.status !== p.status) continue;
-        total++;
-        if (more) continue;
-        if (
-          after !== undefined &&
-          (c.customerId < after[0] || (c.customerId === after[0] && c.subgroupId <= after[1]))
-        ) {
-          continue;
+        let total = 0;
+        let more = false;
+        const page: {
+          customerId: number;
+          subgroupId: number;
+          sellerId: number | null;
+          status: CellStatus;
+        }[] = [];
+        for (const c of cells(grid, stored)) {
+          if (p.productSubgroupId !== undefined && c.subgroupId !== p.productSubgroupId) continue;
+          if (p.sellerId !== undefined && c.sellerId !== p.sellerId) continue;
+          if (p.status !== undefined && c.status !== p.status) continue;
+          total++;
+          if (more) continue;
+          if (
+            after !== undefined &&
+            (c.customerId < after[0] || (c.customerId === after[0] && c.subgroupId <= after[1]))
+          ) {
+            continue;
+          }
+          if (page.length === limit) more = true;
+          else page.push(c);
         }
-        if (page.length === limit) more = true;
-        else page.push(c);
-      }
 
-      const customerRows = page.length
-        ? db
-            .select({ id: customers.id, cnpj: customers.cnpj, legalName: customers.legalName })
-            .from(customers)
-            .where(inArray(customers.id, [...new Set(page.map((c) => c.customerId))]))
-            .all()
-        : [];
-      const customerById = new Map(customerRows.map((r) => [r.id, r]));
-      const subgroupById = subgroupMap(db, [...new Set(page.map((c) => c.subgroupId))]);
-      const sellerById = sellerMap(db, [
-        ...new Set(page.flatMap((c) => (c.sellerId === null ? [] : [c.sellerId]))),
-      ]);
-      const items: AssignmentItem[] = page.map((c) => ({
-        customer: customerById.get(c.customerId) as AssignmentItem['customer'],
-        productSubgroup: subgroupById.get(c.subgroupId) as AssignmentItem['productSubgroup'],
-        seller: c.sellerId === null ? null : (sellerById.get(c.sellerId) ?? null),
-        status: c.status,
-      }));
-      const last = page[page.length - 1];
-      return {
-        items,
-        nextCursor: more && last ? encodeCursor(last.customerId, last.subgroupId) : null,
-        total,
-      };
+        const customerRows = page.length
+          ? db
+              .select({ id: customers.id, cnpj: customers.cnpj, legalName: customers.legalName })
+              .from(customers)
+              .where(inArray(customers.id, [...new Set(page.map((c) => c.customerId))]))
+              .all()
+          : [];
+        const customerById = new Map(customerRows.map((r) => [r.id, r]));
+        const subgroupById = subgroupMap(db, [...new Set(page.map((c) => c.subgroupId))]);
+        const sellerById = sellerMap(db, [
+          ...new Set(page.flatMap((c) => (c.sellerId === null ? [] : [c.sellerId]))),
+        ]);
+        const items: AssignmentItem[] = page.map((c) => ({
+          customer: customerById.get(c.customerId) as AssignmentItem['customer'],
+          productSubgroup: subgroupById.get(c.subgroupId) as AssignmentItem['productSubgroup'],
+          seller: c.sellerId === null ? null : (sellerById.get(c.sellerId) ?? null),
+          status: c.status,
+        }));
+        const last = page[page.length - 1];
+        return {
+          items,
+          nextCursor: more && last ? encodeCursor(last.customerId, last.subgroupId) : null,
+          total,
+        };
+      });
     },
 
     summary(actor, id) {
-      const portfolio = findScoped(db, actor, id);
-      const grid = loadGrid(db, portfolio);
-      const perSubgroup = new Map(
-        grid.subgroupIds.map((g) => [g, { counts: new Map<number, number>(), unassigned: 0, stale: 0 }]),
-      );
-      const totals = { members: grid.memberIds.length, cells: 0, assigned: 0, unassigned: 0, stale: 0 };
-      for (const c of cells(grid, loadStored(db, id))) {
-        if (c.inGrid) totals.cells++;
-        totals[c.status]++;
-        const bucket = perSubgroup.get(c.subgroupId);
-        if (!bucket) continue; // gravada em subgrupo que saiu da carteira: só entra nos totais
-        if (c.status === 'assigned') {
-          bucket.counts.set(c.sellerId as number, (bucket.counts.get(c.sellerId as number) ?? 0) + 1);
-        } else bucket[c.status]++;
-      }
-      const sellerById = sellerMap(db, [...new Set(grid.pairs.map((x) => x.sellerId))]);
-      const subgroupById = subgroupMap(db, grid.subgroupIds);
-      const subgroups: SubgroupSummary[] = grid.subgroupIds.map((g) => {
-        const bucket = perSubgroup.get(g) as NonNullable<ReturnType<typeof perSubgroup.get>>;
-        return {
-          productSubgroup: subgroupById.get(g) as SubgroupSummary['productSubgroup'],
-          sellers: grid.pairs
-            .filter((x) => x.subgroupId === g)
-            .sort((a, b) => (a.sellerCode < b.sellerCode ? -1 : 1))
-            .map((x) => ({
-              seller: sellerById.get(x.sellerId) as SubgroupSummary['sellers'][number]['seller'],
-              count: bucket.counts.get(x.sellerId) ?? 0,
-            })),
-          unassigned: bucket.unassigned,
-          stale: bucket.stale,
-        };
+      // Retrato único: grade, gravadas e dados de exibição na mesma transação de leitura.
+      return db.transaction((db) => {
+        const portfolio = findScoped(db, actor, id);
+        const grid = loadGrid(db, portfolio);
+        const perSubgroup = new Map(
+          grid.subgroupIds.map((g) => [g, { counts: new Map<number, number>(), unassigned: 0, stale: 0 }]),
+        );
+        const totals = { members: grid.memberIds.length, cells: 0, assigned: 0, unassigned: 0, stale: 0 };
+        for (const c of cells(grid, loadStored(db, id))) {
+          if (c.inGrid) totals.cells++;
+          totals[c.status]++;
+          const bucket = perSubgroup.get(c.subgroupId);
+          if (!bucket) continue; // gravada em subgrupo que saiu da carteira: só entra nos totais
+          if (c.status === 'assigned') {
+            bucket.counts.set(c.sellerId as number, (bucket.counts.get(c.sellerId as number) ?? 0) + 1);
+          } else bucket[c.status]++;
+        }
+        const sellerById = sellerMap(db, [...new Set(grid.pairs.map((x) => x.sellerId))]);
+        const subgroupById = subgroupMap(db, grid.subgroupIds);
+        const subgroups: SubgroupSummary[] = grid.subgroupIds.map((g) => {
+          const bucket = perSubgroup.get(g) as NonNullable<ReturnType<typeof perSubgroup.get>>;
+          return {
+            productSubgroup: subgroupById.get(g) as SubgroupSummary['productSubgroup'],
+            sellers: grid.pairs
+              .filter((x) => x.subgroupId === g)
+              .sort((a, b) => (a.sellerCode < b.sellerCode ? -1 : 1))
+              .map((x) => ({
+                seller: sellerById.get(x.sellerId) as SubgroupSummary['sellers'][number]['seller'],
+                count: bucket.counts.get(x.sellerId) ?? 0,
+              })),
+            unassigned: bucket.unassigned,
+            stale: bucket.stale,
+          };
+        });
+        return { subgroups, totals };
       });
-      return { subgroups, totals };
     },
 
     replaceAssignments(actor, id, expectedVersion, input) {
@@ -232,9 +252,11 @@ export function createDistributionService(
         }
         if (set.length > 0) {
           const grid = loadGrid(tx, row);
-          for (const s of set) {
+          // O índice localiza o item em lotes de até 5.000; a mensagem não ecoa ids nem valores. Cliente
+          // inexistente, de outra filial ou sem vínculo ativo não são membros efetivos: mesma mensagem.
+          for (const [i, s] of set.entries()) {
             const reason = invalidReason(grid, s.customerId, s.productSubgroupId, s.sellerId);
-            if (reason !== null) throw invalid(reason);
+            if (reason !== null) throw invalid(`set[${i}]: ${reason}`);
           }
         }
         deleteAssignments(
@@ -284,6 +306,7 @@ export function createDistributionService(
         }
 
         const rows: [number, number, number][] = [];
+        const finalCounts: DistributeResult['finalCounts'] = {};
         const distributed: Record<number, number> = {};
         const skippedSubgroupIds: number[] = [];
         for (const g of targets) {
@@ -304,10 +327,19 @@ export function createDistributionService(
             rows.push([customerIds[i] as number, g, picked[i] as number]);
           }
           distributed[g] = customerIds.length;
+          // Contagem final = válidas preservadas + gravadas agora.
+          const total = new Map(validCounts.get(g) as Map<number, number>);
+          for (const sellerId of picked) total.set(sellerId, (total.get(sellerId) ?? 0) + 1);
+          finalCounts[g] = [...candidates]
+            .sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0))
+            .map((x) => ({ sellerId: x.id, count: total.get(x.id) ?? 0 }));
         }
-        upsertAssignments(tx, id, rows, actor.sub, now());
-        bump(tx, row, actor, now());
-        return { aggregate: loadAggregateBase(tx, id), distributed, skippedSubgroupIds };
+        // Sem nada a gravar, a versão (e o ETag) não muda.
+        if (rows.length > 0) {
+          upsertAssignments(tx, id, rows, actor.sub, now());
+          bump(tx, row, actor, now());
+        }
+        return { aggregate: loadAggregateBase(tx, id), distributed, skippedSubgroupIds, finalCounts };
       });
     },
   };

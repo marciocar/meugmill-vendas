@@ -1,0 +1,2 @@
+CREATE INDEX `portfolio_assignments_seller_id_idx` ON `portfolio_assignments` (`seller_id`);--> statement-breakpoint
+CREATE INDEX `portfolio_assignments_product_subgroup_id_idx` ON `portfolio_assignments` (`product_subgroup_id`);

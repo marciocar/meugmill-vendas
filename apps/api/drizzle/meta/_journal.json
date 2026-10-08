@@ -57,6 +57,13 @@
       "when": 1791457051043,
       "tag": "0007_e6_assignments",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1791458258564,
+      "tag": "0008_e6_assignments_fk_idx",
+      "breakpoints": true
     }
   ]
 }

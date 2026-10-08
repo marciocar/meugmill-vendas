@@ -335,6 +335,8 @@ export const portfolioAssignments = sqliteTable(
       t.sellerId,
     ),
     index('portfolio_assignments_customer_id_idx').on(t.customerId),
+    index('portfolio_assignments_seller_id_idx').on(t.sellerId),
+    index('portfolio_assignments_product_subgroup_id_idx').on(t.productSubgroupId),
   ],
 );
 
