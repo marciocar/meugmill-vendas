@@ -31,7 +31,7 @@
       <button id="apply-token">Aplicar token</button>
     </p>
 
-    <gmill-carteira debug api-base="http://localhost:3000"></gmill-carteira>
+    <gmill-carteira debug api-base="/api"></gmill-carteira>
 
     <h2>Log</h2>
     <pre id="log"></pre>
@@ -39,7 +39,8 @@
     <script type="module">
       import '../src/element.tsx';
       // IdP de teste (mock-oauth2-server) da infra Docker.
-      const IDP_TOKEN_URL = 'http://localhost:8080/default/token';
+      // O issuer dos tokens é http://localhost:39080/default: o navegador precisa pedir o token nesse endereço.
+      const IDP_TOKEN_URL = 'http://localhost:39080/default/token';
       const el = document.querySelector('gmill-carteira');
       const log = document.getElementById('log');
       const write = (msg) => {

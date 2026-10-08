@@ -42,7 +42,13 @@ export default defineConfig(({ command }) => ({
     },
     cssCodeSplit: false,
   },
-  server: { fs: { allow: ['..'] } },
+  server: {
+    fs: { allow: ['..'] },
+    // Mesmo caminho do nginx da imagem: /api/* vai para a API do Compose.
+    proxy: {
+      '/api': { target: 'http://localhost:39000', rewrite: (path) => path.replace(/^\/api/, '') },
+    },
+  },
   test: {
     environment: 'happy-dom',
     css: { include: [/.+/] },
