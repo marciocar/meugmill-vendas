@@ -97,7 +97,12 @@ Resposta `200`:
   "portfolio": { "id": 10, "version": 5 },
   "distributed": { "<productSubgroupId>": 120 },
   "skippedSubgroupIds": [7],
-  "finalCounts": { "<productSubgroupId>": [{ "sellerId": 3, "count": 60 }, { "sellerId": 4, "count": 60 }] }
+  "finalCounts": {
+    "<productSubgroupId>": [
+      { "sellerId": 3, "count": 60 },
+      { "sellerId": 4, "count": 60 }
+    ]
+  }
 }
 ```
 

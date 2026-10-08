@@ -42,6 +42,8 @@ Dois eixos independentes:
   junto com a gravação dos vínculos; até lá nenhuma rota muda o `status`.
 - `active` (inativação): `deactivate` e `reactivate`, idempotentes, com `If-Match`. Não há exclusão. Um
   rascunho pode ser inativado (abandonado) e uma carteira `active` também.
+- **Inativar ou transferir de filial** (carteira ou filial) volta a carteira a `draft` e encerra os seus
+  vínculos, com eventos (ver [`api-vinculos.md`](./api-vinculos.md)). Reativar também deixa `draft`.
 - **Carteira inativa não é editável**: `PATCH`, `PUT /filters` e `PUT /sellers` respondem
   `409 portfolio_inactive`. A checagem vem depois de 404 (escopo), 403 (permissão) e 428 (sem `If-Match`),
   e **antes** da comparação de versão, para que quem tem a tela desatualizada saiba que o problema é a

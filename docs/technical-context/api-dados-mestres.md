@@ -85,6 +85,10 @@ explícitas.** Cada vínculo cliente/vendedor x filial tem o seu `active`; o reg
 - registro inativo globalmente some de `active=true` para todas as filiais; reativar vínculos não o
   reativa, só `reactivate-global`.
 
+**Efeito nos vínculos de carteira (E7):** inativar vendedor, cliente ou filial (por vínculo ou global),
+ou remover o vínculo deles com a filial, encerra os vínculos ativos de carteira afetados, com eventos
+`ended` na outbox e sem mudar a versão da carteira (ver [`api-vinculos.md`](./api-vinculos.md)).
+
 Filiais e catálogos (sem vínculo) seguem com `deactivate`/`reactivate` globais e não têm rotas `-global`.
 
 O `active` da resposta e o filtro `active` da listagem refletem a visão do ator: **ativo = registro

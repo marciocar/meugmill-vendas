@@ -451,6 +451,38 @@ code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/port
   || fail "distribuição desequilibrada (diferença > 1): $(cat "$body")"
 ok "GET /assignments/summary -> 2 vendedores equilibrados (diferença <= 1), unassigned 0"
 
+# Vínculos (E7): cursor da outbox ANTES da 1ª finalização (a base acumula eventos de execuções anteriores).
+events_after=0
+for _ in $(seq 1 200); do
+  code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" \
+    "${API_URL}/v1/link-events?branchId=${branch_id}&after=${events_after}&limit=1000" || true)
+  [ "$code" = "200" ] || fail "GET /v1/link-events esperado 200, recebido ${code}: $(cat "$body")"
+  last=$(json_get 'j.nextAfter')
+  [ -z "$last" ] || events_after=$last
+  [ "$(json_get 'j.hasMore')" = "true" ] || break
+done
+
+code=$(curl -s -o "$body" -w '%{http_code}' -X POST "${API_URL}/v1/portfolios/${pf_dist}/finalize" \
+  -H "$auth_admin" -H 'Content-Type: application/json' -d '{}' || true)
+[ "$code" = "428" ] || fail "POST /finalize sem If-Match esperado 428, recebido ${code}: $(cat "$body")"
+ok "POST /finalize sem If-Match -> 428"
+
+code=$(curl -s -D "$hdrs" -o "$body" -w '%{http_code}' -X POST "${API_URL}/v1/portfolios/${pf_dist}/finalize" \
+  -H "$auth_admin" -H 'Content-Type: application/json' -H "If-Match: \"${dist_version}\"" -d '{}' || true)
+[ "$code" = "200" ] || fail "POST /finalize esperado 200, recebido ${code}: $(cat "$body")"
+[ "$(json_get 'j.created')" = "${dist_total}" ] || fail "finalize esperava created=${dist_total} (clientes x subgrupos): $(cat "$body")"
+[ "$(json_get 'j.ended')" = "0" ] || fail "1ª finalização esperava ended=0: $(cat "$body")"
+[ "$(json_get 'j.takenOver')" = "0" ] || fail "1ª finalização esperava takenOver=0: $(cat "$body")"
+[ "$(json_get 'j.portfolio.status')" = "active" ] || fail "carteira esperada active após finalizar: $(cat "$body")"
+dist_version=$(tr -d '\r' < "$hdrs" | sed -n 's/^[Ee][Tt][Aa][Gg]:[[:space:]]*"\([0-9]*\)".*/\1/p' | head -n1)
+[ -n "$dist_version" ] || fail "POST /finalize sem ETag: $(cat "$hdrs")"
+ok "POST /v1/portfolios/{id}/finalize -> 200 (created=${dist_total}, carteira active)"
+
+code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/portfolios/${pf_dist}/links?limit=2" || true)
+[ "$code" = "200" ] || fail "GET /links esperado 200, recebido ${code}: $(cat "$body")"
+[ "$(json_get 'j.total')" = "${dist_total}" ] || fail "GET /links esperava total ${dist_total}: $(cat "$body")"
+ok "GET /links -> total ${dist_total}"
+
 code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/portfolios/${pf_dist}/assignments?limit=1" || true)
 [ "$code" = "200" ] || fail "GET /assignments esperado 200, recebido ${code}: $(cat "$body")"
 swap_customer=$(json_get 'j.items[0].customer.id')
@@ -460,11 +492,36 @@ if [ "$swap_from" = "$seller_id" ]; then swap_to=$seller2_id; else swap_to=$sell
 code=$(json_put "/v1/portfolios/${pf_dist}/assignments" "$dist_version" \
   "{\"set\":[{\"customerId\":${swap_customer},\"productSubgroupId\":${pf_subgroup_id},\"sellerId\":${swap_to}}]}")
 [ "$code" = "200" ] || fail "PUT /assignments esperado 200, recebido ${code}: $(cat "$body")"
+dist_version=$(tr -d '\r' < "$hdrs" | sed -n 's/^[Ee][Tt][Aa][Gg]:[[:space:]]*"\([0-9]*\)".*/\1/p' | head -n1)
+[ -n "$dist_version" ] || fail "PUT /assignments sem ETag: $(cat "$hdrs")"
 code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" \
   "${API_URL}/v1/portfolios/${pf_dist}/assignments?sellerId=${swap_to}&limit=200" || true)
 [ "$(json_get "j.items.some(i=>i.customer.id===${swap_customer})")" = "true" ] \
   || fail "cliente ${swap_customer} não aparece sob o vendedor ${swap_to} após o PUT: $(cat "$body")"
 ok "PUT /assignments -> 200 (cliente trocado de vendedor)"
+
+code=$(curl -s -D "$hdrs" -o "$body" -w '%{http_code}' -X POST "${API_URL}/v1/portfolios/${pf_dist}/finalize" \
+  -H "$auth_admin" -H 'Content-Type: application/json' -H "If-Match: \"${dist_version}\"" -d '{}' || true)
+[ "$code" = "200" ] || fail "2º POST /finalize esperado 200, recebido ${code}: $(cat "$body")"
+[ "$(json_get 'j.created')" = "1" ] && [ "$(json_get 'j.ended')" = "1" ] \
+  || fail "re-finalização esperava created=1 e ended=1: $(cat "$body")"
+[ "$(json_get 'j.takenOver')" = "0" ] || fail "re-finalização esperava takenOver=0: $(cat "$body")"
+[ "$(json_get 'j.portfolio.status')" = "active" ] || fail "carteira esperada active após re-finalizar: $(cat "$body")"
+ok "re-finalização -> created=1, ended=1 (troca de vendedor)"
+
+code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" \
+  "${API_URL}/v1/link-events?branchId=${branch_id}&after=${events_after}&limit=1000" || true)
+[ "$code" = "200" ] || fail "GET /v1/link-events esperado 200, recebido ${code}: $(cat "$body")"
+want_events=$((dist_total + 2))
+[ "$(json_get "j.items.length >= ${want_events}")" = "true" ] \
+  || fail "link-events esperava >= ${want_events} eventos desde o cursor ${events_after}: $(cat "$body")"
+ok "GET /v1/link-events -> >= ${want_events} eventos (created + ended) desde o cursor"
+
+code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" \
+  "${API_URL}/v1/portfolios/${pf_dist}/links/history?customerId=${swap_customer}" || true)
+[ "$code" = "200" ] || fail "GET /links/history esperado 200, recebido ${code}: $(cat "$body")"
+[ "$(json_get 'j.items.some(i=>!i.active)')" = "true" ] || fail "history sem vínculo encerrado: $(cat "$body")"
+ok "GET /links/history -> mostra o vínculo encerrado"
 
 code=$(curl -s -o /dev/null -w '%{http_code}' -H "$auth_admin" "${WEB_URL}/api/v1/portfolios/${pf_dist}/assignments/summary" || true)
 [ "$code" = "200" ] || fail "GET ${WEB_URL}/api/v1/portfolios/{id}/assignments/summary (proxy) esperado 200, recebido ${code}"
@@ -474,5 +531,15 @@ code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/port
 [ "$code" = "200" ] || fail "GET /v1/portfolios/${pf_dist} esperado 200, recebido ${code}"
 deactivate_portfolio "$pf_dist" "$(json_get 'j.version')"
 ok "carteira de distribuição inativada ao final"
+
+code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/portfolios/${pf_dist}/links" || true)
+[ "$code" = "200" ] || fail "GET /links (inativa) esperado 200, recebido ${code}: $(cat "$body")"
+[ "$(json_get 'j.total')" = "0" ] || fail "inativar deveria encerrar os vínculos (total 0): $(cat "$body")"
+ok "inativação encerrou os vínculos da carteira (GET /links total 0)"
+
+code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/portfolios/${pf_dist}" || true)
+[ "$code" = "200" ] || fail "GET /v1/portfolios/${pf_dist} esperado 200, recebido ${code}"
+[ "$(json_get 'j.status')" = "draft" ] || fail "carteira inativada esperada em draft: $(cat "$body")"
+ok "carteira inativada voltou a draft"
 
 echo "Smoke concluído com sucesso."

@@ -31,8 +31,13 @@ export function setEtag(reply: FastifyReply, version: number): void {
  */
 export function sendDomainError(reply: FastifyReply, err: unknown): FastifyReply {
   if (!(err instanceof DomainError)) throw err;
+  // `detail` (contagens e ids de carteiras, nunca dados de cliente) sai só nos erros que o definem.
   const body =
-    err.code === 'validation_error' ? { error: err.code, message: err.message } : { error: err.code };
+    err.code === 'validation_error'
+      ? { error: err.code, message: err.message }
+      : err.detail
+        ? { error: err.code, detail: err.detail }
+        : { error: err.code };
   return reply.code(err.status).send(body);
 }
 
@@ -43,9 +48,14 @@ export function actorOf(request: FastifyRequest): Actor {
 }
 
 /** Schema de erro `{ error }` (o `message` só existe em validation_error). */
+const DetailSchema = Type.Record(Type.String(), Type.Union([Type.Integer(), Type.Array(Type.Integer())]), {
+  description: 'Contagens e ids de carteiras que explicam o conflito (nunca dados de clientes).',
+});
+
 export const ErrorResponseSchema = Type.Object({
   error: Type.String(),
   message: Type.Optional(Type.String()),
+  detail: Type.Optional(DetailSchema),
 });
 
 /** Códigos de domínio com status 409 (documentados na resposta 409 do OpenAPI). */
@@ -54,7 +64,7 @@ const CONFLICT_CODES = Object.entries(DOMAIN_ERROR_STATUS)
   .map(([code]) => code);
 
 const ConflictResponseSchema = Type.Object(
-  { error: Type.String(), message: Type.Optional(Type.String()) },
+  { error: Type.String(), message: Type.Optional(Type.String()), detail: Type.Optional(DetailSchema) },
   { description: `Conflito: ${CONFLICT_CODES.join(', ')}.` },
 );
 
