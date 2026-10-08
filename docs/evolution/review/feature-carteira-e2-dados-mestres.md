@@ -41,8 +41,9 @@ alfanumérico ponta a ponta, link sem vazar filial oculta e rollback do PATCH.
 **Ficou para E3+, por decisão declarada:** validação das respostas contra o OpenAPI com Ajv, corrida
 real entre processos, carga com volume e claims de produção do IdP.
 
-## Ponto em aberto para o maestro
+## Ponto que estava em aberto (adotado)
 
-O revisor da correção propôs trocar a escalada implícita ("se o admin cobre todas as filiais, inativar
-vira global") por uma rota explícita `POST /:id/deactivate-global`. A lógica está concentrada em
-`applyActiveTransition`, então a troca é pequena. Fica a critério do maestro.
+O revisor da correção propôs trocar a escalada implícita ("se o admin cobre todas as filiais,
+inativar vira global") por rotas explícitas. O maestro adotou a proposta em `d2d5acd`:
+`deactivate`/`reactivate` agem só nos vínculos, e `deactivate-global`/`reactivate-global` exigem
+todas as filiais do registro.
