@@ -130,4 +130,94 @@ code=$(curl -s -o "$body" -w '%{http_code}' -X POST "${API_URL}/v1/product-subgr
 [ "$code" = "200" ] || fail "deactivate com If-Match esperado 200, recebido ${code}: $(cat "$body")"
 ok "POST /v1/product-subgroups/{id}/deactivate com If-Match -> 200"
 
+# Fluxo do wizard da carteira (E3), com o token de ADMIN. Códigos únicos por execução (epoch).
+json_get() { node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const v=Function("j","return "+process.argv[2])(j);process.stdout.write(v===undefined||v===null?"":String(v))' "$body" "$1"; }
+json_post() { # json_post <rota> <corpo> -> código HTTP (corpo em $body, cabeçalhos em $hdrs)
+  curl -s -D "$hdrs" -o "$body" -w '%{http_code}' -X POST "${API_URL}$1" \
+    -H "$auth_admin" -H 'Content-Type: application/json' -d "$2" || true
+}
+json_put() { # json_put <rota> <if-match> <corpo> -> código HTTP
+  curl -s -D "$hdrs" -o "$body" -w '%{http_code}' -X PUT "${API_URL}$1" \
+    -H "$auth_admin" -H 'Content-Type: application/json' -H "If-Match: \"$2\"" -d "$3" || true
+}
+epoch=$(date +%s)
+
+# Pré-requisitos idempotentes: a filial filial-01 (a do token de admin).
+code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/branches?q=filial-01&limit=200" || true)
+[ "$code" = "200" ] || fail "GET /v1/branches esperado 200, recebido ${code}: $(cat "$body")"
+branch_id=$(json_get 'j.items.filter(b=>b.code==="filial-01").map(b=>b.id)[0]')
+if [ -z "$branch_id" ]; then
+  code=$(json_post /v1/branches '{"code":"filial-01","name":"Filial de fumaça","municipalityCode":3205002}')
+  case "$code" in
+    201) branch_id=$(json_get 'j.id') ;;
+    409)
+      code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/branches?q=filial-01&limit=200" || true)
+      [ "$code" = "200" ] || fail "GET /v1/branches (após 409) esperado 200, recebido ${code}"
+      branch_id=$(json_get 'j.items.filter(b=>b.code==="filial-01").map(b=>b.id)[0]') ;;
+    *) fail "POST /v1/branches esperado 201 ou 409, recebido ${code}: $(cat "$body")" ;;
+  esac
+fi
+[ -n "$branch_id" ] || fail "não foi possível obter o id da filial filial-01"
+ok "filial filial-01 disponível (id ${branch_id})"
+
+code=$(json_post /v1/portfolio-types "{\"code\":\"SMK-T-${epoch}\",\"name\":\"Tipo de fumaça\"}")
+[ "$code" = "201" ] || fail "POST /v1/portfolio-types esperado 201, recebido ${code}: $(cat "$body")"
+type_id=$(json_get 'j.id')
+[ -n "$type_id" ] || fail "resposta do POST de tipo de carteira sem id"
+ok "POST /v1/portfolio-types -> 201 (id ${type_id})"
+
+code=$(json_post /v1/product-subgroups "{\"code\":\"SMK-G-${epoch}\",\"name\":\"Subgrupo da carteira\"}")
+[ "$code" = "201" ] || fail "POST /v1/product-subgroups (carteira) esperado 201, recebido ${code}: $(cat "$body")"
+pf_subgroup_id=$(json_get 'j.id')
+[ -n "$pf_subgroup_id" ] || fail "resposta do POST de subgrupo (carteira) sem id"
+
+code=$(json_post /v1/sellers "{\"code\":\"SMK-V-${epoch}\",\"name\":\"Vendedor de fumaça\",\"branchIds\":[${branch_id}]}")
+[ "$code" = "201" ] || fail "POST /v1/sellers esperado 201, recebido ${code}: $(cat "$body")"
+seller_id=$(json_get 'j.id')
+[ -n "$seller_id" ] || fail "resposta do POST de vendedor sem id"
+ok "subgrupo (id ${pf_subgroup_id}) e vendedor (id ${seller_id}) criados com vínculo na filial"
+
+code=$(json_post /v1/portfolios \
+  "{\"name\":\"Carteira de fumaça ${epoch}\",\"branchId\":${branch_id},\"responsibleSub\":\"admin-01\",\"portfolioTypeId\":${type_id}}")
+[ "$code" = "201" ] || fail "POST /v1/portfolios esperado 201, recebido ${code}: $(cat "$body")"
+tr -d '\r' < "$hdrs" | grep -qix 'etag: "1"' || fail "POST de carteira sem ETag \"1\": $(cat "$hdrs")"
+portfolio_id=$(json_get 'j.id')
+[ -n "$portfolio_id" ] || fail "resposta do POST de carteira sem id"
+ok "POST /v1/portfolios -> 201 com ETag \"1\" (rascunho ${portfolio_id})"
+
+code=$(json_put "/v1/portfolios/${portfolio_id}/filters" 1 \
+  '{"regions":[{"level":"state","stateCode":32},{"level":"municipality","stateCode":32,"municipalityCode":3205002},{"level":"neighborhood","stateCode":32,"municipalityCode":3205002,"neighborhoodLabel":"Centro de Serra"}],"retailNetworkIds":[],"economicGroupIds":[]}')
+[ "$code" = "200" ] || fail "PUT /filters esperado 200, recebido ${code}: $(cat "$body")"
+tr -d '\r' < "$hdrs" | grep -qix 'etag: "2"' || fail "PUT /filters sem ETag \"2\": $(cat "$hdrs")"
+ok "PUT /v1/portfolios/{id}/filters -> 200 com ETag \"2\" (UF, município e bairro)"
+
+code=$(json_put "/v1/portfolios/${portfolio_id}/sellers" 2 \
+  "{\"assignments\":[{\"sellerId\":${seller_id},\"productSubgroupId\":${pf_subgroup_id}}]}")
+[ "$code" = "200" ] || fail "PUT /sellers esperado 200, recebido ${code}: $(cat "$body")"
+tr -d '\r' < "$hdrs" | grep -qix 'etag: "3"' || fail "PUT /sellers sem ETag \"3\": $(cat "$hdrs")"
+ok "PUT /v1/portfolios/{id}/sellers -> 200 com ETag \"3\""
+
+code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/portfolios/${portfolio_id}" || true)
+[ "$code" = "200" ] || fail "GET /v1/portfolios/${portfolio_id} esperado 200, recebido ${code}: $(cat "$body")"
+[ "$(json_get 'j.status')" = "draft" ] || fail "carteira esperada com status draft: $(cat "$body")"
+[ "$(json_get 'j.filters.regions.length')" = "3" ] || fail "carteira esperada com 3 regiões: $(cat "$body")"
+[ "$(json_get 'j.sellers.length')" = "1" ] || fail "carteira esperada com 1 vendedor: $(cat "$body")"
+ok "GET /v1/portfolios/{id} -> 200 (draft, 3 regiões, 1 vendedor)"
+
+code=$(curl -s -o "$body" -w '%{http_code}' -X PATCH "${API_URL}/v1/portfolios/${portfolio_id}" \
+  -H "$auth_admin" -H 'Content-Type: application/json' -d '{"description":"Descrição de fumaça"}' || true)
+[ "$code" = "428" ] || fail "PATCH de carteira sem If-Match esperado 428, recebido ${code}: $(cat "$body")"
+ok "PATCH /v1/portfolios/{id} sem If-Match -> 428"
+
+code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" \
+  "${API_URL}/v1/portfolios?branchId=${branch_id}&q=${epoch}" || true)
+[ "$code" = "200" ] || fail "GET /v1/portfolios esperado 200, recebido ${code}: $(cat "$body")"
+[ "$(json_get "j.items.some(i=>i.id===${portfolio_id})")" = "true" ] \
+  || fail "GET /v1/portfolios não contém a carteira ${portfolio_id}"
+ok "GET /v1/portfolios -> 200 contendo a carteira criada"
+
+code=$(curl -s -o /dev/null -w '%{http_code}' -H "$auth_admin" "${WEB_URL}/api/v1/portfolios" || true)
+[ "$code" = "200" ] || fail "GET ${WEB_URL}/api/v1/portfolios (proxy) esperado 200, recebido ${code}"
+ok "proxy /api da demo -> /v1/portfolios 200 com token de admin"
+
 echo "Smoke concluído com sucesso."
