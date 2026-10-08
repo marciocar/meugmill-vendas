@@ -19,14 +19,14 @@ localidades IBGE) com API REST escopada por filial, para E3/E4 consumirem — ve
 - task-manager    → main: OG1-T3 (2723266000000151010) · provider: zoho
 
 ## NEXT
-phase: 1
-phase_title: Schema, migrations e seed IBGE
+phase: 3
+phase_title: API dos catálogos, filiais e localidades (Fase 4 em paralelo)
 status: in_progress
-next_action: "Escrever as tabelas do E2 em apps/api/src/db/schema.ts e gerar a migration 0001"
+next_action: "Integrar as rotas das Fases 3 e 4 no app.ts quando os agentes terminarem e validar o contrato HTTP"
 blocked_by: none
-files_in_flight: [apps/api/src/db/schema.ts, apps/api/drizzle/]
+files_in_flight: [apps/api/src/routes/v1/]
 validate_with: "pnpm --filter @meugmill/api test"
-last_checkpoint: 2026-10-08T00:19Z
+last_checkpoint: 2026-10-08T01:00Z
 
 ## Native transcript
 resume_command: claude --resume <id>

@@ -4,23 +4,27 @@
 > `STATE.md` → `NEXT.phase`. Arquitetura: [architecture.md](architecture.md). Zoho: OG1-T3
 > (`completion_percentage` +20 por fase; o layout só tem Open/Closed).
 
-## Fase 1 — Schema, migrations e seed IBGE [ACTIVE]
+## Fase 1 — Schema, migrations e seed IBGE [DONE]
 
-- [ ] `src/db/schema.ts`: tabelas da arquitetura §2, colunas comuns, índices e FKs
-- [ ] Migration `0001` gerada pelo `drizzle-kit`
-- [ ] `apps/api/scripts/build-ibge-seed.ts` + snapshot JSON datado do IBGE → migration custom `0002_seed_ibge.sql` (fonte e data no cabeçalho)
-- [ ] Testes: tabelas criadas, `foreign_keys` impedindo órfãos, 27 UFs e ~5.570 municípios, ES/Serra presentes
+- [x] `src/db/schema.ts`: tabelas da arquitetura §2, colunas comuns, índices e FKs
+- [x] Migration `0001` gerada pelo `drizzle-kit`
+- [x] `apps/api/scripts/build-ibge-seed.ts` + snapshot JSON datado do IBGE → migration custom `0002_seed_ibge.sql` (fonte e data no cabeçalho)
+- [x] Testes: tabelas criadas, `foreign_keys` impedindo órfãos, 27 UFs e ~5.570 municípios, ES/Serra presentes
+
+**Concluída 2026-10-08** · `b5ad709` · 74 testes · 27 UFs e 5.571 municípios.
 
 **Validar:** `pnpm --filter @meugmill/api test`
 
-## Fase 2 — Domínio: validação, autorização e repositórios [TODO]
+## Fase 2 — Domínio: validação, autorização e repositórios [DONE]
 
-- [ ] `domain/shared`: `cnpj.ts` (normaliza, valida DV), `normalize.ts` (`neighborhood_key`), `authz.ts`, `errors.ts`, `pagination.ts`
-- [ ] Services e repositórios: catálogo genérico, filiais, vendedores, clientes, geo
-- [ ] Regras: unicidade (inclusive inativos), coerência UF × município, escopo por filial, `version`, soft delete idempotente, transação nos vínculos N:N, `customer_exists`
-- [ ] Testes de domínio sem HTTP
+- [x] `domain/shared`: `cnpj.ts` (normaliza, valida DV), `normalize.ts` (`neighborhood_key`), `authz.ts`, `errors.ts`, `pagination.ts`
+- [x] Services e repositórios: catálogo genérico, filiais, vendedores, clientes, geo
+- [x] Regras: unicidade (inclusive inativos), coerência UF × município, escopo por filial, `version`, soft delete idempotente, transação nos vínculos N:N, `customer_exists`
+- [x] Testes de domínio sem HTTP
 
-## Fase 3 — API dos catálogos, filiais e localidades [TODO] (paralela à 4)
+**Concluída 2026-10-08** · 131 testes. Services síncronos; respostas de cliente/vendedor só com filiais do escopo do ator. Risco aberto: CNPJ alfanumérico (Receita, jul/2026).
+
+## Fase 3 — API dos catálogos, filiais e localidades [ACTIVE] (paralela à 4)
 
 - [ ] `routes/v1/catalog.ts` (fábrica para subgrupos, redes e grupos econômicos), `branches.ts`, `geo.ts`
 - [ ] `ETag`/`If-Match` (428, 409), paginação, 403 sem admin, 404 fora do escopo

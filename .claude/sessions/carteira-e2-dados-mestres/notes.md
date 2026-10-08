@@ -1,3 +1,5 @@
 # Notas — carteira-e2-dados-mestres
 
 - 2026-10-08: sessão aberta. Decisões: região por IBGE + bairro normalizado; cliente global N:N com filiais; escrita só admin; soft delete.
+- 2026-10-08: Fase 1 concluída (b5ad709); .gitignore ganhou exceção para apps/api/drizzle/data/.
+- 2026-10-08: Fase 2 concluída (domínio, 131 testes). Fases 3 e 4 disparadas em paralelo; a Fase 4 fica marcada [TODO] no plano para manter uma só [ACTIVE], mas roda junto.
