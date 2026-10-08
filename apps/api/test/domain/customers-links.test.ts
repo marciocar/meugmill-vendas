@@ -130,14 +130,12 @@ describe('clientes: link por CNPJ sem vazamento e ativo por vínculo', () => {
     expect(linkRows(c.id)).toEqual([{ branch_id: car, active: 1 }]);
   });
 
-  it('admin com todas as filiais do registro inativa os vínculos E o registro global', () => {
+  it('admin com todas as filiais: deactivate/reactivate mexem só nos vínculos; global segue ativo', () => {
     const c = svc.create(adminBoth, base({ branchIds: [ser, car] }));
     const off = svc.deactivate(adminBoth, c.id, 1);
     expect(off).toMatchObject({ active: false, version: 2 });
-    expect(globalRow(c.id).active).toBe(0);
+    expect(globalRow(c.id).active).toBe(1);
     expect(linkRows(c.id).every((l) => l.active === 0)).toBe(true);
-    // para o ator parcial também aparece inativo (registro global inativo)
-    expect(svc.get(adminSer, c.id).active).toBe(false);
 
     const on = svc.reactivate(adminBoth, c.id, 2);
     expect(on).toMatchObject({ active: true, version: 3, deactivatedAt: null });
@@ -145,11 +143,59 @@ describe('clientes: link por CNPJ sem vazamento e ativo por vínculo', () => {
     expect(linkRows(c.id).every((l) => l.active === 1)).toBe(true);
   });
 
-  it('reativar sem cobertura total reativa só o vínculo; global inativo segue inativo', () => {
+  it('deactivate-global com cobertura total: global inativo, vínculos intactos, some de active=true', () => {
     const c = svc.create(adminBoth, base({ branchIds: [ser, car] }));
-    svc.deactivate(adminBoth, c.id, 1); // global + vínculos (v2)
-    const partial = svc.reactivate(adminSer, c.id, 2);
-    expect(partial.version).toBe(3);
+    const off = svc.deactivateGlobal(adminBoth, c.id, 1);
+    expect(off).toMatchObject({ active: false, version: 2 });
+    expect(globalRow(c.id)).toEqual({ active: 0, version: 2 });
+    expect(linkRows(c.id).every((l) => l.active === 1)).toBe(true);
+    for (const who of [adminSer, adminCar, adminBoth]) {
+      expect(svc.list(who, { active: true }).items).toHaveLength(0);
+      expect(svc.list(who, { active: false }).items).toHaveLength(1);
+      expect(svc.get(who, c.id).active).toBe(false);
+    }
+    // idempotente: repetir não muda a versão nem exige If-Match atual
+    expect(svc.deactivateGlobal(adminBoth, c.id, 1)).toMatchObject({ version: 2 });
+
+    // reativar os vínculos (já ativos) é no-op e não reativa o global
+    expect(svc.reactivate(adminSer, c.id, 2)).toMatchObject({ active: false, version: 2 });
+    const on = svc.reactivateGlobal(adminBoth, c.id, 2);
+    expect(on).toMatchObject({ active: true, version: 3 });
+    expect(globalRow(c.id)).toEqual({ active: 1, version: 3 });
+    expect(svc.list(adminCar, { active: true }).items).toHaveLength(1);
+    expect(svc.reactivateGlobal(adminBoth, c.id, 1)).toMatchObject({ version: 3 }); // idempotente
+  });
+
+  it('deactivate-global/reactivate-global sem cobertura total: 403 sem mudar a versão', () => {
+    const c = svc.create(adminBoth, base({ branchIds: [ser, car] }));
+    expect(codeOf(() => svc.deactivateGlobal(adminSer, c.id, 1))).toBe('forbidden');
+    expect(globalRow(c.id)).toEqual({ active: 1, version: 1 });
+    svc.deactivateGlobal(adminBoth, c.id, 1);
+    expect(codeOf(() => svc.reactivateGlobal(adminSer, c.id, 2))).toBe('forbidden');
+    expect(globalRow(c.id)).toEqual({ active: 0, version: 2 });
+    // não-admin
+    expect(codeOf(() => svc.deactivateGlobal({ ...adminBoth, roles: [] }, c.id, 2))).toBe('forbidden');
+  });
+
+  it('rotas globais: 428 sem If-Match, 409 com versão velha, 404 fora do escopo', () => {
+    const c = svc.create(adminBoth, base({ branchIds: [ser, car] }));
+    expect(codeOf(() => svc.deactivateGlobal(adminBoth, c.id, undefined))).toBe('precondition_required');
+    expect(codeOf(() => svc.reactivateGlobal(adminBoth, c.id, undefined))).toBe('precondition_required');
+    svc.deactivate(adminSer, c.id, 1); // v2
+    expect(codeOf(() => svc.deactivateGlobal(adminBoth, c.id, 1))).toBe('version_conflict');
+    expect(globalRow(c.id)).toEqual({ active: 1, version: 2 });
+    const other = svc.create(adminCar, base({ cnpj: CNPJ_B, branchIds: [car] }));
+    expect(codeOf(() => svc.deactivateGlobal(adminSer, other.id, 1))).toBe('not_found');
+    expect(codeOf(() => svc.reactivateGlobal(adminSer, other.id, 1))).toBe('not_found');
+    expect(globalRow(other.id)).toEqual({ active: 1, version: 1 });
+  });
+
+  it('reativar vínculos não reativa o registro global inativo', () => {
+    const c = svc.create(adminBoth, base({ branchIds: [ser, car] }));
+    svc.deactivate(adminBoth, c.id, 1); // vínculos (v2)
+    svc.deactivateGlobal(adminBoth, c.id, 2); // global (v3)
+    const partial = svc.reactivate(adminSer, c.id, 3);
+    expect(partial.version).toBe(4);
     expect(partial.branches[0]).toMatchObject({ code: 'SER', active: true });
     expect(partial.active).toBe(false); // registro global ainda inativo
     expect(globalRow(c.id).active).toBe(0);
@@ -157,8 +203,6 @@ describe('clientes: link por CNPJ sem vazamento e ativo por vínculo', () => {
       { branch_id: ser, active: 1 },
       { branch_id: car, active: 0 },
     ]);
-    // quem cobre tudo reativa o global
-    expect(svc.reactivate(adminBoth, c.id, 3)).toMatchObject({ active: true, version: 4 });
   });
 
   it('é idempotente por vínculo: repetir não muda a versão nem exige If-Match atual', () => {

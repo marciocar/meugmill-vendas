@@ -75,12 +75,28 @@ describe('HTTP: cliente compartilhado entre filiais', () => {
     const asB = await call('GET', `/v1/customers/${id}`, ADMIN_B);
     expect(asB.json()).toMatchObject({ active: true, branches: [{ code: 'FB', active: true }] });
 
-    // admin com as duas filiais inativa globalmente
+    // admin com as duas filiais: deactivate segue só nos vínculos (global ativo)
     const all = await call('POST', `/v1/customers/${id}/deactivate`, ADMIN_AB, { ifMatch: '"3"' });
     expect(all.statusCode).toBe(200);
+    expect(all.headers.etag).toBe('"4"');
     expect((await call('GET', `/v1/customers/${id}`, ADMIN_B)).json().active).toBe(false);
-    const list = await call('GET', '/v1/customers?active=false', ADMIN_B);
-    expect(list.json().items).toHaveLength(1);
+    // reativa os vínculos e inativa globalmente
+    await call('POST', `/v1/customers/${id}/reactivate`, ADMIN_AB, { ifMatch: '"4"' });
+    const partial = await call('POST', `/v1/customers/${id}/deactivate-global`, ADMIN_A, { ifMatch: '"5"' });
+    expect(partial.statusCode).toBe(403);
+    expect(partial.json()).toEqual({ error: 'forbidden' });
+    const noHeader = await call('POST', `/v1/customers/${id}/deactivate-global`, ADMIN_AB);
+    expect(noHeader.statusCode).toBe(428);
+    const stale = await call('POST', `/v1/customers/${id}/deactivate-global`, ADMIN_AB, { ifMatch: '"4"' });
+    expect(stale.statusCode).toBe(409);
+    const glob = await call('POST', `/v1/customers/${id}/deactivate-global`, ADMIN_AB, { ifMatch: '"5"' });
+    expect(glob.statusCode).toBe(200);
+    expect(glob.headers.etag).toBe('"6"');
+    expect(glob.json()).toMatchObject({ active: false, version: 6 });
+    expect((await call('GET', '/v1/customers?active=true', ADMIN_B)).json().items).toHaveLength(0);
+    expect((await call('GET', '/v1/customers?active=false', ADMIN_B)).json().items).toHaveLength(1);
+    const back = await call('POST', `/v1/customers/${id}/reactivate-global`, ADMIN_AB, { ifMatch: '"6"' });
+    expect(back.json()).toMatchObject({ active: true, version: 7 });
   });
 
   it('deactivate fora do escopo: 404 e a versão não muda', async () => {
@@ -96,6 +112,10 @@ describe('HTTP: cliente compartilhado entre filiais', () => {
     const id = created.json().id as number;
     const res = await call('POST', `/v1/customers/${id}/deactivate`, ADMIN_A, { ifMatch: '"1"' });
     expect(res.statusCode).toBe(404);
+    for (const path of ['deactivate-global', 'reactivate-global']) {
+      const r = await call('POST', `/v1/customers/${id}/${path}`, ADMIN_A, { ifMatch: '"1"' });
+      expect(r.statusCode).toBe(404);
+    }
     expect((await call('GET', `/v1/customers/${id}`, ADMIN_B)).headers.etag).toBe('"1"');
   });
 });
@@ -128,6 +148,16 @@ describe('HTTP: vendedor compartilhado entre filiais', () => {
     const all = await call('POST', `/v1/sellers/${id}/deactivate`, ADMIN_AB, { ifMatch: '"3"' });
     expect(all.statusCode).toBe(200);
     expect((await call('GET', `/v1/sellers/${id}`, ADMIN_B)).json().active).toBe(false);
+    await call('POST', `/v1/sellers/${id}/reactivate`, ADMIN_AB, { ifMatch: '"4"' });
+    expect(
+      (await call('POST', `/v1/sellers/${id}/deactivate-global`, ADMIN_A, { ifMatch: '"5"' })).statusCode,
+    ).toBe(403);
+    expect((await call('POST', `/v1/sellers/${id}/deactivate-global`, ADMIN_AB)).statusCode).toBe(428);
+    const glob = await call('POST', `/v1/sellers/${id}/deactivate-global`, ADMIN_AB, { ifMatch: '"5"' });
+    expect(glob.json()).toMatchObject({ active: false, version: 6 });
+    expect((await call('GET', '/v1/sellers?active=true', ADMIN_B)).json().items).toHaveLength(0);
+    const back = await call('POST', `/v1/sellers/${id}/reactivate-global`, ADMIN_AB, { ifMatch: '"6"' });
+    expect(back.json()).toMatchObject({ active: true, version: 7 });
   });
 
   it('link: 401, 403 (não-admin / filial fora), 404, 400', async () => {

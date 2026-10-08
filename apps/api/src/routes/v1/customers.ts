@@ -34,6 +34,7 @@ export function registerCustomerRoutes(
     createSchema: CreateCustomerSchema,
     updateSchema: UpdateCustomerSchema,
     tag: 'customers',
+    sharedActive: service,
   });
 
   // Liga um cliente já cadastrado (em outra filial) à filial do admin. Idempotente. Responde SÓ

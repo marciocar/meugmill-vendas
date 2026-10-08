@@ -12,14 +12,14 @@ contrato completo e gerado do código está em [`openapi-v1.json`](./openapi-v1.
 
 Todos sob `/v1`, autenticados por JWT Bearer (exceto `GET /v1/openapi.json`, `/health` e `/ready`).
 
-| Recurso | Rotas |
-|---|---|
-| `branches` (filiais), `product-subgroups`, `retail-networks`, `economic-groups`, `sellers`, `customers` | `GET /v1/{recurso}` (lista), `GET /v1/{recurso}/{id}`, `POST /v1/{recurso}`, `PATCH /v1/{recurso}/{id}`, `POST /v1/{recurso}/{id}/deactivate`, `POST /v1/{recurso}/{id}/reactivate` |
-| Vínculo de cliente | `POST /v1/customers/by-cnpj/{cnpj}/branches` com `{ "branchId": n }`: liga um cliente já cadastrado (em outra filial) à filial do admin. Idempotente. Responde `200` com **só** `{ id, version }` e `ETag`: nenhum dado do cliente. |
-| Vínculo de vendedor | `POST /v1/sellers/by-code/{code}/branches` com `{ "branchId": n }`: mesma regra e mesma resposta (`{ id, version }`). |
-| Localidades IBGE | `GET /v1/geo/states`, `GET /v1/geo/municipalities?uf=&q=` (somente leitura) |
-| Sessão | `GET /v1/me` (sub, papéis e filiais do token) |
-| Contrato | `GET /v1/openapi.json` (público, só o JSON; sem interface visual) |
+| Recurso                                                                                                 | Rotas                                                                                                                                                                                                                               |
+| ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `branches` (filiais), `product-subgroups`, `retail-networks`, `economic-groups`, `sellers`, `customers` | `GET /v1/{recurso}` (lista), `GET /v1/{recurso}/{id}`, `POST /v1/{recurso}`, `PATCH /v1/{recurso}/{id}`, `POST /v1/{recurso}/{id}/deactivate`, `POST /v1/{recurso}/{id}/reactivate`                                                 |
+| Vínculo de cliente                                                                                      | `POST /v1/customers/by-cnpj/{cnpj}/branches` com `{ "branchId": n }`: liga um cliente já cadastrado (em outra filial) à filial do admin. Idempotente. Responde `200` com **só** `{ id, version }` e `ETag`: nenhum dado do cliente. |
+| Vínculo de vendedor                                                                                     | `POST /v1/sellers/by-code/{code}/branches` com `{ "branchId": n }`: mesma regra e mesma resposta (`{ id, version }`).                                                                                                               |
+| Localidades IBGE                                                                                        | `GET /v1/geo/states`, `GET /v1/geo/municipalities?uf=&q=` (somente leitura)                                                                                                                                                         |
+| Sessão                                                                                                  | `GET /v1/me` (sub, papéis e filiais do token)                                                                                                                                                                                       |
+| Contrato                                                                                                | `GET /v1/openapi.json` (público, só o JSON; sem interface visual)                                                                                                                                                                   |
 
 Catálogos (subgrupos, redes, grupos econômicos) têm `code` (imutável) e `name`. Clientes e vendedores
 recebem `branchIds` (ids internos) no corpo; as respostas trazem as filiais como
@@ -62,18 +62,30 @@ idempotentes quando já estão no estado pedido. Listas aceitam `active=true|fal
 
 **Catálogos e filiais:** o `active` é do próprio registro.
 
-**Clientes e vendedores (compartilhados entre filiais): ativo por vínculo.** Cada vínculo
-cliente/vendedor x filial tem o seu `active`. `POST /v1/{customers|sellers}/{id}/deactivate|reactivate`:
+**Clientes e vendedores (compartilhados entre filiais): ativo por vínculo, com rotas globais
+explícitas.** Cada vínculo cliente/vendedor x filial tem o seu `active`; o registro tem ainda o
+`active` global. Não há escalada implícita: cada escopo tem a sua rota.
 
-- age **só nos vínculos das filiais do token do admin** (as que o registro tem dentro do escopo),
-  por vínculo e de forma idempotente;
-- se o admin cobre **todas** as filiais vinculadas ao registro, altera também o `active` **global**
-  do registro; se não cobre, o `active` global não é tocado e as demais filiais seguem como estavam;
-- reativar sem cobertura total reativa só os vínculos do ator; se o registro estiver inativo
-  globalmente, ele continua inativo para todos até um admin com cobertura total reativá-lo;
-- quando algo muda, exige `If-Match` e incrementa a `version` uma vez; quando nada muda, responde `200`
-  sem exigir versão atual nem alterá-la;
+`POST /v1/{customers|sellers}/{id}/deactivate|reactivate` (escopo vínculo):
+
+- age **sempre e só nos vínculos das filiais do token** que o registro tem no escopo, por vínculo e
+  de forma idempotente; o `active` global **nunca** muda aqui, mesmo que o admin cubra todas as
+  filiais do registro;
+- quando algo muda, exige `If-Match` (`428`/`409`) e incrementa a `version` uma vez; quando nada muda,
+  responde `200` sem exigir versão atual nem alterá-la;
 - fora do escopo: `404`, sem mudar a versão.
+
+`POST /v1/{customers|sellers}/{id}/deactivate-global|reactivate-global` (escopo registro):
+
+- mudam o `active` **global** do registro e não mexem nos vínculos;
+- exigem admin com **todas** as filiais vinculadas ao registro no token; caso contrário `403 forbidden`
+  (sem alterar a versão). Registro fora do escopo continua `404`;
+- `If-Match` obrigatório quando algo muda (`428`/`409`); idempotente quando já está no estado pedido;
+  incrementa a `version` uma vez;
+- registro inativo globalmente some de `active=true` para todas as filiais; reativar vínculos não o
+  reativa, só `reactivate-global`.
+
+Filiais e catálogos (sem vínculo) seguem com `deactivate`/`reactivate` globais e não têm rotas `-global`.
 
 O `active` da resposta e o filtro `active` da listagem refletem a visão do ator: **ativo = registro
 global ativo E ao menos um vínculo ativo dentro do escopo dele**. Inativar um vínculo não esconde o
@@ -109,14 +121,14 @@ Atualizar é uma nova migration gerada por `apps/api/scripts/build-ibge-seed.ts`
 Formato `{ "error": "<codigo>", "message"?: "..." }`. O `message` só existe em `validation_error`, com
 texto fixo do domínio. **Nenhuma resposta de erro ecoa o valor enviado** (LGPD).
 
-| Status | `error` |
-|---|---|
-| 400 | `validation_error` |
-| 401 | token ausente ou inválido |
-| 403 | `forbidden` |
-| 404 | `not_found` |
-| 409 | `conflict`, `customer_exists`, `seller_exists`, `version_conflict` |
-| 428 | `precondition_required` |
+| Status | `error`                                                            |
+| ------ | ------------------------------------------------------------------ |
+| 400    | `validation_error`                                                 |
+| 401    | token ausente ou inválido                                          |
+| 403    | `forbidden`                                                        |
+| 404    | `not_found`                                                        |
+| 409    | `conflict`, `customer_exists`, `seller_exists`, `version_conflict` |
+| 428    | `precondition_required`                                            |
 
 ## Contrato OpenAPI
 

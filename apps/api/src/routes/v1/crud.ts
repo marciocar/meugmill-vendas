@@ -1,7 +1,8 @@
 import { Type, type TSchema } from '@sinclair/typebox';
 import type { FastifyInstance } from 'fastify';
 import { ListQuerySchema, PageSchema, type ListParams } from '../../domain/shared/pagination.js';
-import type { CrudService } from '../../domain/shared/service.js';
+import type { Actor } from '../../domain/shared/authz.js';
+import type { CrudService, SharedActiveService } from '../../domain/shared/service.js';
 import {
   actorOf,
   ERROR_RESPONSES,
@@ -20,6 +21,8 @@ export interface CrudRoutesOptions<R extends { version: number }, C, U> {
   createSchema: TSchema;
   updateSchema: TSchema;
   tag: string;
+  /** Cadastros compartilhados: habilita `deactivate-global`/`reactivate-global`. */
+  sharedActive?: SharedActiveService<R>;
 }
 
 /** Rotas CRUD comuns (lista, detalhe, criar, alterar, inativar, reativar) de um `CrudService`. */
@@ -124,9 +127,20 @@ export function registerCrudRoutes<R extends { version: number }, C, U>(
     },
   );
 
-  for (const action of ['deactivate', 'reactivate'] as const) {
+  const transitions: { path: string; run: (actor: Actor, id: number, v: number | undefined) => R }[] = [
+    { path: 'deactivate', run: (a, id, v) => service.deactivate(a, id, v) },
+    { path: 'reactivate', run: (a, id, v) => service.reactivate(a, id, v) },
+  ];
+  if (o.sharedActive) {
+    const shared = o.sharedActive;
+    transitions.push(
+      { path: 'deactivate-global', run: (a, id, v) => shared.deactivateGlobal(a, id, v) },
+      { path: 'reactivate-global', run: (a, id, v) => shared.reactivateGlobal(a, id, v) },
+    );
+  }
+  for (const { path, run } of transitions) {
     app.post(
-      `${prefix}/:id/${action}`,
+      `${prefix}/:id/${path}`,
       {
         onRequest,
         schema: {
@@ -139,7 +153,7 @@ export function registerCrudRoutes<R extends { version: number }, C, U>(
       async (request, reply) => {
         try {
           const { id } = request.params as { id: number };
-          const row = service[action](actorOf(request), id, parseIfMatch(request.headers['if-match']));
+          const row = run(actorOf(request), id, parseIfMatch(request.headers['if-match']));
           setEtag(reply, row.version);
           return row;
         } catch (err) {

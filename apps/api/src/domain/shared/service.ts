@@ -13,3 +13,13 @@ export interface CrudService<Response, Create, Update> {
   deactivate(actor: Actor, id: number, expectedVersion: number | undefined): Response;
   reactivate(actor: Actor, id: number, expectedVersion: number | undefined): Response;
 }
+
+/**
+ * Cadastros compartilhados entre filiais (cliente, vendedor). `deactivate`/`reactivate` do
+ * `CrudService` agem só nos vínculos das filiais do token; estas mudam o `active` GLOBAL
+ * (exigem admin com todas as filiais vinculadas ao registro).
+ */
+export interface SharedActiveService<Response> {
+  deactivateGlobal(actor: Actor, id: number, expectedVersion: number | undefined): Response;
+  reactivateGlobal(actor: Actor, id: number, expectedVersion: number | undefined): Response;
+}

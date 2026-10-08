@@ -5,7 +5,8 @@ import { assertAllInScope, intersects, requireAdmin, resolveScopeIds, type Actor
 import { isUniqueViolation, writeTx, type Conn, type Db, type ServiceOptions } from '../shared/db.js';
 import { DomainError, forbidden, notFound } from '../shared/errors.js';
 import {
-  applyActiveTransition,
+  applyGlobalActiveTransition,
+  applyLinkActiveTransition,
   assertBranchesActive,
   coversAllBranches,
   effectiveState,
@@ -23,7 +24,7 @@ import {
   type ListParams,
   type Page,
 } from '../shared/pagination.js';
-import type { CrudService } from '../shared/service.js';
+import type { CrudService, SharedActiveService } from '../shared/service.js';
 import { keyContains, likeContains } from '../shared/sql.js';
 import { cleanCode, cleanText, parseInput } from '../shared/validate.js';
 import {
@@ -36,7 +37,10 @@ import {
 
 type SellerRow = typeof sellers.$inferSelect;
 
-export interface SellerService extends CrudService<SellerResponse, CreateSellerInput, UpdateSellerInput> {
+export interface SellerService
+  extends
+    CrudService<SellerResponse, CreateSellerInput, UpdateSellerInput>,
+    SharedActiveService<SellerResponse> {
   /**
    * Liga um vendedor já existente (por código) a uma filial do ator. Admin; filial no token;
    * idempotente. Devolve SÓ `{ id, version }`: nenhum dado do vendedor sai por aqui.
@@ -84,14 +88,20 @@ export function createSellerService(db: Db, opts: ServiceOptions = {}): SellerSe
     return row;
   };
 
-  function transition(actor: Actor, id: number, expected: number | undefined, active: boolean) {
+  function transition(
+    actor: Actor,
+    id: number,
+    expected: number | undefined,
+    active: boolean,
+    scope: 'link' | 'global',
+  ) {
     requireAdmin(actor);
     const version = requireVersion(expected);
     return writeTx(db, (tx) => {
       const scopeIds = resolveScopeIds(tx, actor);
       const row = findVisible(tx, id, scopeIds);
-      // Semântica (vínculo x global) documentada em `applyActiveTransition`.
-      applyActiveTransition({
+      // Semântica documentada em `applyLinkActiveTransition` / `applyGlobalActiveTransition`.
+      (scope === 'link' ? applyLinkActiveTransition : applyGlobalActiveTransition)({
         conn: tx,
         repo: sellerLinks,
         table: sellers as unknown as AuditedTable,
@@ -213,8 +223,10 @@ export function createSellerService(db: Db, opts: ServiceOptions = {}): SellerSe
       });
     },
 
-    deactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, false),
-    reactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, true),
+    deactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, false, 'link'),
+    reactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, true, 'link'),
+    deactivateGlobal: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, false, 'global'),
+    reactivateGlobal: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, true, 'global'),
 
     linkSellerToBranchByCode(actor, rawCode, branchId) {
       requireAdmin(actor);

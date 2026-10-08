@@ -28,6 +28,7 @@ export function registerSellerRoutes(
     createSchema: CreateSellerSchema,
     updateSchema: UpdateSellerSchema,
     tag: 'sellers',
+    sharedActive: service,
   });
 
   // Liga um vendedor já cadastrado (em outra filial) à filial do admin. Idempotente. Responde SÓ

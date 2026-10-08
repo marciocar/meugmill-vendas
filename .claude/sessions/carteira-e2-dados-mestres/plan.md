@@ -50,5 +50,5 @@
 ## Fechamento do E2 [DONE]
 
 - Revisão: 1 alto (cliente/vendedor compartilhado) decidido pelo maestro e curado; 2 médios e 6 baixos curados. Resíduo em `docs/evolution/review/feature-carteira-e2-dados-mestres.md`.
-- Em aberto, a critério do maestro: rota explícita `deactivate-global` em vez da escalada implícita.
+- Rota explícita `deactivate-global` adotada (maestro, 2026-10-08): `deactivate` age só nos vínculos; o global exige todas as filiais.
 - Pendências fora do E2: confirmar com a GMill que `branch_ids` do token são códigos de filial; validar respostas contra o OpenAPI (Ajv) no E3+.

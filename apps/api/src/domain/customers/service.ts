@@ -6,7 +6,8 @@ import { isUniqueViolation, writeTx, type Conn, type Db, type ServiceOptions } f
 import { DomainError, forbidden, invalid, notFound } from '../shared/errors.js';
 import { findMunicipality } from '../geo/repository.js';
 import {
-  applyActiveTransition,
+  applyGlobalActiveTransition,
+  applyLinkActiveTransition,
   assertBranchesActive,
   coversAllBranches,
   customerLinks,
@@ -25,7 +26,7 @@ import {
   type ListParams,
   type Page,
 } from '../shared/pagination.js';
-import type { CrudService } from '../shared/service.js';
+import type { CrudService, SharedActiveService } from '../shared/service.js';
 import { keyContains, likeContains } from '../shared/sql.js';
 import { cleanOptionalText, cleanText, parseInput } from '../shared/validate.js';
 import {
@@ -38,11 +39,10 @@ import {
 
 type CustomerRow = typeof customers.$inferSelect;
 
-export interface CustomerService extends CrudService<
-  CustomerResponse,
-  CreateCustomerInput,
-  UpdateCustomerInput
-> {
+export interface CustomerService
+  extends
+    CrudService<CustomerResponse, CreateCustomerInput, UpdateCustomerInput>,
+    SharedActiveService<CustomerResponse> {
   /**
    * Liga um cliente já existente (por CNPJ) a uma filial do ator. Admin; filial no token;
    * idempotente (já ligado não incrementa a versão). Devolve SÓ `{ id, version }`: nenhum dado do
@@ -128,14 +128,20 @@ export function createCustomerService(db: Db, opts: ServiceOptions = {}): Custom
     return row;
   };
 
-  function transition(actor: Actor, id: number, expected: number | undefined, active: boolean) {
+  function transition(
+    actor: Actor,
+    id: number,
+    expected: number | undefined,
+    active: boolean,
+    scope: 'link' | 'global',
+  ) {
     requireAdmin(actor);
     const version = requireVersion(expected);
     return writeTx(db, (tx) => {
       const scopeIds = resolveScopeIds(tx, actor);
       const row = findVisible(tx, id, scopeIds);
-      // Semântica (vínculo x global) documentada em `applyActiveTransition`.
-      applyActiveTransition({
+      // Semântica documentada em `applyLinkActiveTransition` / `applyGlobalActiveTransition`.
+      (scope === 'link' ? applyLinkActiveTransition : applyGlobalActiveTransition)({
         conn: tx,
         repo: customerLinks,
         table: customers as unknown as AuditedTable,
@@ -309,8 +315,10 @@ export function createCustomerService(db: Db, opts: ServiceOptions = {}): Custom
       });
     },
 
-    deactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, false),
-    reactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, true),
+    deactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, false, 'link'),
+    reactivate: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, true, 'link'),
+    deactivateGlobal: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, false, 'global'),
+    reactivateGlobal: (actor, id, expectedVersion) => transition(actor, id, expectedVersion, true, 'global'),
 
     linkCustomerToBranchByCnpj(actor, rawCnpj, branchId) {
       requireAdmin(actor);

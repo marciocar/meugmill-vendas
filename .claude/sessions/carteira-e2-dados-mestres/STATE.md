@@ -23,7 +23,7 @@ phase: done
 phase_title: E2 concluído — aguardando decisão de push/PR
 status: done
 next_action: "Com o ok do maestro: push da feature/carteira-e2-dados-mestres e PR via /engineer:pr"
-blocked_by: decisão do maestro (push/PR; rota deactivate-global opcional)
+blocked_by: merge do PR (decisão do maestro)
 files_in_flight: []
 validate_with: "pnpm test && bash scripts/smoke.sh"
 last_checkpoint: 2026-10-08T03:30Z

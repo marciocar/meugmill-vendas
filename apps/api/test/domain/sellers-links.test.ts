@@ -77,14 +77,40 @@ describe('vendedores: link por código e ativo por vínculo', () => {
     expect(svc.update(adminBoth, s.id, 3, { name: 'Outro' })).toMatchObject({ name: 'Outro', version: 4 });
   });
 
-  it('admin com todas as filiais inativa vínculos e registro global', () => {
+  it('admin com todas as filiais: deactivate/reactivate mexem só nos vínculos; global segue ativo', () => {
     const s = svc.create(adminBoth, { code: 'V1', name: 'X', branchIds: [ser, car] });
     expect(svc.deactivate(adminBoth, s.id, 1)).toMatchObject({ active: false, version: 2 });
-    expect(globalRow(s.id).active).toBe(0);
+    expect(globalRow(s.id).active).toBe(1);
     expect(linkRows(s.id).every((l) => l.active === 0)).toBe(true);
-    expect(svc.get(adminSer, s.id).active).toBe(false);
     expect(svc.reactivate(adminBoth, s.id, 2)).toMatchObject({ active: true, version: 3 });
     expect(globalRow(s.id).active).toBe(1);
+  });
+
+  it('deactivate-global/reactivate-global: cobertura total, idempotência, 403, 428, 409, 404', () => {
+    const s = svc.create(adminBoth, { code: 'V1', name: 'X', branchIds: [ser, car] });
+    expect(codeOf(() => svc.deactivateGlobal(adminSer, s.id, 1))).toBe('forbidden');
+    expect(globalRow(s.id)).toEqual({ active: 1, version: 1 });
+    expect(codeOf(() => svc.deactivateGlobal(adminBoth, s.id, undefined))).toBe('precondition_required');
+
+    const off = svc.deactivateGlobal(adminBoth, s.id, 1);
+    expect(off).toMatchObject({ active: false, version: 2 });
+    expect(globalRow(s.id)).toEqual({ active: 0, version: 2 });
+    expect(linkRows(s.id).every((l) => l.active === 1)).toBe(true);
+    for (const who of [adminSer, adminCar, adminBoth]) {
+      expect(svc.list(who, { active: true }).items).toHaveLength(0);
+    }
+    expect(svc.deactivateGlobal(adminBoth, s.id, 1)).toMatchObject({ version: 2 }); // idempotente
+
+    expect(codeOf(() => svc.reactivateGlobal(adminSer, s.id, 2))).toBe('forbidden');
+    expect(codeOf(() => svc.reactivateGlobal(adminBoth, s.id, undefined))).toBe('precondition_required');
+    expect(codeOf(() => svc.reactivateGlobal(adminBoth, s.id, 1))).toBe('version_conflict');
+    expect(svc.reactivateGlobal(adminBoth, s.id, 2)).toMatchObject({ active: true, version: 3 });
+    expect(svc.list(adminSer, { active: true }).items).toHaveLength(1);
+
+    const other = svc.create(adminCar, { code: 'V2', name: 'Y', branchIds: [car] });
+    expect(codeOf(() => svc.deactivateGlobal(adminSer, other.id, 1))).toBe('not_found');
+    expect(codeOf(() => svc.reactivateGlobal(adminSer, other.id, 1))).toBe('not_found');
+    expect(globalRow(other.id)).toEqual({ active: 1, version: 1 });
   });
 
   it('fora do escopo: 404 sem mudar a versão; repetir por vínculo é idempotente', () => {

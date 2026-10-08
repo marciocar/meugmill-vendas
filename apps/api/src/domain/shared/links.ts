@@ -3,9 +3,9 @@ import { sql, type AnyColumn, type SQL } from 'drizzle-orm';
 import { assertVersion, writeVersionBump, type AuditedTable } from './audit.js';
 import { assertAllInScope } from './authz.js';
 import type { Conn } from './db.js';
-import { invalid } from './errors.js';
+import { forbidden, invalid } from './errors.js';
 
-/** Filial do vínculo. `active` é o estado do VÍNCULO (não o da filial): ver `applyActiveTransition`. */
+/** Filial do vínculo. `active` é o estado do VÍNCULO (não o da filial): ver `applyLinkActiveTransition`. */
 export const BranchRefSchema = Type.Object({
   id: Type.Integer(),
   code: Type.String(),
@@ -176,19 +176,15 @@ export function coversAllBranches(linkedBranchIds: number[], scopeIds: number[])
 }
 
 /**
- * Inativar/reativar um cadastro compartilhado entre filiais (cliente, vendedor).
+ * Inativar/reativar um cadastro compartilhado entre filiais (cliente, vendedor): escopo VÍNCULO.
  *
- * SEMÂNTICA (decisão do maestro): a rota é uma só e age conforme a cobertura do ator.
- *  - Sempre muda os VÍNCULOS das filiais do token do admin (dentro do registro), por vínculo e
- *    de forma idempotente.
- *  - Se o ator cobre TODAS as filiais vinculadas ao registro, muda também o `active` GLOBAL do
- *    registro. Se não cobre, o `active` global não é tocado: as outras filiais seguem como estavam.
- *  - Reativar sem cobertura total reativa só os vínculos do ator; se o registro estiver inativo
- *    globalmente, ele continua inativo para todos até alguém com cobertura total reativá-lo.
- *  - Algo mudou -> confere o If-Match e incrementa a versão uma vez. Nada mudou -> no-op sem
- *    exigir versão (idempotente).
+ * SEMÂNTICA: age SEMPRE e SÓ nos vínculos das filiais do token que o registro tem no escopo,
+ * por vínculo e de forma idempotente. O `active` global NUNCA muda aqui, mesmo que o ator cubra
+ * todas as filiais do registro (para isso existe `applyGlobalActiveTransition`).
+ * Algo mudou -> confere o If-Match e incrementa a versão uma vez. Nada mudou -> no-op sem exigir
+ * versão (idempotente).
  */
-export function applyActiveTransition(args: {
+export function applyLinkActiveTransition(args: {
   conn: Conn;
   repo: LinkRepo;
   table: AuditedTable;
@@ -200,19 +196,41 @@ export function applyActiveTransition(args: {
   at: number;
 }): void {
   const { conn, repo, table, row, scopeIds, active } = args;
-  const all = repo.links(conn, row.id);
   const scope = new Set(scopeIds);
-  const toChange = all.filter((l) => scope.has(l.branchId) && l.active !== active).map((l) => l.branchId);
-  const globalChange = coversAllBranches(
-    all.map((l) => l.branchId),
-    scopeIds,
-  )
-    ? row.active !== active
-    : false;
-  if (toChange.length === 0 && !globalChange) return;
+  const toChange = repo
+    .links(conn, row.id)
+    .filter((l) => scope.has(l.branchId) && l.active !== active)
+    .map((l) => l.branchId);
+  if (toChange.length === 0) return;
   assertVersion(row.version, args.expectedVersion);
   repo.setActive(conn, row.id, toChange, active, args.sub, args.at);
-  writeVersionBump(conn, table, row.id, args.sub, args.at, globalChange ? { active } : undefined);
+  writeVersionBump(conn, table, row.id, args.sub, args.at);
+}
+
+/**
+ * Inativar/reativar o registro GLOBAL (`active` do cadastro), sem tocar nos vínculos.
+ * Exige que o ator cubra TODAS as filiais vinculadas ao registro (senão 403 `forbidden`, sem
+ * alterar nada). Já no estado pedido -> no-op idempotente; senão confere o If-Match e
+ * incrementa a versão uma vez.
+ */
+export function applyGlobalActiveTransition(args: {
+  conn: Conn;
+  repo: LinkRepo;
+  table: AuditedTable;
+  row: { id: number; active: boolean; version: number };
+  scopeIds: number[];
+  active: boolean;
+  expectedVersion: number;
+  sub: string;
+  at: number;
+}): void {
+  const { conn, repo, table, row, scopeIds, active } = args;
+  if (!coversAllBranches(repo.branchIdsOf(conn, row.id), scopeIds)) {
+    throw forbidden('Alterar o estado global exige todas as filiais do cadastro no token');
+  }
+  if (row.active === active) return;
+  assertVersion(row.version, args.expectedVersion);
+  writeVersionBump(conn, table, row.id, args.sub, args.at, { active });
 }
 
 export interface LinkPlan {
