@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>API da Carteira de Clientes</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #faf7f2;
+        color: #1c1612;
+      }
+      .bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        padding: 12px 16px;
+        background: #1c1612;
+        color: #f4f1ec;
+      }
+      .bar a {
+        color: #ea580c;
+      }
+      .bar select,
+      .bar button {
+        font: inherit;
+        padding: 4px 10px;
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="bar">
+      <strong>🧅 Carteira de Clientes · Referência da API</strong>
+      <a href="./">Documentação</a>
+      <a href="./manual.html">Manual de uso</a>
+      <label>
+        Testar como:
+        <select id="profile">
+          <option value="">sem token (só leitura da referência)</option>
+          <option value="demo-admin">admin (demo-admin)</option>
+          <option value="demo-gestor">gestor (demo-gestor)</option>
+          <option value="demo-vendedor">vendedor (demo-vend)</option>
+          <option value="demo-supervisao">supervisão (demo-sup)</option>
+        </select>
+      </label>
+      <button id="apply" type="button">Aplicar</button>
+      <span id="status"></span>
+    </div>
+    <div id="app"></div>
+    <!-- Scalar API Reference (MIT), versão fixada. Lê o OpenAPI que a própria API gera. -->
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.69.2"></script>
+    <script type="module">
+      // O token de TESTE fica só na memória desta página (nunca em storage nem na URL).
+      const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
+      const IDP_TOKEN_URL = LOCAL ? 'http://localhost:39080/default/token' : '/default/token';
+      const status = document.getElementById('status');
+      let reference = null;
+
+      function render(token) {
+        if (reference && typeof reference.destroy === 'function') reference.destroy();
+        document.getElementById('app').replaceChildren();
+        reference = Scalar.createApiReference('#app', {
+          url: '/api/v1/openapi.json',
+          // As chamadas de teste passam pelo proxy /api desta mesma origem.
+          servers: [{ url: `${location.origin}/api`, description: 'Esta demonstração' }],
+          ...(token
+            ? {
+                authentication: {
+                  preferredSecurityScheme: 'bearerAuth',
+                  securitySchemes: { bearerAuth: { token } },
+                },
+              }
+            : {}),
+          // Página para cliente: sem os botões de produto do próprio Scalar (IA, deploy, ferramentas de dev).
+          showDeveloperTools: 'never',
+          agent: { disabled: true },
+          hideDownloadButton: false,
+          defaultHttpClient: { targetKey: 'shell', clientKey: 'curl' },
+          metaData: { title: 'API da Carteira de Clientes' },
+        });
+      }
+
+      document.getElementById('apply').addEventListener('click', async () => {
+        const clientId = document.getElementById('profile').value;
+        if (!clientId) {
+          render(null);
+          status.textContent = 'sem token';
+          return;
+        }
+        try {
+          const res = await fetch(IDP_TOKEN_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              grant_type: 'client_credentials',
+              client_id: clientId,
+              client_secret: 'demo',
+              scope: 'openid',
+            }),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          render((await res.json()).access_token);
+          status.textContent = `token de teste de ${clientId} aplicado (vale 1 hora)`;
+        } catch (err) {
+          status.textContent = `falha ao obter token de teste: ${err.message}`;
+        }
+      });
+
+      render(null);
+    </script>
+  </body>
+</html>

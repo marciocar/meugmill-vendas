@@ -393,3 +393,11 @@ textarea:disabled {
 progress {
   width: 100%;
 }
+
+code {
+  font-family: 'SFMono-Regular', 'Fira Code', 'Courier New', monospace;
+  font-size: 0.9em;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: #f0f2f4;
+}

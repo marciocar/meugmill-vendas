@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useApi } from '../api/client';
 import { describeError } from '../api/errors';
 import type { CsvLayout, ImportJob, LayoutId, Page } from '../api/types';
@@ -6,6 +6,11 @@ import { isAdmin } from '../roles';
 import { Field, LoadMore, Notice, formatDateTime, useAsync, usePaged, useTabShown } from '../ui';
 import type { Me } from '../use-me';
 import { ImportJobPanel, STATUS_TEXT } from './ImportJobPanel';
+
+/** Os textos do dicionário marcam valores entre crases (`S`, `;`): mostra como código, nunca como HTML. */
+export function withCode(text: string): ReactNode[] {
+  return text.split('`').map((part, i) => (i % 2 === 1 ? <code key={i}>{part}</code> : part));
+}
 
 /** Mesmo teto da API (16 MB): recusa antes de enviar. */
 export const MAX_FILE_BYTES = 16 * 1024 * 1024;
@@ -36,7 +41,7 @@ export function CsvView({ me }: { me: Me }) {
     <div>
       <h2>Importar e exportar</h2>
       <Notice kind="error">{catalog.error}</Notice>
-      {catalog.data && <p className="gc-muted">{catalog.data.format}</p>}
+      {catalog.data && <p className="gc-muted">{withCode(catalog.data.format)}</p>}
       <div className="gc-toolbar">
         <Field label="Layout">
           <select value={layoutId} onChange={(e) => setLayoutId(e.target.value as LayoutId)}>
@@ -66,7 +71,7 @@ function LayoutDictionary({ layout }: { layout: CsvLayout }) {
       <summary>
         Dicionário de dados — chave: {layout.key.join(' + ')} ({layout.columns.length} colunas)
       </summary>
-      <p>{layout.description}</p>
+      <p>{withCode(layout.description)}</p>
       <table className="gc-table">
         <thead>
           <tr>
@@ -85,7 +90,7 @@ function LayoutDictionary({ layout }: { layout: CsvLayout }) {
               </td>
               <td>{c.type}</td>
               <td>{c.readOnly ? 'só leitura' : c.required ? 'sim' : 'não'}</td>
-              <td>{c.description}</td>
+              <td>{withCode(c.description)}</td>
               <td>
                 <code>{c.example}</code>
               </td>

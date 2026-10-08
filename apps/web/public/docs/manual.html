@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Manual da Carteira</title>
+    <style>
+      :root {
+        --bg: #faf7f2;
+        --card: #ffffff;
+        --text: #1c1612;
+        --body: #3d3530;
+        --muted: #6b635b;
+        --orange: #c2410c;
+        --purple: #7c3aed;
+        --border: rgba(28, 22, 18, 0.12);
+        --code: rgba(194, 65, 12, 0.09);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) {
+          --bg: #1c1612;
+          --card: #261e19;
+          --text: #f4f1ec;
+          --body: #d2c6b7;
+          --muted: #a89b88;
+          --orange: #ea580c;
+          --purple: #c074ff;
+          --border: #3d3128;
+          --code: rgba(234, 88, 12, 0.18);
+        }
+      }
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.7;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: 260px minmax(0, 1fr);
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      nav {
+        position: sticky;
+        top: 0;
+        align-self: start;
+        max-height: 100vh;
+        overflow: auto;
+        padding: 32px 16px;
+        font-size: 0.92rem;
+      }
+      nav a {
+        display: block;
+        padding: 3px 0;
+        color: var(--body);
+        text-decoration: none;
+      }
+      nav a.h3 {
+        padding-left: 14px;
+        font-size: 0.86rem;
+        color: var(--muted);
+      }
+      nav a:hover {
+        color: var(--orange);
+      }
+      article {
+        padding: 32px 16px 96px;
+        min-width: 0;
+      }
+      article h1,
+      article h2 {
+        font-family: Georgia, serif;
+        font-weight: 600;
+      }
+      article h2 {
+        margin-top: 48px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+      }
+      article p,
+      article li {
+        color: var(--body);
+      }
+      article a {
+        color: var(--orange);
+      }
+      article img {
+        max-width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: #fff;
+      }
+      article code {
+        background: var(--code);
+        padding: 1px 5px;
+        border-radius: 5px;
+        font-size: 0.9em;
+      }
+      article table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      article th,
+      article td {
+        border-bottom: 1px solid var(--border);
+        padding: 6px 8px;
+        text-align: left;
+      }
+      article blockquote {
+        margin: 16px 0;
+        padding: 4px 16px;
+        border-left: 3px solid var(--purple);
+        color: var(--body);
+      }
+      @media (max-width: 800px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+        nav {
+          position: static;
+          max-height: none;
+          border-bottom: 1px solid var(--border);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <nav id="toc"><a href="./">← Documentação</a></nav>
+      <article id="content"><p>Carregando o manual…</p></article>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/marked@18.0.13/lib/marked.umd.js"></script>
+    <script>
+      // O manual é Markdown (manual.md, versionado no repositório) renderizado aqui; o índice sai dos títulos.
+      fetch('./manual.md')
+        .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))))
+        .then((md) => {
+          const content = document.getElementById('content');
+          content.innerHTML = marked.parse(md);
+          const toc = document.getElementById('toc');
+          content.querySelectorAll('h2, h3').forEach((h, i) => {
+            h.id = h.id || `s${i}`;
+            const a = document.createElement('a');
+            a.href = `#${h.id}`;
+            a.textContent = h.textContent;
+            if (h.tagName === 'H3') a.className = 'h3';
+            toc.append(a);
+          });
+          if (location.hash) document.querySelector(location.hash)?.scrollIntoView();
+        })
+        .catch((err) => {
+          document.getElementById('content').textContent =
+            `Não foi possível carregar o manual (${err.message}).`;
+        });
+    </script>
+  </body>
+</html>

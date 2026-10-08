@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Documentação da Carteira</title>
+    <style>
+      :root {
+        --bg: #faf7f2;
+        --card: #ffffff;
+        --text: #1c1612;
+        --body: #3d3530;
+        --muted: #6b635b;
+        --orange: #c2410c;
+        --purple: #7c3aed;
+        --border: rgba(28, 22, 18, 0.09);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) {
+          --bg: #1c1612;
+          --card: #261e19;
+          --text: #f4f1ec;
+          --body: #d2c6b7;
+          --muted: #a89b88;
+          --orange: #ea580c;
+          --purple: #c074ff;
+          --border: #3d3128;
+        }
+      }
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+      }
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 48px 16px;
+      }
+      .kick {
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--orange);
+      }
+      h1 {
+        font-family: Georgia, serif;
+        font-weight: 600;
+        font-size: 2.4rem;
+        margin: 8px 0 12px;
+      }
+      p {
+        color: var(--body);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 16px;
+        margin-top: 32px;
+      }
+      a.card {
+        display: block;
+        padding: 24px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-top: 4px solid var(--orange);
+        border-radius: 14px;
+        color: inherit;
+        text-decoration: none;
+      }
+      a.card:hover {
+        border-color: var(--orange);
+      }
+      a.card h2 {
+        margin: 0 0 6px;
+        font-size: 1.25rem;
+      }
+      a.card p {
+        margin: 0;
+      }
+      .tag {
+        font-family: ui-monospace, monospace;
+        font-size: 0.8rem;
+        color: var(--purple);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="kick">🧅 MeuGmill Vendas · Carteira de Clientes</div>
+      <h1>Documentação</h1>
+      <p>
+        A carteira organiza quem atende cada farmácia, filial por filial: carteiras por região, rede e grupo,
+        disputa entre carteiras, distribuição entre vendedores e visibilidade por perfil.
+      </p>
+      <div class="grid">
+        <a class="card" href="./manual.html">
+          <div class="tag">PARA QUEM USA</div>
+          <h2>Manual de uso</h2>
+          <p>As telas passo a passo: carteiras, o wizard de 5 etapas, planilhas e "Meus clientes".</p>
+        </a>
+        <a class="card" href="./api.html">
+          <div class="tag">PARA QUEM INTEGRA</div>
+          <h2>Referência da API</h2>
+          <p>84 operações em 9 grupos, geradas do código. Teste as chamadas com um token de demonstração.</p>
+        </a>
+        <a class="card" href="/demo/index.html">
+          <div class="tag">AO VIVO</div>
+          <h2>Demonstração</h2>
+          <p>O componente rodando, com a filial fictícia DEMO-ES e um login por perfil.</p>
+        </a>
+      </div>
+    </main>
+  </body>
+</html>

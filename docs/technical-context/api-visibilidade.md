@@ -136,6 +136,11 @@ subir: recrie o `idp` depois de mudar `docker/idp-config.json`. O `scripts/smoke
 vendedor (limpando o de execuções anteriores), confere `me/customers` e `check` com o token dele, e a
 supervisão com `403` em escrita.
 
+Para a demonstração há também `demo-admin`, `demo-gestor`, `demo-vendedor` (sub `demo-vend`) e
+`demo-supervisao` (sub `demo-sup`), todos só com a filial `DEMO-ES`, que o `scripts/demo/seed.mjs` popula pela
+importação CSV (ver [`docs/demo/roteiro-gmill.md`](../demo/roteiro-gmill.md)). Os mapeamentos `demo-*` vêm
+antes do coringa, que continua por último.
+
 ## Fica para os próximos épicos
 
 Tela (E9) e arquivo (E10).

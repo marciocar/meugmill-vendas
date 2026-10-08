@@ -11,6 +11,8 @@ coverage/
 *.tsbuildinfo
 # SQLite local (o volume de produção fica fora do repo)
 data/
+# Os CSVs fictícios da demo da GMill são versionados (scripts/demo/generate-data.py os gera).
+!scripts/demo/data/
 # ...exceto o snapshot versionado do IBGE, que é seed, não banco
 !apps/api/drizzle/data/
 *.sqlite
