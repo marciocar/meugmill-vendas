@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { branchRoutes } from './branches.js';
 import { catalogRoutes } from './catalog.js';
 import { customerRoutes } from './customers.js';
+import { distributionRoutes } from './distribution.js';
 import { eligibilityRoutes } from './eligibility.js';
 import { geoRoutes } from './geo.js';
 import { portfolioRoutes } from './portfolios.js';
@@ -21,4 +22,5 @@ export async function v1Routes(app: FastifyInstance): Promise<void> {
   await app.register(portfolioTypeRoutes);
   await app.register(portfolioRoutes);
   await app.register(eligibilityRoutes);
+  await app.register(distributionRoutes);
 }

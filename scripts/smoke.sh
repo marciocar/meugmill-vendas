@@ -399,4 +399,80 @@ deactivate_portfolio "$pf_hood" "$hood_version"
 deactivate_portfolio "$pf_city" "$city_version"
 ok "carteiras do teste de conflito inativadas ao final"
 
+# Distribuição dos clientes entre vendedores (E6). Bairro ÚNICO por execução (RJ), dois vendedores no
+# mesmo subgrupo e 5 clientes: a divisão automática tem de ficar equilibrada (diferença <= 1).
+dist_hood="Bairro Distribuicao ${epoch}"
+code=$(json_post /v1/sellers "{\"code\":\"SMK-V2-${epoch}\",\"name\":\"Vendedor de fumaça 2\",\"branchIds\":[${branch_id}]}")
+[ "$code" = "201" ] || fail "POST /v1/sellers (2º vendedor) esperado 201, recebido ${code}: $(cat "$body")"
+seller2_id=$(json_get 'j.id')
+[ -n "$seller2_id" ] || fail "resposta do POST do 2º vendedor sem id"
+dist_total=5
+for n in 4 5 6 7 8; do
+  cnpj_d=$(make_cnpj "$epoch" "$n")
+  [ "${#cnpj_d}" = "14" ] || fail "geração de CNPJ do cliente ${n} falhou (${cnpj_d})"
+  code=$(json_post /v1/customers \
+    "{\"cnpj\":\"${cnpj_d}\",\"legalName\":\"Cliente Distribuicao ${n} ${epoch}\",\"municipalityCode\":3304557,\"neighborhood\":\"${dist_hood}\",\"branchIds\":[${branch_id}]}")
+  [ "$code" = "201" ] || fail "POST /v1/customers (distribuição ${n}) esperado 201, recebido ${code}: $(cat "$body")"
+done
+code=$(json_post /v1/portfolios \
+  "{\"name\":\"Distribuicao ${epoch}\",\"branchId\":${branch_id},\"responsibleSub\":\"admin-01\",\"portfolioTypeId\":${type_id}}")
+[ "$code" = "201" ] || fail "POST /v1/portfolios (distribuição) esperado 201, recebido ${code}: $(cat "$body")"
+pf_dist=$(json_get 'j.id')
+code=$(json_put "/v1/portfolios/${pf_dist}/filters" 1 \
+  "{\"regions\":[{\"level\":\"neighborhood\",\"stateCode\":33,\"municipalityCode\":3304557,\"neighborhoodLabel\":\"${dist_hood}\"}],\"retailNetworkIds\":[],\"economicGroupIds\":[]}")
+[ "$code" = "200" ] || fail "PUT /filters (distribuição) esperado 200, recebido ${code}: $(cat "$body")"
+code=$(json_put "/v1/portfolios/${pf_dist}/sellers" 2 \
+  "{\"assignments\":[{\"sellerId\":${seller_id},\"productSubgroupId\":${pf_subgroup_id}},{\"sellerId\":${seller2_id},\"productSubgroupId\":${pf_subgroup_id}}]}")
+[ "$code" = "200" ] || fail "PUT /sellers (distribuição) esperado 200, recebido ${code}: $(cat "$body")"
+dist_version=$(tr -d '\r' < "$hdrs" | sed -n 's/^[Ee][Tt][Aa][Gg]:[[:space:]]*"\([0-9]*\)".*/\1/p' | head -n1)
+[ -n "$dist_version" ] || fail "carteira de distribuição sem ETag: $(cat "$hdrs")"
+ok "carteira de distribuição (${pf_dist}) criada: 2 vendedores no mesmo subgrupo e ${dist_total} clientes no bairro único"
+
+code=$(curl -s -o "$body" -w '%{http_code}' -X POST "${API_URL}/v1/portfolios/${pf_dist}/distribute" \
+  -H "$auth_admin" -H 'Content-Type: application/json' -d '{}' || true)
+[ "$code" = "428" ] || fail "POST /distribute sem If-Match esperado 428, recebido ${code}: $(cat "$body")"
+ok "POST /distribute sem If-Match -> 428"
+
+code=$(curl -s -D "$hdrs" -o "$body" -w '%{http_code}' -X POST "${API_URL}/v1/portfolios/${pf_dist}/distribute" \
+  -H "$auth_admin" -H 'Content-Type: application/json' -H "If-Match: \"${dist_version}\"" -d '{}' || true)
+[ "$code" = "200" ] || fail "POST /distribute esperado 200, recebido ${code}: $(cat "$body")"
+[ "$(json_get "Object.values(j.distributed).reduce((a,b)=>a+b,0)")" = "${dist_total}" ] \
+  || fail "distribute esperava ${dist_total} atribuições gravadas: $(cat "$body")"
+dist_version=$(tr -d '\r' < "$hdrs" | sed -n 's/^[Ee][Tt][Aa][Gg]:[[:space:]]*"\([0-9]*\)".*/\1/p' | head -n1)
+[ -n "$dist_version" ] || fail "POST /distribute sem ETag: $(cat "$hdrs")"
+ok "POST /v1/portfolios/{id}/distribute -> 200 (${dist_total} atribuições)"
+
+code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/portfolios/${pf_dist}/assignments/summary" || true)
+[ "$code" = "200" ] || fail "GET /assignments/summary esperado 200, recebido ${code}: $(cat "$body")"
+[ "$(json_get 'j.totals.unassigned')" = "0" ] || fail "summary esperava unassigned 0: $(cat "$body")"
+[ "$(json_get 'j.totals.assigned')" = "${dist_total}" ] || fail "summary esperava assigned ${dist_total}: $(cat "$body")"
+[ "$(json_get 'j.subgroups[0].sellers.length')" = "2" ] || fail "summary esperava 2 vendedores: $(cat "$body")"
+[ "$(json_get 'Math.abs(j.subgroups[0].sellers[0].count - j.subgroups[0].sellers[1].count) <= 1')" = "true" ] \
+  || fail "distribuição desequilibrada (diferença > 1): $(cat "$body")"
+ok "GET /assignments/summary -> 2 vendedores equilibrados (diferença <= 1), unassigned 0"
+
+code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/portfolios/${pf_dist}/assignments?limit=1" || true)
+[ "$code" = "200" ] || fail "GET /assignments esperado 200, recebido ${code}: $(cat "$body")"
+swap_customer=$(json_get 'j.items[0].customer.id')
+swap_from=$(json_get 'j.items[0].seller.id')
+[ -n "$swap_customer" ] && [ -n "$swap_from" ] || fail "GET /assignments sem item atribuído: $(cat "$body")"
+if [ "$swap_from" = "$seller_id" ]; then swap_to=$seller2_id; else swap_to=$seller_id; fi
+code=$(json_put "/v1/portfolios/${pf_dist}/assignments" "$dist_version" \
+  "{\"set\":[{\"customerId\":${swap_customer},\"productSubgroupId\":${pf_subgroup_id},\"sellerId\":${swap_to}}]}")
+[ "$code" = "200" ] || fail "PUT /assignments esperado 200, recebido ${code}: $(cat "$body")"
+code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" \
+  "${API_URL}/v1/portfolios/${pf_dist}/assignments?sellerId=${swap_to}&limit=200" || true)
+[ "$(json_get "j.items.some(i=>i.customer.id===${swap_customer})")" = "true" ] \
+  || fail "cliente ${swap_customer} não aparece sob o vendedor ${swap_to} após o PUT: $(cat "$body")"
+ok "PUT /assignments -> 200 (cliente trocado de vendedor)"
+
+code=$(curl -s -o /dev/null -w '%{http_code}' -H "$auth_admin" "${WEB_URL}/api/v1/portfolios/${pf_dist}/assignments/summary" || true)
+[ "$code" = "200" ] || fail "GET ${WEB_URL}/api/v1/portfolios/{id}/assignments/summary (proxy) esperado 200, recebido ${code}"
+ok "proxy /api da demo -> /assignments/summary 200"
+
+code=$(curl -s -o "$body" -w '%{http_code}' -H "$auth_admin" "${API_URL}/v1/portfolios/${pf_dist}" || true)
+[ "$code" = "200" ] || fail "GET /v1/portfolios/${pf_dist} esperado 200, recebido ${code}"
+deactivate_portfolio "$pf_dist" "$(json_get 'j.version')"
+ok "carteira de distribuição inativada ao final"
+
 echo "Smoke concluído com sucesso."

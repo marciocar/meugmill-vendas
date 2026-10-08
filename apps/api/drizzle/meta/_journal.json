@@ -50,6 +50,20 @@
       "when": 1791435622262,
       "tag": "0006_e5_customers_state_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1791457051043,
+      "tag": "0007_e6_assignments",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1791458258564,
+      "tag": "0008_e6_assignments_fk_idx",
+      "breakpoints": true
     }
   ]
 }
