@@ -305,6 +305,39 @@ export const portfolioCustomerOverrides = sqliteTable(
   ],
 );
 
+// Atribuições do E6 (rascunho): vendedor de cada cliente em cada subgrupo da carteira. A PK garante
+// um único vendedor por (cliente, subgrupo). A validade é decidida na leitura (domain/distribution).
+export const portfolioAssignments = sqliteTable(
+  'portfolio_assignments',
+  {
+    portfolioId: integer('portfolio_id')
+      .notNull()
+      .references(() => portfolios.id, { onDelete: 'cascade' }),
+    customerId: integer('customer_id')
+      .notNull()
+      .references(() => customers.id),
+    productSubgroupId: integer('product_subgroup_id')
+      .notNull()
+      .references(() => productSubgroups.id),
+    sellerId: integer('seller_id')
+      .notNull()
+      .references(() => sellers.id),
+    createdAt: integer('created_at').notNull(),
+    createdBy: text('created_by').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    updatedBy: text('updated_by').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.portfolioId, t.customerId, t.productSubgroupId] }),
+    index('portfolio_assignments_portfolio_subgroup_seller_idx').on(
+      t.portfolioId,
+      t.productSubgroupId,
+      t.sellerId,
+    ),
+    index('portfolio_assignments_customer_id_idx').on(t.customerId),
+  ],
+);
+
 export type State = typeof states.$inferSelect;
 export type NewState = typeof states.$inferInsert;
 export type Municipality = typeof municipalities.$inferSelect;
@@ -339,3 +372,5 @@ export type PortfolioSeller = typeof portfolioSellers.$inferSelect;
 export type NewPortfolioSeller = typeof portfolioSellers.$inferInsert;
 export type PortfolioCustomerOverride = typeof portfolioCustomerOverrides.$inferSelect;
 export type NewPortfolioCustomerOverride = typeof portfolioCustomerOverrides.$inferInsert;
+export type PortfolioAssignment = typeof portfolioAssignments.$inferSelect;
+export type NewPortfolioAssignment = typeof portfolioAssignments.$inferInsert;
