@@ -83,11 +83,7 @@ POST /v1/imports?layout=…  ──202──▶ validating ──▶ validated �
      (subida ou desligamento da API com job aberto ──▶ interrupted · erro inesperado ──▶ failed)
 ```
 
-- **Simulação.** As escritas reais dos serviços rodam numa **cópia do banco em memória**, feita com
-  `serialize` no início e descartada no fim. Os blocos são cumulativos: cada um vê o efeito dos anteriores,
-  como na gravação. O banco real não fica travado, e o relatório traz o que a gravação faria. O job termina
-  `validated` sem nenhum erro e `invalid` com algum erro, ou com erro de arquivo em `fileError` (mensagem e
-  linha).
+- **Simulação.** As escritas reais dos serviços rodam numa **cópia do banco**, feita no início com o `backup` do SQLite (por páginas, cedendo a vez entre os passos) num diretório temporário próprio, apagado no fim. Os blocos são cumulativos: cada um vê o efeito dos anteriores, como na gravação. O banco real não fica travado, e o relatório traz o que a gravação faria. O job termina `validated` sem nenhum erro e `invalid` com algum erro, ou com erro de arquivo em `fileError` (mensagem e linha).
 - **Confirmação.** Só vale para um job `validated` sem erros e do próprio usuário, dentro do prazo de 24 h e
   com o **mesmo escopo de token** da simulação: mesmos papéis e mesmas filiais. Outro escopo mudaria o
   resultado, por exemplo de `linked` para `update`, e responde `409 import_not_ready`. A gravação usa
@@ -95,7 +91,7 @@ POST /v1/imports?layout=…  ──202──▶ validating ──▶ validated �
   relatório do bloco na mesma transação. Entre os blocos a API atende outras requisições. Uma linha falha sem
   sobrescrever em dois casos: se o registro mudou depois da simulação (`version_conflict`) ou se a ação ou a
   ativação saíram diferentes do simulado (`changed_since_validation`). O job então termina
-  `partially_applied`.
+  `partially_applied`. Numa carteira de vínculos desfeita na confirmação, todas as linhas dela saem `failed`. Desligar a API no meio da gravação termina `partially_applied` se algum bloco já entrou (o relatório diz quais linhas), e `interrupted` se nenhum entrou.
 - **Vencimento.** Uma varredura a cada 10 minutos, e também a cada envio, faz a simulação vencida virar
   `expired` e tira o arquivo da memória, mesmo que ninguém leia o job.
 - **Assíncrono.** Há uma fila serial por processo (SQLite, instância única). `POST /v1/imports` e
@@ -106,8 +102,7 @@ POST /v1/imports?layout=…  ──202──▶ validating ──▶ validated �
   ativação, o código e a mensagem fixa do domínio. A mensagem **nunca** ecoa o valor enviado.
 - **Acesso.** Importar é só do `admin`. Supervisão e vendedor recebem `403` no `onRequest`, **antes** de a
   API ler o corpo. O parser de `text/csv` com limite de 16 MB vale só na rota de envio. O job é visível só a
-  quem o criou: outro `sub` recebe `404`. Cada usuário tem no máximo 5 jobs abertos, e o serviço guarda no
-  máximo 128 MB de arquivos abertos (`too_many_imports`). Confirmar ou cancelar fora do estado responde
+  quem o criou: outro `sub` recebe `404`. Cada usuário tem no máximo 5 jobs abertos e 48 MB de arquivos abertos, e o serviço guarda no máximo 256 MB (`too_many_imports`). Confirmar ou cancelar fora do estado responde
   `409 import_not_ready`.
 
 ## Exportação
@@ -145,8 +140,7 @@ Cada linha passa pelos serviços de domínio, o que custa cerca de 1,2 ms por li
   de até 50 ms somado a pausas de GC de até cerca de 190 ms, e por isso só vai para o log.
 
 A leitura do arquivo, a pré-validação e a carga do relatório cedem a vez a cada fatia (1 milhão de caracteres
-ou 10 mil linhas). Um campo gigante é recusado durante a leitura. A cópia do banco para a simulação custa
-cerca de 40 ms com 16 MB.
+ou 20 mil registros na leitura; 10 mil linhas no resto). Um campo gigante é recusado durante a leitura. A cópia do banco para a simulação é feita por páginas (cerca de 4 MB por passo), cedendo a vez entre os passos, então o tamanho do banco não trava a API.
 
 **Exceção: vínculos.** A carteira é uma unidade e nunca é partida. Uma carteira grande segura a API pelo tempo
 da troca de atribuições e da finalização, cerca de 2,3 s com 10 mil células. É o mesmo custo de finalizar a
@@ -165,4 +159,5 @@ página).
 3. A fila e os arquivos abertos são **do processo**. Com mais de uma instância da API, seria preciso uma
    fila compartilhada, o que vai junto com a troca para PostgreSQL.
 4. **Carteira grande nos vínculos** segura a API pelo tempo da finalização (ver Desempenho).
-5. A simulação sobre a cópia **dobra a memória** do banco enquanto roda (16 MB com 50 mil clientes).
+5. A simulação ocupa, enquanto roda, **o tamanho do banco em disco temporário** (16 MB com 50 mil clientes).
+6. A regra nova de código (sem `|` nem `:`) vale para os dados novos. Um código antigo com esses caracteres não volta a ser aceito no vínculo por código e faz a exportação falhar no meio do download. Ainda não há dado de produção; conferir antes da carga inicial.

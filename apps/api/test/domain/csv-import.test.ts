@@ -337,6 +337,22 @@ describe('estado e acesso do job', () => {
     expect(codeOf(() => s1.confirm(ADMIN, job.id))).toBe('import_not_ready');
   });
 
+  it('parar no meio da gravação deixa partially_applied (algo já foi gravado)', async () => {
+    const s1 = svc(1);
+    const rows = Array.from({ length: 50 }, (_, i) => `S${i};Nome ${i}`);
+    const sim = await simulate('product-subgroups', csv('codigo;nome', ...rows), ADMIN, s1);
+    s1.confirm(ADMIN, sim.id);
+    while (s1.get(ADMIN, sim.id).processedRows === 0) await new Promise((r) => setImmediate(r));
+    s1.stop();
+    await s1.idle();
+    const done = s1.get(ADMIN, sim.id);
+    expect(done.status).toBe('partially_applied');
+    const n = count('product_subgroups');
+    expect(n).toBeGreaterThan(0);
+    expect(n).toBeLessThan(50);
+    expect(jobs.lines(ADMIN, sim.id, { status: 'applied', limit: 1000 }).items).toHaveLength(n);
+  });
+
   it('limita os jobs abertos por usuário', async () => {
     for (let i = 0; i < 5; i++) await simulate('product-subgroups', csv('codigo;nome', `S${i};A`));
     expect(codeOf(() => jobs.submit(ADMIN, 'product-subgroups', csv('codigo;nome', 'X;A')))).toBe(
@@ -612,6 +628,53 @@ describe('carteiras e vínculos', () => {
     ).toEqual([
       { name: 'PA', n: 2 },
       { name: 'PB', n: 1 },
+    ]);
+  });
+
+  it('carteira desfeita na confirmação não deixa nenhuma linha como gravada', async () => {
+    await world();
+    await importAll('portfolios', csv(pHead, `SER;VN;GEO;gest-01;ES/${VITORIA};SG1:V1|SG1:V2`));
+    const lHead = 'filial_codigo;carteira;cnpj;subgrupo_codigo;vendedor_codigo';
+    await importAll('links', csv(lHead, `SER;VN;${CNPJ_A};SG1;V1`, `SER;VN;${CNPJ_B};SG1;V1`));
+    const sim = await simulate('links', csv(lHead, `SER;VN;${CNPJ_A};SG1;V2`, `SER;VN;${CNPJ_B};SG1;V1`));
+    expect(brief(sim.id).map((b) => b.slice(0, 3))).toEqual([
+      [2, 'valid', 'update'],
+      [3, 'valid', 'unchanged'],
+    ]);
+    // B é inativado pela API entre a simulação e a confirmação (a versão da carteira não muda).
+    const cs = createCustomerService(fx.db);
+    const b = sq().prepare('select id, version from customers where cnpj = ?').get(CNPJ_B) as {
+      id: number;
+      version: number;
+    };
+    cs.deactivate(ADMIN, b.id, b.version);
+    const done = await confirm(sim.id);
+    expect(done.status).toBe('partially_applied');
+    expect(done.counts).toEqual({});
+    expect(lines(done.id).map((l) => l.status)).toEqual(['failed', 'failed']);
+    expect(lines(done.id)[0]?.message).toBe('Carteira não gravada: outra linha dela tem erro');
+    // A troca de A para V2 foi desfeita, como o relatório diz.
+    expect(
+      sq()
+        .prepare(
+          `select s.code from portfolio_links l join sellers s on s.id = l.seller_id
+           join customers c on c.id = l.customer_id where l.active = 1 and c.cnpj = ?`,
+        )
+        .get(CNPJ_A),
+    ).toEqual({ code: 'V1' });
+  });
+
+  it('dois CNPJs sem cadastro na mesma carteira não colidem (sem oráculo pela célula repetida)', async () => {
+    await world();
+    await importAll('portfolios', csv(pHead, `SER;VN;GEO;gest-01;ES/${VITORIA};SG1:V1`));
+    const lHead = 'filial_codigo;carteira;cnpj;subgrupo_codigo;vendedor_codigo';
+    const sim = await simulate(
+      'links',
+      csv(lHead, `SER;VN;${CNPJ_D};SG1;V1`, `SER;VN;60701190000104;SG1;V1`),
+    );
+    expect(brief(sim.id)).toEqual([
+      [2, 'invalid', 'validation_error', 'Cliente não é membro efetivo da carteira'],
+      [3, 'invalid', 'validation_error', 'Carteira não gravada: outra linha dela tem erro'],
     ]);
   });
 

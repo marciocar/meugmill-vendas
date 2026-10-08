@@ -60,10 +60,13 @@ export class CsvReader {
     this.text = text.startsWith(BOM) ? text.slice(1) : text;
   }
 
-  /** Lê até ~`budget` caracteres (sempre registros inteiros). Devolve `true` quando o texto acabou. */
-  step(budget = Number.POSITIVE_INFINITY): boolean {
+  /**
+   * Lê até ~`budget` caracteres ou `maxRecords` registros, vazios inclusive (sempre registros inteiros).
+   * Devolve `true` quando o texto acabou.
+   */
+  step(budget = Number.POSITIVE_INFINITY, maxRecords = Number.POSITIVE_INFINITY): boolean {
     const stop = this.i + budget;
-    while (this.i < this.text.length && this.i < stop) this.readRecord();
+    for (let n = 0; this.i < this.text.length && this.i < stop && n < maxRecords; n++) this.readRecord();
     return this.i >= this.text.length;
   }
 

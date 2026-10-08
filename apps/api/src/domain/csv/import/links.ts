@@ -23,7 +23,8 @@ import { findPortfolio, portfolioKey } from './portfolios.js';
 import type { Importer, RowFail, RowResult, Unit } from './types.js';
 
 const UNIT_FAILED = 'Carteira não gravada: outra linha dela tem erro';
-const NO_CUSTOMER = Number.MAX_SAFE_INTEGER;
+// Um id que nunca existe, diferente por linha (dois CNPJs sem cadastro não colidem na mesma célula).
+const noCustomer = (line: number) => Number.MAX_SAFE_INTEGER - line;
 
 interface Cell {
   row: Row;
@@ -122,7 +123,7 @@ export const linkImporter: Importer = {
           row: r,
           // CNPJ sem cadastro segue com um id que nunca existe: o E6 responde por ele exatamente como por um
           // cliente de outra filial ("não é membro efetivo"), e a simulação não revela o que existe.
-          customerId: customer?.id ?? NO_CUSTOMER,
+          customerId: customer?.id ?? noCustomer(r.line),
           subgroupId: lookupId(ctx.db, productSubgroups, code(r, 'subgrupo_codigo'), 'subgrupo_codigo'),
           sellerId: lookupId(ctx.db, sellers, code(r, 'vendedor_codigo'), 'vendedor_codigo'),
         });

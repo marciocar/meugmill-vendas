@@ -1,4 +1,7 @@
 import { createHash } from 'node:crypto';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { and, asc, desc, eq, gt, gte, inArray, lt, lte, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
@@ -55,9 +58,14 @@ export const SWEEP_INTERVAL_MS = 10 * 60 * 1000;
 /** Jobs abertos (simulando, simulados ou gravando) por usuário. */
 export const MAX_OPEN_JOBS = 5;
 /** Soma dos arquivos de jobs abertos guardados na memória do processo. */
-export const MAX_OPEN_BYTES = 128 * 1024 * 1024;
-/** Caracteres lidos do arquivo entre duas cessões de vez. */
+export const MAX_OPEN_BYTES = 256 * 1024 * 1024;
+/** Soma dos arquivos abertos de um mesmo usuário (poucos admins não esgotam o serviço). */
+export const MAX_OPEN_BYTES_PER_USER = 48 * 1024 * 1024;
+/** Caracteres e registros (vazios inclusive) lidos do arquivo entre duas cessões de vez. */
 const PARSE_SLICE = 1_000_000;
+const PARSE_RECORDS = 20_000;
+/** Páginas copiadas por passo do backup da simulação (~4 MB). */
+const BACKUP_PAGES = 1000;
 /** Linhas pré-validadas, gravadas no relatório ou carregadas entre duas cessões de vez. */
 const ROW_SLICE = 10_000;
 
@@ -103,6 +111,7 @@ export interface ImportJobOptions extends ServiceOptions {
 const MALFORMED = 'Número de campos diferente do cabeçalho';
 const DUPLICATE = 'Chave repetida no arquivo';
 const CHANGED_RESULT = 'Resultado diferente do simulado: simule de novo';
+const UNIT_FAILED = 'Carteira não gravada: outra linha dela tem erro';
 const SCOPE_CHANGED = 'O perfil ou as filiais do token mudaram desde a simulação: simule de novo';
 
 class UnitRollback extends Error {
@@ -112,7 +121,8 @@ class UnitRollback extends Error {
 }
 
 class Stopped extends Error {
-  constructor() {
+  /** Na gravação, algum bloco já foi gravado antes da parada. */
+  constructor(readonly partial: boolean) {
     super('import stopped');
   }
 }
@@ -167,6 +177,7 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
   const chunkMs = opts.chunkMs ?? DEFAULT_CHUNK_MS;
   const ttlMs = opts.ttlMs ?? DEFAULT_TTL_MS;
   const contents = new Map<number, Buffer>();
+  const owners = new Map<number, string>();
   let tail: Promise<void> = Promise.resolve();
   let stopping = false;
   let timer: NodeJS.Timeout | undefined;
@@ -198,6 +209,7 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
   /** Fim do job: estado terminal e o arquivo sai da memória. */
   const finish = (id: number, values: Partial<ImportJob>): void => {
     contents.delete(id);
+    owners.delete(id);
     patch(db, id, { ...values, finishedAt: now() });
   };
 
@@ -224,7 +236,7 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
   const enqueue = (jobId: number, task: () => Promise<void>): void => {
     tail = tail.then(task).catch((err: unknown) => {
       if (err instanceof Stopped) {
-        finish(jobId, { status: 'interrupted' });
+        finish(jobId, { status: err.partial ? 'partially_applied' : 'interrupted' });
         return;
       }
       try {
@@ -240,7 +252,7 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
   /** Lê o arquivo em fatias, cedendo a vez entre elas. Erro de arquivo sobe como DomainError. */
   async function readRows(layout: LayoutId, content: Buffer): Promise<Row[]> {
     const reader = new CsvReader(content);
-    while (!reader.step(PARSE_SLICE)) await yieldLoop();
+    while (!reader.step(PARSE_SLICE, PARSE_RECORDS)) await yieldLoop();
     const doc = reader.result();
     await yieldLoop();
     return bindRows(LAYOUTS[layout], doc);
@@ -295,7 +307,13 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
             }
           }
         }
-        if ([...r.values()].some((x) => !x.ok)) throw new UnitRollback(r);
+        if ([...r.values()].some((x) => !x.ok)) {
+          // A unidade é desfeita inteira: nenhuma linha dela pode sair como gravada no relatório.
+          for (const [line, res] of r) {
+            if (res.ok) r.set(line, { ok: false, code: 'validation_error', message: UNIT_FAILED });
+          }
+          throw new UnitRollback(r);
+        }
         return r;
       });
     } catch (err) {
@@ -409,18 +427,31 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
   }
 
   /** Cópia do banco em memória para a simulação (descartada no fim). */
-  function snapshot(): { conn: Db; close: () => void } {
+  async function snapshot(): Promise<{ conn: Db; close: () => void }> {
     // O `drizzle()` do better-sqlite3 expõe a conexão em `$client` (fora do tipo `Db`).
     const client = (db as unknown as { $client?: Database.Database }).$client;
     if (!client) throw new Error('conexão SQLite indisponível para a simulação');
-    const image = client.serialize();
-    // Bytes 18 e 19 do cabeçalho = versão de escrita e leitura. O banco real roda em WAL (2), que não
-    // existe num banco em memória: voltar para o journal clássico (1), ou a cópia não abre transação.
-    image[18] = 1;
-    image[19] = 1;
-    const copy = new Database(image);
-    copy.pragma('foreign_keys = ON');
-    return { conn: drizzle(copy, { schema }), close: () => copy.close() };
+    // `backup` copia por páginas em passos e cede a vez entre eles: o custo não trava a API, por maior que
+    // seja o banco. A cópia vai para um diretório temporário próprio, apagado no fim.
+    const dir = mkdtempSync(join(tmpdir(), 'carteira-sim-'));
+    const drop = () => rmSync(dir, { recursive: true, force: true });
+    try {
+      await client.backup(join(dir, 'copia.sqlite'), { progress: () => BACKUP_PAGES });
+      const copy = new Database(join(dir, 'copia.sqlite'));
+      copy.pragma('journal_mode = MEMORY');
+      copy.pragma('synchronous = OFF');
+      copy.pragma('foreign_keys = ON');
+      return {
+        conn: drizzle(copy, { schema }),
+        close: () => {
+          copy.close();
+          drop();
+        },
+      };
+    } catch (err) {
+      drop();
+      throw err;
+    }
   }
 
   async function process(jobId: number, actor: Actor, phase: 'simulate' | 'apply'): Promise<void> {
@@ -456,7 +487,7 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
     await yieldLoop();
 
     const units = importer.units ? importer.units(good) : good.map((r) => ({ rows: [r] }));
-    const sim = phase === 'simulate' ? snapshot() : undefined;
+    const sim = phase === 'simulate' ? await snapshot() : undefined;
     const conn = sim?.conn ?? db;
     const base = {
       db: conn,
@@ -468,7 +499,7 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
     try {
       let next = 0;
       while (next < units.length) {
-        if (stopping) throw new Stopped();
+        if (stopping) throw new Stopped(phase === 'apply' && processed > pre.size);
         const results = new Map<number, RowResult>();
         const stats: Record<string, number> = {};
         const runChunk = () => {
@@ -536,7 +567,17 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
       if (content.length > MAX_FILE_BYTES) throw invalid('Arquivo maior que o permitido');
       sweep();
       let openBytes = 0;
-      for (const c of contents.values()) openBytes += c.length;
+      let mine = 0;
+      for (const [jobId, c] of contents) {
+        openBytes += c.length;
+        if (owners.get(jobId) === actor.sub) mine += c.length;
+      }
+      if (mine + content.length > MAX_OPEN_BYTES_PER_USER) {
+        throw new DomainError(
+          'too_many_imports',
+          'Há importações demais em aberto: confirme ou cancele antes',
+        );
+      }
       if (openBytes + content.length > MAX_OPEN_BYTES) {
         throw new DomainError(
           'too_many_imports',
@@ -572,6 +613,7 @@ export function createImportJobService(db: Db, opts: ImportJobOptions = {}): Imp
           .get().id;
       });
       contents.set(id, content);
+      owners.set(id, actor.sub);
       enqueue(id, () => process(id, actor, 'simulate'));
       return toResponse(load(id) as ImportJob);
     },
