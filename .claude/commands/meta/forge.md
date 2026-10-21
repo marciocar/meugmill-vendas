@@ -1,5 +1,5 @@
 ---
-description: Forja as peças que o comando novo pede (das 7 do conjunto), medindo antes o que já existe. Core-only.
+description: Forja as peças que o comando novo pede (das 7 do conjunto), medindo antes o que já existe.
 allowed-tools: Read, Write, Edit, Grep, Glob, Bash, TodoWrite
 ---
 
@@ -16,8 +16,10 @@ confirmado — achado ancorado em `docs/evolution/research/agent-command-composi
 
 ## Degrau e limites
 
-- **Core-only** (Camada 1 = autoria do framework). A face que viaja é **gated**: gatilho nomeado na
-  cláusula 4 da doutrina.
+- **Viaja para quem tem o framework instalado** (core, onion-core, hub, adotado, standalone): a face que
+  viaja foi aberta pelo maestro em 2026-10-14, para o time forjar os próprios componentes internos. Na
+  superfície de **plugin** o caminho `.claude/` nu segue sob a REGRA 74 (Caminho .claude/ NU dentro de
+  plugin só resolve no core, com catraca); a cláusula 4 da doutrina diz o que continua medido.
 - **Maestro-invocado.** Não auto-inicia.
 - **Entrevista, não assume.** A topologia do comando novo é perguntada; só a peça 5 é invariante.
   Assumir é petrificar a forma da 1ª instância — a objeção `N=1`, que sobreviveu a refutação real.
@@ -39,6 +41,31 @@ comandos-com-framework já existem e **quais peças cada um cita**. A saída é 
 que existe mas o artefato não cita conta como ausente — de propósito, porque a sessão que lê a
 superfície também não a acharia. Na primeira medição (2026-09-28) a própria instância de referência
 tinha lente e bancada e **não citava nenhuma das duas**.
+
+## Entrada vinda do `/meta:dissect` — planos de absorção (SAC-77)
+
+Quando a forja nasce de um veredito `absorver`/`costurar`, a entrada **não é a entrevista**: é o
+plano que o [`/meta:dissect`](dissect.md) escreveu como nós `x_absorb_*` no grafo da dissecação.
+O leitor roda na carga e mede as peças do alvo no `forge-census.sh`:
+
+!`bash .claude/validation/dissect-plans.sh . || true`
+
+- Plano **INCOMPLETO** (sem origem com pin, sem licença, sem família de paridade, forma fora do
+  enum, alvo fora do censo) **não se forja**: volte ao dissect. A doutrina é a §4b de
+  [`common:prompts:dissect-doctrine`](../common/prompts/dissect-doctrine.md).
+- As peças marcadas `falta` são as que a forja emite (dentro do que esta versão gera: 2, 3, 7).
+  As `existe` **mudam, não se recriam** — e esta versão **não tem passo próprio de mudar**: a
+  mudança segue o fluxo normal (`/engineer:*`) com o plano como especificação, e a forja cobra
+  os passos 5 e 6 (dogfood + paridade com mutante). Medido no 1º plano (Conductor, 2026-10-11):
+  ele pede as peças 4 e 7 de um alvo que já tem as duas — é mudança, não emissão.
+- A **origem e a licença** vão no cabeçalho do artefato forjado, e o caso de **paridade** entra na
+  família que o plano nomeia — reprovando sem a peça (passo 6).
+- `costurar` = adapter SDAAL; nunca cópia. `vendor-pin` só para licença que o permita.
+- Plano com **régua de outro repo** (`x_dissect_against`, decisão de 2026-10-14) sai NAO-MEDIDO na
+  carga acima: as peças se medem no repo do alvo, e a raiz dele é passada, nunca adivinhada —
+  `bash .claude/validation/dissect-plans.sh . <ferramenta> --against-root <repo>=<caminho>` (a régua
+  = o próprio repo, padrão num adotado, mede aqui sem raiz passada). Plano
+  dentro de grafo de **estudo** é recusado: estudo não decide, então não emite plano.
 
 ## Procedimento
 

@@ -1,29 +1,45 @@
 # Mapa role → bundle — O-QUE-SE-INSTALA por papel: verticais de domínio (base/optional) +
-# ferramentas de TRABALHO cross-cutting (work_tools).
+# ferramentas de TRABALHO e de FÁBRICA (work_tools, por conjuntos nomeados).
 #
 # NÃO confundir com .claude/utils/trust/ (QUEM-FALA-COM-QUEM: relay/advise/correct). Aqui é o ESCOPO
 # DE CAPACIDADE: qual conjunto de plugins/tools cada papel recebe. Federação 2026 (marketplace de org):
 #   (a) acesso-por-grupo (Team/Enterprise) — role → group → auto-install;
 #   (b) fallback /meta:adopt — quais verticais/tools vendorizar por papel quando não há marketplace de org.
 #
-# TRÊS grupos de capacidade (ortogonais):
-#   - VERTICAIS de domínio (base/optional): produto/engenharia/testes/docs/design/compliance.
-#   - WORK_TOOLS (cross-cutting): ferramentas de trabalho de commands/meta que NÃO são meta-fábrica
-#     (kg/diary/orchestrate/metaspec-validate/...). std == hub == source aqui (pesquisa 2026-07-19,
-#     docs/evolution/research/onion-tier-matrix-2026-07). Cada tool arrasta seu motor/agente.
-#   - META-FÁBRICA: create-*/evolve/graph/inventory/federation-* = Camada 1, core-only (o hub USA o framework,
-#     não o autora). ADOPT = Camada 2 (source + hub — a empresa adota os PRÓPRIOS projetos; ver adopt.md PASSO 0).
-#     DOWNSTREAM (co-deliver/announce) = Camada 3, gated (federação cross-empresa; autoridade do core por ora).
+# A MATRIZ DAS PORTAS (decisão do maestro em 2026-10-09, nó D_MATRIZ_DE_PORTAS_2026_10; F2 = SAC-91):
+#   source     (core e porta onion-core) → TODOS os conjuntos: trabalho, meta-fábrica, federação e adoção.
+#   hub        → recebe TUDO por invariante do transporte (vendor-manifest.sh, caso b3 da bancada); a
+#                federação cross-empresa (co-deliver/co-announce) segue exercida só pelo source enquanto a
+#                Camada 3 estiver gated (`downstream: gated`) — o corte NÃO é feito aqui, é declarado.
+#   standalone → core MENOS adoção e federação: full + meta_factory. LEVA a meta-fábrica.
+#   plugins    → a MESMA superfície do standalone, empacotada como plugins (o empacotamento da
+#                meta-fábrica nos manifestos de vertical é da F4, SAC-93).
+#   mini       → ALLOWLIST didática explícita (bloco `allowlist:`), sem KG, sem meta e sem compliance.
+#   ⚠️ CORRIGIDO 2026-10-10: até a F2 este cabeçalho e a nota do `source` diziam que a meta-fábrica "nunca
+#   sai do core", enquanto o transporte mandava tudo para o hub (vendor-manifest.sh, bloco do corte por
+#   papel). A doutrina contradizia o mecanismo; a matriz resolve a favor de "a meta-fábrica viaja para
+#   todo papel menos o mini", e o que fica só no core passa a ser a BIOGRAFIA, não a fábrica.
+#
+# OS CONJUNTOS PARTICIONAM `commands/meta/`: todo comando de meta/ (menos o README) mora em EXATAMENTE um
+# conjunto. A REGRA 37 (Mapa role→bundle (roles.yaml) consistente com os verticais) cobra a partição, então
+# comando novo sem classificação reprova no lint em vez de viajar (ou sumir) por default. A lista é à mão,
+# mas não envelhece em silêncio.
+# Os COMPANHEIROS de um conjunto que não são comando (skill onion-publish, hook do inbox, utils/adopt,
+# utils/co-evolution, utils/federation-transport, validation/federation-*) são cortados por PATHSPEC no
+# vendor-manifest.sh (`_role_cut`): outra granularidade, outro SSOT, e os dois concordam pela bancada.
 #
 # SSOT: verticais = verticals/*.manifest.sh; work_tools = verticals/onion.manifest.sh (o núcleo absorveu onion-work-tools em 2026-09-04); ambos em marketplace.json.
-# Drift-guard: lint check_role_bundle_sync (todo vertical/tool nomeado resolve a artefato real).
-# Resolver: resolve-role-bundle.sh <role> [--with-optional] [--tools].
+# Drift-guard: lint check_role_bundle_sync (todo vertical/tool nomeado resolve a artefato real; partição de meta/; allowlist do mini existe).
+# Resolver: resolve-role-bundle.sh <role> [--with-optional] [--tools] [--allowlist].
 version: 1
 
-# Conjuntos de work_tools nomeados (referenciados por papel abaixo). NÃO são verticais de domínio,
-# NÃO são meta-fábrica. O manifesto onion.manifest.sh (núcleo) materializa comandos + motores + agente — onion-work-tools foi absorvido em 2026-09-04.
+# Conjuntos de work_tools nomeados (referenciados por papel abaixo, como LISTA de conjuntos). NÃO são
+# verticais de domínio. O manifesto onion.manifest.sh (núcleo) materializa o `full` — onion-work-tools foi
+# absorvido em 2026-09-04.
 work_tool_sets:
-  # FULL — source/hub/standalone: a ferramenta de trabalho COMPLETA (o reframe: std=solo-completo).
+  # FULL — todo papel menos o mini: a ferramenta de trabalho COMPLETA (o reframe: std=solo-completo).
+  # ⚠️ co-evolve e co-relay MORARAM AQUI até 2026-10-10, e era a mistura que a matriz desfaz: são
+  # co-evolução (federação upstream), não trabalho. Saíram para o conjunto `federation`.
   full:
     - kg                     # motor: validation/kg-radar.sh + kg-console.sh
     - diary                  # motor: validation/diary-index.sh
@@ -37,8 +53,6 @@ work_tool_sets:
     - constellation          # motor: validation/constellation-map.sh
     - setup-integration
     - setup-code-review
-    - co-evolve              # co-evolução upstream: ler o inbox do core
-    - co-relay               # co-evolução upstream: sinalizar o core
     # ── A MAQUINARIA DO MÉTODO (KG + SSOTs geradas) — acrescentada em 2026-09-15 ──────────────
     # Este conjunto foi escrito quando estes comandos ainda não existiam, e ficou defasado em
     # silêncio: nada media a lista contra o que o alvo de fato precisa. O corte por papel do
@@ -61,38 +75,97 @@ work_tool_sets:
     - radar                  # radar de mundo com baseline datada (REGRA 65)
     - drive                  # conduzir um plano-grafo até o fim
     - census                 # censo do backlog medido, não lembrado
-  # DOWNSTREAM — carteiro core→adotante. Só quem TEM sub-adotados (source; hub quando a seam
-  # org-marketplace abrir). std/consumer têm exposes_downstream vazio por definição → não recebem.
-  downstream:
+    - decide                 # o que está em voo vira questionário com recomendação, e a resposta vira selo (maestro, 2026-10-14: viaja para todos menos o mini)
+  # META_FACTORY — a AUTORIA do framework (Camada 1): forjar comandos, agentes, skills, guardas e verticais,
+  # auditar e absorver. Pela matriz ela VIAJA para todo papel menos o mini (antes era core-only).
+  meta_factory:
+    - absorb-skill
+    - cc-update
+    - create-abstraction
+    - create-agent
+    - create-agent-express
+    - create-command
+    - create-knowledge-base
+    - create-skill
+    - create-vertical
+    - dissect
+    - evolve
+    - forge
+    - forge-guard
+  # FEDERATION — a co-evolução entre repos: upstream (co-evolve, co-relay: o adotante fala com o core) e
+  # downstream (co-deliver, co-announce: o core fala com o adotante). Companheiros cortados por pathspec:
+  # o hook do inbox (hooks/co-evolution-inbox-check.sh), utils/co-evolution/ e utils/federation-transport/.
+  # ⚠️ O conjunto `downstream` (co-deliver, co-announce) foi ABSORVIDO aqui em 2026-10-10: era a mesma
+  # natureza com outro nome. O campo `downstream:` de cada papel segue como anotação de Camada 3.
+  # personality-sync MOROU em `pending` até 2026-10-11 e entrou aqui por decisão do maestro
+  # (Q_PERSONALITY_SYNC_SEM_CONJUNTO): escreve a linha personality_summary do members.yaml, o registro da
+  # federação. O corte das portas não muda: federation e pending iam para os mesmos papéis (source e hub).
+  federation:
+    - co-evolve
+    - co-relay
     - co-deliver
     - co-announce
+    - personality-sync
+  # ADOPTION — instalar e governar o framework em OUTROS repos, e o ledger da federação (federation-*).
+  # Companheiros cortados por pathspec: utils/adopt/ (menos o CONTRATO vendor-manifest.sh),
+  # validation/federation-*, skills/onion-publish/ e o motor de publicação do marketplace.
+  adoption:
+    - adopt
+    - federation-a2a         # /meta:federation-a2a (F1 do configurador A2A, SAC-122): convidar, pinar, diagnosticar, aceitar e revogar é ato do RECEPTOR (fonte ou hub)
+    - federation-check
+    - federation-member
+    - federation-publish
+    - federation-register
+    - federation-rollback
+    - federation-status
+    - publish                # /meta:publish (core-only; F3 das portas, SAC-92): publicar portas é ato da FONTE, par da skill onion-publish
+  # PENDING — comando que a matriz NÃO classificou. Fica com source e hub (o status quo dele) e NÃO viaja
+  # para standalone/plugins até o maestro decidir. VAZIO de novo desde 2026-10-14: `decide` nasceu aqui em
+  # 2026-10-12 e o maestro o classificou em `full` (viaja para todo papel com KG, menos o mini), e fica
+  # como o lugar de quem nascer sem classificação.
+  pending: []
   # MINIMAL (consumer T2) — A DEFINIR quando nascer um consumer real (subconjunto de full).
 
 roles:
-  source:        # TIER 0 — o core (onion-evolve). Instala TUDO: autor + autoridade emissora.
+  source:        # TIER 0 — o core (onion-evolve) e a porta onion-core. Instala TUDO: autor + autoridade emissora.
     base: [onion-engineering, onion-product, onion-design, onion-compliance]
     optional: []
-    work_tools: full
+    work_tools: [full, meta_factory, federation, adoption, pending]
     downstream: true
-    note: "Alem dos verticais e dos work_tools, a meta-factory (create-*/adopt/federation-*/evolve/graph/inventory) e core-only e NAO e vertical/tool — nunca sai do core."
+    note: "Todos os conjuntos, inclusive meta-fabrica, adocao e federacao. O que nao sai do core e a BIOGRAFIA (diario, analises, registro), cortada pela allowlist do vendor-manifest.sh e pelo --stub-baselines, nao a fabrica."
 
   hub:           # TIER 1 — adocao de EMPRESA; a empresa como autoridade sobre os PROPRIOS projetos.
     base: [onion-engineering, onion-product]
     optional: [onion-design, onion-compliance]
-    work_tools: full
+    # Declara o que o transporte JA entrega: o hub recebe a superficie inteira por invariante (caso b3).
+    # Ate 2026-10-10 dizia so `full`, e o transporte mandava tudo: o declarado era menor que o entregue.
+    work_tools: [full, meta_factory, federation, adoption, pending]
     # 3 CAMADAS de capacidade (2026-07-23, sinal de campo de um adotante — o "multi" chegou):
-    #   Camada 1 (autoria do framework: create-*/evolve/graph/inventory) = source-only. Hub USA, nao autora.
+    #   Camada 1 (autoria do framework: meta_factory) = viaja (matriz 2026-10-09; antes era source-only).
     #   Camada 2 (adocao+controle LOCAL dos proprios projetos: /meta:adopt e --update) = source + HUB. ABERTA
     #     (gate em adopt.md PASSO 0 = grep role: source|hub; NAO e um campo de bundle aqui): o hub carimba
     #     role: hub via /meta:adopt --promote-hub e o PASSO 0 passa. FED-3-1 intacto (adopted puro barra).
     #   Camada 3 (federacao CROSS-empresa: co-deliver/announce, members.yaml de topologia, org-marketplace) = gated.
-    downstream: gated    # Camada 3 — co-deliver/announce cross-empresa so quando a seam abrir; hoje a autoria e do core
+    downstream: gated    # Camada 3 — co-deliver/announce chegam, mas so o source os exerce enquanto a seam estiver fechada
 
-  standalone:    # TIER 3 — dev solo com ferramenta COMPLETA, SEM federacao. Pode evoluir p/ hub ou consumer.
+  standalone:    # TIER 3 — dev solo com ferramenta COMPLETA e meta-fabrica, SEM adocao nem federacao.
     base: [onion-engineering, onion-product]
     optional: [onion-design, onion-compliance]
-    work_tools: full
+    work_tools: [full, meta_factory]
     downstream: false   # exposes_downstream sempre vazio — sem sub-adotados
+    # PAPEL DE ADOÇÃO ≠ PAPEL DE PORTA (decisão do maestro, 2026-10-11, nó
+    # D_PAPEL_DE_ADOCAO_STANDALONE_NAO_E_A_PORTA): o projeto ADOTADO com papel standalone (carimbo SEM
+    # `kind: door`) mantém o canal upstream com o core; a PORTA onion-standalone (kind: door) segue sem
+    # adoção e federação. Lido só com `--kind adoption` (resolve-role-bundle.sh --tools, vendor-manifest.sh);
+    # os companheiros que não são comando (utils/co-evolution/ e o hook do inbox) seguem o mesmo destino
+    # pelo `_role_cut` do vendor-manifest.sh. Cada nome tem de morar num conjunto (REGRA 37).
+    adoption_keeps: [co-evolve, co-relay]
+
+  plugins:       # PORTA onion-plugins — a superficie do standalone empacotada como plugins do Claude Code.
+    base: [onion-engineering, onion-product]
+    optional: [onion-design, onion-compliance]
+    work_tools: [full, meta_factory]   # = standalone; a meta-fabrica entra nos manifestos de vertical na F4 (SAC-93)
+    downstream: false
 
   consumer:      # TIER 2 — minimo (adota um hub, nao o core).
     base: [onion-engineering, onion-product]
@@ -100,7 +173,123 @@ roles:
     work_tools: tbd     # A DEFINIR quando nascer um consumer real (subconjunto de full)
     downstream: false
 
-  distilled:     # NAO vendoriza nem instala — destilacao curada (onion-mini, prompt-as-bytecode).
+  mini:          # PORTA onion-mini — didatica para iniciantes: o ciclo produto→engenharia, por ALLOWLIST.
+    base: []
+    optional: []
+    work_tools: none    # sem KG, sem meta, sem compliance
+    downstream: false
+    # O vendor-manifest.sh --role mini INCLUI so o que esta lista nomeia (o inverso do corte). Caminhos
+    # relativos a .claude/; diretorio termina em `/`. Materializada pela 1a vez na F5 (SAC-94): a
+    # verificacao dela, que NAO leva o lint, e o .claude/validation/door-mini-check.sh (allowlist exata,
+    # sem ponteiro morto, sem caminho de maquina), chamado pelo motor do /meta:publish (core-only).
+    allowlist:
+      commands:
+        - commands/warm-up.md
+        - commands/catch-up.md
+        - commands/product/collect.md
+        - commands/product/refine.md
+        - commands/product/spec.md
+        - commands/product/feature.md
+        - commands/engineer/start.md
+        - commands/engineer/plan.md
+        - commands/engineer/work.md
+        - commands/engineer/pr.md
+      agents:
+        - agents/product/product-agent.md
+        # F5: com TASK_MANAGER_PROVIDER=none (o default de quem comeca) e ele quem decompoe; o
+        # product-agent e dois adapters o chamam pelo nome.
+        - agents/product/task-specialist.md
+        - agents/review/code-reviewer.md
+        - agents/testing/test-engineer.md
+      skills:
+        - skills/onion/       # o SKILL.md e SUBSTITUIDO pelo overlay simplificado (abaixo)
+      # BASE MINIMA de que os comandos acima dependem, medida por citacao em 2026-10-10: o engineer:start
+      # e o product:* chamam o task manager (env-check.sh, 7 citacoes), o engineer:pr passa pelo forge, e
+      # resolve-integration-branch/onion-version sao lidos pelos fluxos de versionamento.
+      support:
+        - utils/task-manager/
+        - utils/forge/
+        - validation/onion-version.sh
+        - validation/resolve-integration-branch.sh
+        - commands/common/prompts/clickup-patterns.md
+        # F5: os dois fragmentos que o engineer:start e o engineer:work mandam SEGUIR. O detector da F2
+        # nao via fragmento citado como `common:prompts:<nome>`; a 1a passada da F5 viu.
+        - commands/common/prompts/task-manager-provider-detection.md
+        - commands/common/prompts/task-manager-auto-update.md
+      # OVERLAYS (F5): arquivos PROPRIOS do mini, que o core guarda em ops/door-templates/mini/ e o
+      # materializador escreve por cima do que o manifesto leva. destino na porta: fonte no core (os dois
+      # relativos a RAIZ do repo). As fontes NAO se chamam README.md/CLAUDE.md/SKILL.md de proposito: um
+      # CLAUDE.md dentro do core seria carregado como instrucao por quem tocasse o diretorio, e um
+      # SKILL.md seria contado como skill do core.
+      overlays:
+        README.md: ops/door-templates/mini/README.door.md
+        CLAUDE.md: ops/door-templates/mini/CLAUDE.door.md
+        .claude/skills/onion/SKILL.md: ops/door-templates/mini/skill-onion.door.md
+        # O CONTRATO DE SESSÃO (passada adversarial da F5): engineer:start, plan e work dizem que a
+        # estrutura do worklog e os badges [DONE]/[ACTIVE]/[TODO] "são definidos na SSOT" e mandam NÃO
+        # redefini-los. Sem estas duas KBs o ciclo didático apontava o próprio contrato para um documento
+        # que não viajava. Fonte = o arquivo real do core (cópia fiel, não extrato que envelhece).
+        docs/knowledge-base/frameworks/gitflow-patterns.md: docs/knowledge-base/frameworks/gitflow-patterns.md
+        docs/knowledge-base/concepts/worklog-protocol.md: docs/knowledge-base/concepts/worklog-protocol.md
+      # AUSENCIAS DECLARADAS (F5): o que arquivos COMPARTILHADOS com o core citam e o mini deliberadamente
+      # NAO leva, cada uma com o porque de ser inofensiva para o iniciante. Catraca nos dois sentidos
+      # (door-mini-check.sh): citacao nova fora desta lista reprova, e linha que ninguem mais cita tambem.
+      # A cura de uma linha e tirar a citacao do arquivo compartilhado ou trazer o alvo para a allowlist.
+      known_absent:
+        .claude/validation/kg-radar.sh: "warm-up, catch-up e engineer:work so o rodam SE houver um .kg.yaml no repo; o mini nao tem grafo, o passo nao dispara"
+        .claude/hooks/aside-router-hook.sh: "o warm-up descreve o hook de marcadores; o mini nao leva hook nenhum, e o marcador vira texto comum"
+        /meta:co-evolve: "warm-up e catch-up so o sugerem quando o hook de inbox sinaliza mensagem; o mini nao tem inbox nem hook"
+        .claude/validation/review-artifact-check.sh: "o engineer:pr so manda gerar o residuo da REGRA 56 no core, onde ela vale; em repo derivado o validador se declara fora de escopo, e o iniciante do mini nao tem passada adversarial a registrar"
+        /meta:setup-integration: "os adapters o sugerem quando falta variavel; o mini nao leva meta (a matriz), e as variaveis vao a mao no .env conforme utils/task-manager/README.md — sem elas o mini trabalha offline (provider none)"
+        /meta/setup-integration: "a mesma sugestao na forma antiga do nome (engineer:start, product:feature e tres docs do task manager); idem acima"
+        /meta:adopt: "citado em comentario e mensagem de onion-version.sh, resolve-integration-branch.sh e engineer:pr sobre repo ADOTADO; o mini nao adota"
+        /git:flow: "o product:feature e o adapter do GitHub o sugerem como proximo passo; no mini o caminho guiado e o engineer:start"
+        /git/sync: "o engineer:pr e o product:feature sugerem sincronizar depois do merge; no mini basta atualizar a branch principal"
+        /git:sync: "o fragmento task-manager-auto-update o sugere depois do merge; no mini basta atualizar a branch principal"
+        /product/task: "sugerido como alternativa ao product:feature; no mini a task nasce no product:feature"
+        /product/estimate: "estimativa por story points e opcional (o gate do engineer:start nao bloqueia)"
+        /product/create-task-structure: "o task-specialist o cita como irmao read-only; no mini o proprio agente decompoe"
+        /product/warm-up: "o warm-up lista os warm-ups por dimensao; o mini tem so o geral"
+        /engineer/warm-up: "o warm-up lista os warm-ups por dimensao; o mini tem so o geral"
+        /engineer/hotfix: "o product:feature o cita para correcao urgente em producao; fora do ciclo didatico"
+        /engineer/pre-pr: "o code-reviewer o cita como gate antes do PR; no mini o review e o proprio code-reviewer"
+        /engineer/validate-phase-sync: "citado no adapter de operacao do ClickUp; e da versao completa"
+        common:prompts:story-points-gate: "gate de estimativa opcional do engineer:start (nao bloqueia, so orienta)"
+        common:prompts:story-points-estimation: "o product:feature o cita para estimar; estimativa e opcional no mini"
+        "@story-points-framework-specialist": "estimativa por story points e opcional no mini"
+        "@gitflow-specialist": "o engineer:pr o cita para GitFlow avancado; o PR do mini sai direto do engineer:pr"
+        "@metaspec-gate-keeper": "o warm-up o cita para conformidade com meta-specs; o mini nao tem meta-specs"
+        "@onion": "o warm-up cita o agente orquestrador; no mini a orientacao e a skill onion (digite onion)"
+        "@branch-code-reviewer": "o code-reviewer cita o irmao diff-scoped; no mini o review e o proprio code-reviewer"
+        "@clickup-specialist": "o product-agent e o task-specialist o chamam para operacao avancada de ClickUp; o adapter cobre o basico"
+        "@jira-specialist": "o task-specialist o chama para operacao avancada de Jira; o adapter cobre o basico"
+        # ── 2a passada (adversarial da F5): link relativo, docs/ e comando de raiz, que a 1a nao media ──
+        /onion: "o warm-up e o zoho-token.sh citam o comando-orquestrador da versao completa; no mini a orientacao e a skill onion (digite onion)"
+        /docs/sync-sessions: "o contrato de sessao (gitflow-patterns) cita a sincronizacao de sessoes com docs; e da versao completa"
+        /product/transform-consolidated: "o contrato de sessao cita a transformacao de documento consolidado; e da versao completa"
+        .claude/hooks/worklog-capture-session.sh: "o worklog-protocol descreve os hooks que capturam a sessao; o mini nao leva hook, e o worklog e escrito pelos proprios comandos"
+        .claude/hooks/worklog-precompact-breadcrumb.sh: "idem: hook opcional de migalha antes da compactacao; o mini nao leva hook"
+        docs/knowledge-base/concepts/specification-driven-ai-abstraction-layer.md: "a doutrina SDAAL que os adapters de task manager e forge citam como fundamento; o adapter funciona sem ela"
+        docs/knowledge-base/concepts/task-manager-abstraction.md: "a KB da abstracao de task manager; o README do task manager no mini cobre o uso"
+        docs/sdaal/sdaal.md: "a especificacao SDAAL citada pelo adapter de operacao do ClickUp; e da versao completa"
+        docs/knowledge-base/platforms/zoho-projects-api.md: "a referencia da API do Zoho citada pelo adapter; o adapter traz o necessario"
+        docs/knowledge-base/concepts/knowledge-graph-sdaal.md: "warm-up, catch-up e engineer:work so a usam SE houver um .kg.yaml; o mini nao tem grafo"
+        docs/knowledge-base/concepts/context-window-optimization.md: "o engineer:work e o worklog-protocol a citam como leitura de fundo; nao e passo do ciclo"
+        docs/knowledge-base/concepts/agent-orchestration.md: "o worklog-protocol a cita como leitura de fundo sobre orquestracao; fora do ciclo didatico"
+        docs/knowledge-base/concepts/spec-driven-development.md: "o worklog-protocol a cita como leitura de fundo; fora do ciclo didatico"
+        docs/meta-specs/architecture.md: "o contrato de sessao cita a meta-spec de arquitetura; o mini nao tem meta-specs"
+        docs/meta-specs/index.md: "o warm-up le as meta-specs SE existirem; o mini nao tem meta-specs"
+        docs/INDEX.md: "o warm-up le o indice de docs SE existir; o projeto do iniciante pode nao ter"
+        docs/evolution/README.md: "o warm-up cita o protocolo de co-evolucao, que so vale com inbox; o mini nao tem"
+        docs/evolution/inbox/_processed/2026-06-18-adopt-gitflow-develop-branch-config.md: "comentario de origem no resolve-integration-branch.sh; historia do core"
+        docs/knowledge-base/agentic-patterns/harness/maestro-aside.md: "o warm-up cita a doutrina dos marcadores, que dependem do hook que o mini nao leva"
+        docs/knowledge-base/meta/onion-framework-identity.md: "o warm-up cita a identidade do framework como leitura de fundo; o README do mini a resume"
+        docs/onion/agents-reference.md: "o warm-up le as referencias geradas do core SE existirem; o mini nao as leva"
+        docs/onion/commands-guide.md: "idem: guia gerado do core"
+        docs/onion/inventory.md: "idem: inventario gerado do core"
+
+  distilled:     # LEGADO — a destilacao curada antiga do onion-mini (prompt-as-bytecode). A porta mini usa `mini`;
+                 # este papel fica porque o grafo da topologia o declara (ROLE_distilled, REGRA 41).
     base: []
     optional: []
     work_tools: none

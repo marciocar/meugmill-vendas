@@ -77,6 +77,27 @@ get_role() {
   ' "$MEMBERS"
 }
 
+# Obter kind de um membro. A AUTORIDADE DE FONTE se reconhece pela NATUREZA (kind: source), nunca só pelo
+# papel: desde a matriz das portas (2026-10-09) a porta onion-core publica `role: source` com `kind: door`,
+# e o refutador de 2026-10-10 mostrou um adotante disfarçado de porta source AUTORIZADO a `correct` qualquer
+# membro quando a decisão lia só o role.
+get_kind() {
+  local ID="$1"
+  awk -v id="$ID" '
+    /^  - id:/ { found = ($NF == id) }
+    found && /^    kind:/ { print $2; exit }
+  ' "$MEMBERS"
+}
+
+# Obter parent de um membro (o hub que o T2 adota). Mesmo leitor do role e do kind; comentário inline cai.
+get_parent() {
+  local ID="$1"
+  awk -v id="$ID" '
+    /^  - id:/ { found = ($NF == id) }
+    found && /^    parent:/ { v = $0; sub(/#.*$/, "", v); sub(/^    parent:[[:space:]]*/, "", v); gsub(/[[:space:]"\047]/, "", v); print v; exit }
+  ' "$MEMBERS"
+}
+
 # Verificar se ID está em uma lista YAML (campo: [a, b, c])
 # Indentação LIVRE (os campos de trust vivem a 6 espaços, aninhados sob `trust:`)
 # e comentário inline removido ANTES da comparação — sem isso o match é sempre-falso
@@ -147,9 +168,11 @@ EOF
 
 FROM_ROLE="$(get_member_role "$FROM_ID")"
 TO_ROLE="$(get_member_role "$TO_ID")"
+FROM_KIND="$(get_kind "$FROM_ID")"
+TO_KIND="$(get_kind "$TO_ID")"
 
 # source (core) pode enviar para qualquer membro — autoridade emissora
-if [ "$FROM_ROLE" = "source" ]; then
+if [ "$FROM_KIND" = "source" ]; then
   log_attempt "AUTORIZADO" "core (source) tem autoridade emissora universal"
   echo "✅ AUTORIZADO: $FROM_ID ($FROM_ROLE) → $TO_ID ($TO_ID) [$ACTION]"
   echo "   Razão: core (source) tem autoridade emissora — sem restrição de saída."
@@ -157,7 +180,7 @@ if [ "$FROM_ROLE" = "source" ]; then
 fi
 
 # Qualquer membro pode enviar para o core via relay/advise
-if [ "$TO_ROLE" = "source" ] && [ "$ACTION" != "correct" ]; then
+if [ "$TO_KIND" = "source" ] && [ "$ACTION" != "correct" ]; then
   log_attempt "AUTORIZADO" "inbox do core é aberto para relay e advise"
   echo "✅ AUTORIZADO: $FROM_ID ($FROM_ROLE) → $TO_ID (core) [$ACTION]"
   echo "   Razão: inbox do core é aberto para relay e advise de qualquer membro."
@@ -165,7 +188,7 @@ if [ "$TO_ROLE" = "source" ] && [ "$ACTION" != "correct" ]; then
 fi
 
 # correct para o core: verificar can_correct_to
-if [ "$TO_ROLE" = "source" ] && [ "$ACTION" = "correct" ]; then
+if [ "$TO_KIND" = "source" ] && [ "$ACTION" = "correct" ]; then
   AUTHORIZED="$(id_in_list "onion-evolve" "$FROM_ID" "can_correct_to")"
   if [ "$AUTHORIZED" = "yes" ]; then
     log_attempt "AUTORIZADO" "can_correct_to inclui onion-evolve"
@@ -199,10 +222,19 @@ if [ "$FROM_ROLE" = "hub" ] && [ "$TO_ROLE" = "consumer" ]; then
   fi
 fi
 
-# consumer → seu parent hub (feedback upward): sempre autorizado
+# consumer → SEU parent hub (feedback upward). Até a F3 do configurador A2A (2026-10-15) a regra dizia "seu
+# parent" e checava só os papéis: qualquer consumer falava com QUALQUER hub. Com o hub virando receptor vivo
+# (/a2a/<hub> no bridge do core), isso deixava o filho de um hub escrever na fila de outro. Agora o parent
+# do consumer tem de ser o hub de destino; consumer de outro hub fala com ele pelo core, não de lado.
 if [ "$FROM_ROLE" = "consumer" ] && [ "$TO_ROLE" = "hub" ] && [ "$ACTION" != "correct" ]; then
-  # Verificar que FROM tem TO como referência em can_receive_from (o inverso: que hub está em can_receive_from do consumer)
-  # Simplificação: T2 pode sempre enviar para seu parent T1 via relay/advise
+  FROM_PARENT="$(get_parent "$FROM_ID")"
+  if [ "$FROM_PARENT" != "$TO_ID" ]; then
+    REASON="$FROM_ID (consumer) tem parent '${FROM_PARENT:-ausente}', não '$TO_ID': consumer só fala com o PRÓPRIO hub."
+    log_attempt "BLOQUEADO" "$REASON"
+    echo "🚫 BLOQUEADO: $FROM_ID → $TO_ID [$ACTION]" >&2
+    echo "   $REASON" >&2
+    exit 1
+  fi
   log_attempt "AUTORIZADO" "consumer→parent hub (feedback upward)"
   echo "✅ AUTORIZADO: $FROM_ID (consumer) → $TO_ID (hub) [$ACTION]"
   echo "   Razão: consumer sempre pode enviar feedback ao seu parent hub."
@@ -243,7 +275,7 @@ if [ "$FROM_ROLE" = "hub" ] && [ "$TO_ROLE" = "hub" ] && [ "$ACTION" = "correct"
 fi
 
 # standalone → qualquer não-core: bloqueado
-if [ "$FROM_ROLE" = "standalone" ] && [ "$TO_ROLE" != "source" ]; then
+if [ "$FROM_ROLE" = "standalone" ] && [ "$TO_KIND" != "source" ]; then
   REASON="standalone não tem canal lateral. Comunicação só via core."
   log_attempt "BLOQUEADO" "$REASON"
   echo "🚫 BLOQUEADO: $FROM_ID (standalone) → $TO_ID [$ACTION]" >&2

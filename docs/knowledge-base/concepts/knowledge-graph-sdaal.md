@@ -108,7 +108,7 @@ camadas** (campo `layer`, default `audit` — retrocompatível):
   - `edge_type`: `SUPPORTS` · `REFUTES` · `SUPERSEDES` · `CAUSES` · `DEPENDS_ON` · `TRACES_TO`
 - **`layer: domain`** (SSOT durável — o que o sistema *é*):
   - `node_type`: `entity` · `state` · `event` · `rule` · `invariant` · `policy`
-  - `edge_type`: `HAS_STATE` · `TRANSITIONS` (com atributo `on:` = evento gatilho) · `EMITS` ·
+  - `edge_type`: `HAS_STATE` · `TRANSITIONS` (com atributo `trigger:` = evento gatilho; `on:` é legado proibido) · `EMITS` ·
     `CONSTRAINS` · `READS` · `WRITES`
 - **`plane`**: `DEV` (código/branch/commit) ou `PROD` (artefato vivo: deploy + config + dados)
 - **peso do nó**: `impact` (1–5) × `confidence` (0–1) × `status`
@@ -168,8 +168,10 @@ sem erro visível**. Evite:
 
 - **`on:` vira booleano `True` (YAML 1.1).** A chave `on:` de `TRANSITIONS ... on: EVENTO` é
   interpretada como o booleano `true` pelo parser YAML 1.1 → **os gatilhos de transição somem** (no
-  campo: 9 gatilhos perdidos numa migração, um estado-absorvente **falso** apareceu). **Cite o evento
-  entre aspas** (`on: "EVENTO"`) ou trate a chave `True` ao ler; nunca deixe `on:` nu.
+  campo: 9 gatilhos perdidos numa migração, um estado-absorvente **falso** apareceu). ~~Cite o evento
+  entre aspas (`on: "EVENTO"`)~~ — aspas no **valor** não salvam a **chave**. **Cura (2026-10-07):** o
+  gatilho chama-se **`trigger:`** e `on:` é **proibido** (alinhado ao contrato formal do `.kg.yaml`
+  em curso, perfil YAML 1.2 restrito). O radar ainda lê `on:` legado, mas acusa `ON-LEGADO`.
 - **Colisão de keyword-substring com o radar — CORRIGIDA em 2026-07-19 (não é mais footgun).** O
   `kg-radar.sh` é awk puro (por design determinístico: não aluga LLM) e **até 2026-07-19** capturava
   campos por substring de linha, tomando a **última** ocorrência: um campo livre (`label:`, `trace:`,
@@ -220,13 +222,13 @@ sem erro visível**. Evite:
    estado-absorvente pode ser terminal legítimo; o juízo é humano). As 5 checagens (promovidas do
    dogfood de campo 2026-07-08 + ADR design):
    - **estado-absorvente**: `state` que recebe `TRANSITIONS` e não emite nenhuma (limbo?);
-   - **EVENT-sem-efeito**: `event` que não origina aresta nem dispara `TRANSITIONS` via `on:`;
+   - **EVENT-sem-efeito**: `event` que não origina aresta nem dispara `TRANSITIONS` via `trigger:`;
    - **STATE-sem-dona**: `state` que nenhuma `entity` possui via `HAS_STATE`;
    - **RULE-sem-trace**: `rule|invariant|policy` sem `TRACES_TO` (regra não ancorada em artefato);
    - **fonte-única**: nó de domínio com >1 `READS` saindo (1 átomo = 1 fonte — ver §design abaixo).
 5. **FRESCOR** (`--freshness`, ⚠ atenção, **não reprova**) — a SSOT foi re-verificada contra o vivo?
    **STALE-MISSING** (nó `plane:PROD` sem `verified_at:`) · **STALE-OLD** (`verified_at` anterior à
-   `meta.baseline`) · **UNANCHORED** (`node_type: claim` com `verified_at:` sem `verified_against:` — carimbo sem alvo declarado). Ver §[Frescor e versão de schema](#frescor-e-versão-de-schema--o-radar-recusaavisa-quando-a-ssot-driftou).
+   `meta.baseline`) · **UNANCHORED** (`node_type: claim` com `verified_at:` sem `verified_against:` — carimbo sem alvo declarado) · **STALE-EXPIRED** (nó com `reverify_every:` cujo `verified_at` + a cadência já passou, calculado pelo `kg_validate.py --due` do kg-ssot; desde 2026-10-21). Ver §[Frescor e versão de schema](#frescor-e-versão-de-schema--o-radar-recusaavisa-quando-a-ssot-driftou).
 6. **SCHEMA** (`--schema`, ✗ **reprova**) — `meta.schema_version` bate com a versão que o radar entende?
    Divergência = recusa (o radar não sabe ler o arquivo); ausência = ⚠ retrocompat.
 7. **VALIDADE** (`--validade`, e também em `--all`, ⚠ atenção, **não reprova**) — o conhecimento ainda
@@ -302,9 +304,29 @@ SSOT-as-runtime à KB), a mesma máquina com duas referências — *o radar recu
   qual nós `superseded`/`refuted` já eram pulados. Os 170 não somem: viram **uma linha `ℹ` contada**, para
   o filtro ser auditável em vez de mágico. Lição atrás da lição: o veredito foi shipado **sem teste** e
   com alcance largo demais; a correção veio junto com a fixture e o caso `(MUT)` que faltavam.
+- **STALE-EXPIRED** (desde 2026-10-21; só em nó que declara `reverify_every:`, campo **do contrato**
+  kg-ssot v4.8): o `verified_at` somado à cadência já passou → ⚠. A cadência é **opt-in do dono do nó** e
+  por isso vale também para nó DEV sem `verified_against:`. O radar **não calcula** a data: consome o
+  relatório `kg_validate.py --due <hoje> --format json` (formato `kg-ssot.due/1`,
+  `vendor/kg-ssot/spec/due.schema.json`), e a soma de calendário mora no leitor de referência. Junto saem
+  **CADENCE-UNSTAMPED** (cadência sem `verified_at`), **CADENCE-MALFORMED** (cadência fora da forma, que o
+  `--due` descarta calado: o radar a lê do veredito SHOULD do mesmo leitor, `form.*.node.reverify_every`) e
+  uma linha `ℹ` que conta vencidos, sem carimbo, fora da forma, só por evento (`reverify_on`) e os em nó
+  `superseded`/`refuted` (história, não cobrada). **Fail-closed declarado:** leitor ausente, vendor sem
+  `--due`, rc ≠ 0 (inclusive leitor morto sem stderr), JSON ilegível, formato ≠ `kg-ssot.due/1`, due/1 sem
+  as listas do schema, `as_of` diferente de hoje, veredito do contrato que não rodou ou arquivo que o leitor
+  não parseia → `STALE-EXPIRED NÃO MEDIDO` com o porquê, nunca "0 vencidos". Grafo sem `reverify_*` não muda
+  em nada (medido: 515 grafos rastreados com saída e rc idênticos). **Tetos declarados:** este veredito
+  **usa a data de hoje** (`date -u`), e não há como fixá-la por ambiente, então só se reproduz no mesmo dia;
+  o pré-filtro é **texto** (a chave no começo de uma linha), e uma narrativa que a cite paga a chamada e,
+  com vendor sem `--due`, imprime o NÃO MEDIDO; e o `--freshness-tsv` **não** carrega o vencimento
+  (contrato de 11 colunas exatas, com consumidores por coluna fixa). Origem: `D_AUDIT_VOCAB_CONTRACT_VS_CORE_SPLIT_1021` (opção A), em
+  `docs/evolution/research/audit-evidence-machinery-2026-10/`. Vocabulário de auditoria do core: a gramática
+  em `.claude/rules/kg-grammar.md`.
 - **Aviso, não erro** — um nó stale **mente**, não corrompe; o veredito certo é "re-verifique", não
-  "recuse o arquivo". Determinístico: compara **duas datas do próprio arquivo** (`verified_at` × `baseline`),
-  **sem "agora"** — reproduzível.
+  "recuse o arquivo". Determinístico: STALE-MISSING/STALE-OLD/UNANCHORED/MISPLANED comparam **campos do
+  próprio arquivo** (`verified_at` × `baseline`), **sem "agora"** — reproduzíveis. O STALE-EXPIRED é a
+  exceção declarada acima: depende de hoje.
 
 **B. Versão de schema (drift no formato — `--schema`, ✗ recusa).** Uma SSOT que nenhuma ferramenta
 valida não é fonte da verdade (no campo: a SSOT viva estava no schema de uma ferramenta morta e dava

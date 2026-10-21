@@ -363,7 +363,7 @@ hard=0; soft=0
 # versão anterior refazia sha1 dentro de um `cmd | getline` por candidato só para reencontrar o nome.
 while IFS=$'\037' read -r n nid; do
   [ -n "${n}" ] || continue
-  if ! printf '%s\n' "${known}" | grep -qxF "${n}"; then
+  if ! grep -qxF "${n}" <<< "${known}"; then
     emit HARD NOVO "${n%%::*}" \
       "no '${nid:-<id oculto>}' e plane:PROD impact>=4 SEM verified_at e FORA do baseline — meca contra o vivo antes de selar (/meta:kg-freshness), ou o grafo afirma sobre producao sem nunca ter olhado."
     hard=$((hard+1))
@@ -381,6 +381,16 @@ done <<< "${PAIRS}"
 #   REMOVIDO         o nó não existe mais naquele arquivo                         → HARD
 #   FUGA-SEM-ARESTA  virou refuted/superseded por reetiqueta NUA, sem aresta      → HARD
 #   FUGA-DE-ESCOPO   segue sem carimbo e saiu rebaixando plane/impact             → HARD
+#   RETIRADO         o GRAFO INTEIRO saiu da árvore por decisão registrada no ledger → SOFT
+#
+# ⚠️ RETIRADO (2026-10-13) — a ÚNICA saída sem medição, e por isso a mais estreita. Nasceu quando o
+# core ficou PÚBLICO e o maestro mandou TIRAR da árvore grafos de dados pessoais: ali não há forma
+# honesta de aposentar o nó NO PRÓPRIO grafo (o `superseded` com aresta deixaria o id público, e o id
+# já é dado pessoal). Três travas, para não virar o atalho que o REMOVIDO fechou: (1) a chave tem de
+# estar no ledger `docs/evolution/kg-retired-from-tree.tsv` (data + decisão, visível no diff, e o
+# ledger não viaja — `docs/evolution/` fica fora do transporte); (2) o ARQUIVO do grafo tem de ter
+# sumido da árvore — nó apagado de grafo VIVO segue HARD REMOVIDO mesmo com a chave no ledger; (3) a
+# saída é SOFT DECLARADA, nunca silêncio: a medição que o baseline cobrava não aconteceu, e o gate diz.
 #
 # ⚠️ ESTA TABELA JA MENTIU, e o defeito e instrutivo: ela dizia `REMOVIDO → SOFT (ato visivel no
 # diff)` e "tres classes legitimas" DEPOIS de 2026-08-08, quando o PR da 2a porta ja tinha trocado a
@@ -415,12 +425,23 @@ done <<< "${PAIRS}"
 _orphans="$(printf '%s\n' "${TO_JUDGE}" | grep -v '^$' | grep -vxF -f <(printf '%s\n' "${UNVERIFIED}") 2>/dev/null || true)"
 if [ -n "${_orphans}" ]; then load_universe; load_hash_index; fi
 
+_RETIRED_LEDGER="${REPO_ROOT}/docs/evolution/kg-retired-from-tree.tsv"
+_retired() {  # $1 = chave path::hash → 0 se o ledger a declara retirada (só a 1a coluna conta)
+  [ -f "${_RETIRED_LEDGER}" ] || return 1
+  grep -vE '^[[:space:]]*(#|$)' "${_RETIRED_LEDGER}" 2>/dev/null | cut -f1 | grep -qxF -- "$1"
+}
 while IFS= read -r k; do
   [ -n "${k}" ] || continue
-  printf '%s\n' "${UNVERIFIED}" | grep -qxF "${k}" && continue
+  grep -qxF "${k}" <<< "${UNVERIFIED}" && continue
   kp="${k%%::*}"
+  # RETIRADO: as três travas do cabeçalho (ledger + arquivo AUSENTE da árvore + saída declarada).
+  if _retired "${k}" && [ ! -e "${REPO_ROOT}/${kp}" ]; then
+    emit SOFT RETIRADO "docs/evolution/kg-retired-from-tree.tsv" \
+      "o grafo ${kp} saiu da árvore por decisão registrada no ledger — a entrada sai do julgamento SEM medição (é declarado, não verificado): ${k}"
+    soft=$((soft+1)); continue
+  fi
   # a linha ainda está no baseline, ou o operador já a removeu? muda só o conselho da mensagem
-  if printf '%s\n' "${known}" | grep -qxF "${k}"; then hint="remova do baseline"; else hint="a linha ja saiu do baseline"; fi
+  if grep -qxF "${k}" <<< "${known}"; then hint="remova do baseline"; else hint="a linha ja saiu do baseline"; fi
   rec="$(resolve_key "${k}")"
   n_rec=$(printf '%s' "${rec}" | grep -c . || true)
   # AMBIGUIDADE: mais de um nó do corpus casa esta chave. Não dá para dizer se mudou de path, se
@@ -477,7 +498,7 @@ while IFS= read -r k; do
     # acabou de receber o arquivo movido — e o teste diria "ja existia" sobre um `git mv` legitimo.
     # Fail-open de ref vazia, medido aqui mesmo. Sem ponto de ramificacao nao ha como distinguir
     # homonimo de mudanca, e isso vai DITO na mensagem em vez de ser adivinhado.
-    if [ -n "${BASE_REF}" ] && git show "${BASE_REF}:${rpath}" 2>/dev/null | grep -qE "^[[:space:]]*-[[:space:]]*id:[[:space:]]*${rid}[[:space:]]*$"; then
+    if [ -n "${BASE_REF}" ] && grep -qE "^[[:space:]]*-[[:space:]]*id:[[:space:]]*${rid}[[:space:]]*$" <<< "$(git show "${BASE_REF}:${rpath}" 2>/dev/null)"; then
       emit HARD ID-AMBIGUO "${kp}" \
         "o no '${rid}' JA EXISTIA em ${rpath} antes desta branch — logo ele nao MUDOU de ${kp} para la: sao HOMONIMOS, e o gate NAO SABE qual era o desta entrada. Desambigue renomeando um dos ids, ou meca o no e remova a entrada."
       hard=$((hard+1)); continue

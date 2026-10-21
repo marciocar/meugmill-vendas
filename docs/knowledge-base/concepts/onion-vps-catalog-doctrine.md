@@ -26,7 +26,7 @@
 
 ## 🎯 Por que esta doutrina existe
 
-A VPS compartilhada (Hostinger KVM8, `srv1812846`) acumulou, entre julho e agosto de 2026, um auth
+A VPS compartilhada (Hostinger KVM8, `<host-da-vps>`) acumulou, entre julho e agosto de 2026, um auth
 maduro (Logto), um WhatsApp vivo (whatsapp-sender), um gap nomeado (email) e uma lista de candidatos
 (monitoramento, tunneling). O impulso natural — "vamos desenhar a arquitetura que harmoniza tudo isso"
 — **já foi tentado e reprovado** (F2, `stack-harmonia-2026-08`): a síntese citava "9 membros" e "canal
@@ -143,7 +143,7 @@ A convenção foi aplicada em 2026-08-05 (renomes: `onion-vps-waha`, `onion-vps-
 de contenção `onion-vps-docker-firewall` (abaixo).
 
 **Repo-por-ferramenta** é o padrão de casa para o esqueleto de cada entrada do catálogo: `onion-vps-logto`
-(vivo em `/home/marcio/onion-vps-logto/`) é a referência — README, `docker-compose.yml`, `up.sh` que lê
+(vivo em `⟨home do operador⟩/onion-vps-logto/`) é a referência — README, `docker-compose.yml`, `up.sh` que lê
 segredo via `pass`+`direnv` com `${VAR:?}` fail-closed, `upgrade.sh`, `check-version.sh`, `backup.sh`,
 `console.sh`, `.envrc`, `.gitignore`. Segredo da casa é **sempre `pass`(GPG)+`direnv`, nunca `.env`
 plaintext** — o mesmo invariante que o incidente de 2026-08-05 reforçou por outro ângulo (superfície
@@ -155,7 +155,7 @@ exposta não pode depender de disciplina, precisa de mecanismo).
 
 Em 2026-08-05, o Docker furou o `ufw`: a chain `DOCKER-FORWARD` roda **antes** do `ufw` no `iptables`, e
 `DOCKER-USER` estava vazia — resultado, data stores de adotantes (`onion-adopt-<nome>-*`: redis,
-postgres, milvus/minio/attu) ficaram **expostos à internet pública** em `179.197.65.94`, apesar do `ufw`
+postgres, milvus/minio/attu) ficaram **expostos à internet pública** em `<ip-da-vps>`, apesar do `ufw`
 "achar" que estava fechando as portas. Contido por uma regra `DOCKER-USER` default-deny (`-i eth0`)
 persistida em `onion-vps-docker-firewall.service` (systemd oneshot, `After=docker.service`, idempotente).
 
@@ -202,7 +202,7 @@ nomeia (env switch fictício), só que na camada de rede em vez de configuraçã
   `docs/evolution/research/stack-harmonia-2026-08/SYNTHESIS.md`.
 - **Incidente de rede (o invariante "atrás do bridge" testado):**
   `onion-vps-network-exposure-2026-08` (core-only).
-- **Esqueleto de referência vivo (repo-por-ferramenta):** `/home/marcio/onion-vps-logto/`.
+- **Esqueleto de referência vivo (repo-por-ferramenta):** `⟨home do operador⟩/onion-vps-logto/`.
 - **Critério de graduação (o Teste do Eixo/Gatilho, citado não recopiado):**
   [Doutrina de Abstração do Onion](onion-abstraction-doctrine.md).
 - **Recursão canal→solução (citado não recopiado):**

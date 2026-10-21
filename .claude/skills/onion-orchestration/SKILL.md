@@ -111,11 +111,15 @@ Nativas" (fonte única).
 8. **Relatório ao usuário** em pt-BR: padrão escolhido, nº de workers, tier de
    modelo, budget gasto, o resultado consolidado **e onde o `write(KG)` persistiu** (path do `.md`
    + `.kg.yaml` + veredito do radar).
-   **Antes de declarar o tier, cheque o ambiente:** `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` (Claude Code
-   ≥ 2.1.257) aplica UM modelo a todo subagente **ignorando** `model` por spawn e por definição de
-   agente — com ela setada, o tiering declarado no relatório é falso. Se `env | grep -c
-   CLAUDE_CODE_SUBAGENT_MODEL` ≠ 0, imprima **AVISO: tiering declarado ≠ executado (env force)**
-   e o modelo efetivo (behavior-over-declaration; radar E3 2026-09-02).
+   **Antes de declarar o tier, cheque o ambiente** rodando
+   `bash .claude/utils/orchestration/forced-model-check.sh`. Duas variáveis forçam o modelo e tornam
+   falso o tiering declarado: `CLAUDE_CODE_SUBAGENT_MODEL_FORCE` (Claude Code ≥ 2.1.257, aplica UM
+   modelo a todo subagente **ignorando** `model` por spawn e por definição de agente) e
+   `CLAUDE_CODE_WORKFLOW_SUBAGENT_MODEL` (≥ 2.1.296, roda todo agente de Workflow num modelo só).
+   Com rc 1 o helper imprime **AVISO: tiering declarado ≠ executado (env force)** e o modelo
+   efetivo; repasse o aviso no relatório. Não troque o helper por grep de substring à mão: o grep
+   antigo dava 0 para a variável de 2.1.296 e acusava `CLAUDE_CODE_SUBAGENT_MODEL` sozinha, que é
+   piso e não força (behavior-over-declaration; radar E3 2026-09-02 e r9 2026-10-11).
 
 ## Padrões → primitivas
 
@@ -260,7 +264,7 @@ força), e a doutrina desta casa é que `fix-must-become-mechanism` vale **quand
 - **Refutador roda em WORKTREE ISOLADA — e isso é mecanismo, não etiqueta.** Medido em 2026-09-20:
   um refutador com briefing que dizia, literalmente, *"Não modifique NENHUM arquivo; só meça e
   reporte"* escreveu em **seis** arquivos da árvore principal — incluindo o script de merge
-  (`ops/pr-merge-verified.sh`) e o lint. O conteúdo era **bom** (achou um defeito que quebraria
+  (`ops/pr-merge-verified.sh`, (core-only)) e o lint. O conteúdo era **bom** (achou um defeito que quebraria
   todo PR), e é justamente isso que torna o caso instrutivo: a instrução não falhou por ser
   ignorada de má-fé, falhou porque **instrução em prosa não é fronteira**. Pior, a violação só
   apareceu por acidente — três casos de bancada que eu não escrevi ficaram vermelhos.

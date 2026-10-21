@@ -31,7 +31,7 @@ São as regras que o gate mecânico do Onion aplica a **todo repo da rede**: o m
 lint roda no core e em cada adotante. **HARD** bloqueia o merge; **SOFT** avisa, mas não
 bloqueia o CI.
 
-**95 regras** no total — **84 HARD**, **33 SOFT**.
+**102 regras** no total — **90 HARD**, **42 SOFT**.
 
 ## Frontmatter & conformidade de artefato
 
@@ -46,6 +46,7 @@ Campos obrigatórios, válidos e bem-formados no frontmatter de agentes e comand
 | 17 | Frontmatter: valor escalar com ': ' não-aspado | HARD | YAML de frontmatter quebrado por escalar com ': ' não-aspado |
 | 23 | Frontmatter: category: em agentes (a metade 'model: em comandos' foi REVOGADA pela REGRA 71) | HARD | agente sem category: — o roteamento/inventário dependem dele. Até 2026-09-03 esta regra também EXIGIA |
 | 51 | Agentes branch-* documentam a distinção vs o par geral | SOFT | par de agentes com overlap invisível — dispatcher que roteia por description não escolhe |
+| 102 | Chave de frontmatter de agente pertence à allowlist (oficiais + as da casa) | HARD + SOFT | typo de chave de agente (`tool:` no lugar de `tools:`, `modle:`) que o Claude Code ignora em silêncio |
 
 ## Higiene de artefato
 
@@ -62,11 +63,10 @@ Tamanho saudável, nomes kebab-case, dialeto puro e links que resolvem.
 | 48 | Referência de caminho `.claude/…` em backtick (prosa) que não resolve | HARD | referência .claude/ em backtick na prosa apontando p/ arquivo inexistente (ponteiro morto silencioso) |
 | 60 | Identificador de código em INGLÊS | HARD | identificador em pt-BR entrando no código sem que nenhuma guarda mecânica o veja. |
 | 71 | Comando não declara model: no frontmatter — segue a escada da sessão | HARD | o Claude Code 2.1.259 passou a HONRAR model: de comando em sessão interativa (radar E3 rodada 2, l.17): |
-| 72 | Namespace de comando em plugin é /<plugin>:<cmd>, nunca o do core | HARD | comando empacotado citando `/engineer:pr` — ponteiro que não resolve no consumidor |
-| 73 | Hook empacotado resolve no plugin instalado | HARD | hook morto e silencioso no plugin (script ausente, motor não embarcado, caminho $REPO/${CLAUDE_PLUGIN_ROOT}, matcher perdido) |
-| 74 | Caminho .claude/ NU dentro de plugin só resolve no core, com catraca | HARD + SOFT | comando/agente empacotado apontando .claude/{utils,commands,templates,…} que não viajou — ponteiro morto no consumidor |
-| 75 | Link markdown relativo dentro de plugin resolve no plugin | HARD | `[irmã](../kb/x.md)` num plugin apontando para arquivo que não viajou — 404 no consumidor |
+| 74 | Caminho .claude/ NU dentro de plugin só resolve no core, com catraca | HARD + SOFT | baseline de passivo crescendo calado — um PR transformava ref NOVA (HARD) em PASSIVO (SOFT) acrescentando linha |
 | 94 | MUTANTE esquecido na árvore | HARD + SOFT | teste de mutação que morre no meio e deixa o repo PIOR que antes |
+| 98 | Diretiva de injeção escrita como CITAÇÃO não pode estar VIVA | HARD | exemplo de documentação que o harness lê como diretiva e EXECUTA a cada invocação do comando. |
+| 109 | CLAUDE.md não cresce sem tirar o equivalente ou citar um nó | HARD + SOFT | o arquivo que carrega em TODA sessão e compactação engordar sem ninguém decidir |
 
 ## Fronteiras & contratos de arquitetura
 
@@ -79,7 +79,6 @@ Proibições estruturais, documentação no lugar certo e os contratos de confor
 | 20 | Capability Contract: tier de conformance cumprido | HARD | componente reivindica um tier de conformance que não cumpre |
 | 40 | Adotante: .onion-version DEVE estar trackeado no git | HARD | adotante com .onion-version não-trackeado — 156 falso-HARD |
 | 53 | Regra path-scoped declara `paths:` que casa algo real | HARD | regra em .claude/rules/ que nunca carrega — instrução que o modelo jamais vê |
-| 77 | Contrato de dependência entre plugins | HARD + SOFT | dois plugins embarcando a mesma skill/KB (cópias divergem) ou um plugin usando skill que só outro embarca sem declarar |
 
 ## SDAAL — abstração de provider
 
@@ -89,17 +88,20 @@ O consumidor fala com a abstração, nunca com o provider direto.
 |---:|-------|:----------:|---------------|
 | 10 | SDAAL: sem chamada direta a provider no consumidor | HARD | consumidor chamando o provider direto, furando a abstração SDAAL |
 | 11 | Método de abstração usado no consumidor deve existir na interface | HARD | consumidor chama método de abstração que não existe na interface |
+| 103 | Adapter do task-manager declara todas as capacidades da interface, com fonte | HARD | capacidade declarada que o adapter não exerce, e célula "medida" sem fonte nenhuma. |
+| 104 | Executável do adapter e declaração de capacidades listam os mesmos verbos | HARD | executável do task-manager que exerce verbo declarado not_implemented (ou não declarado), e medição adapter: que nenhum executável roda. |
+| 105 | Script rastreado não chama a API do provedor de task manager por fora do adapter | HARD | o cliente do provedor reescrito fora do adapter (o script avulso da sessão promovido a ops/), que contorna o tm.sh e a declaração de capacidades. |
+| 107 | Adapter SDAAL declara onde o seu contrato é cobrado | HARD + SOFT | adapter em prosa cujo contrato só vale se a sessão lembrar — nenhum executável, hook ou validador o cobra. |
 
 ## SSOT anti-drift
 
-Toda superfície DERIVADA fica em sincronia com a fonte única — contagens, mapas, plugins, topologia.
+Toda superfície DERIVADA fica em sincronia com a fonte única — contagens, mapas, catálogo, topologia.
 
 | Nº | Regra | Severidade | O que previne |
 |---:|-------|:----------:|---------------|
 | 8 | Inventário canônico sincronizado com o filesystem | HARD | inventário mentindo vs o filesystem real (contagem drifta) |
 | 9 | Contagens no CLAUDE.md em sincronia com a SSOT | HARD | contagens no CLAUDE.md drifta da SSOT do inventário |
 | 16 | Contagem de inventário-TOTAL divergente da SSOT | SOFT | contagem-TOTAL do inventário divergindo da SSOT |
-| 19 | Plugins de vertical (plugins/*) sincronizados com as fontes | HARD | plugin de vertical driftando das fontes — bundle de adoção errado |
 | 21 | Grafo (docs/onion/graph.md) sincronizado com a spec-as-code | HARD | docs/onion/graph.md desatualizado vs a spec-as-code |
 | 27 | Dependência de script de comando empacotado | HARD | comando empacotado dependendo de script ausente no bundle |
 | 37 | Mapa role→bundle (roles.yaml) consistente com os verticais | HARD | mapa role->bundle (roles.yaml) driftando dos verticais |
@@ -110,15 +112,17 @@ Toda superfície DERIVADA fica em sincronia com a fonte única — contagens, ma
 | 62 | Projeção GERADA em sincronia com a fonte (docs/backlog.md) | HARD | projeção gerada que envelhece calada — o item existe no grafo e some da superfície que as sessões leem |
 | 63 | Colheita de grafo emite os ids colhidos no resíduo de revisão | HARD + SOFT | nó removido de um .kg.yaml sem registro consultável de que existiu — a promessa "a história fica no artefato de revisão" cumprida só na letra |
 | 70 | fallbackModel do settings.json é PROJEÇÃO da escada de modelos (eixo E6) | HARD | a escada (session_models + session_floor em docs/onion/radar-baselines.yaml) e o fallback nativo do |
-| 76 | marketplace.json da raiz é projeção do gerador | HARD | .claude-plugin/marketplace.json envelhecendo calado (o core também é marketplace instalável) |
+| 76 | marketplace.json da raiz aponta o repo PÚBLICO e é projeção dos manifestos | HARD | .claude-plugin/marketplace.json envelhecendo calado ou apontando um plugins/ local que o core não guarda mais |
 | 80 | Números do harness saem de SSOT gerada, nunca de comentário | HARD | contagem sobre o próprio harness escrita à mão, que envelhece calada e é citada como medição |
 | 81 | Painel de estado é GERADO dos produtores, nunca redigido | HARD | painel de testes com número sem produtor — metas redesenhadas como medição, que foi o defeito real deste repo |
 | 83 | Id de modelo VERSIONADO só na SSOT declarada | HARD | versão literal de modelo espalhada por config, que caduca sem aviso |
 | 84 | Índice de leitura do KG em sincronia com os traces | HARD + SOFT | o hook da perna de leitura mentir POR OMISSÃO |
-| 85 | Porta pública espelha o core, com catraca | HARD + SOFT | a porta MENTIR sobre o que o core é, por falta de re-materialização |
+| 85 | Porta pública espelha o core, com catraca | SOFT | a porta MENTIR sobre o que o core é, por falta de re-materialização |
 | 90 | Prosa de comando conhece os papéis que o script aceita | SOFT | o par script×prosa dos comandos de co-evolução desencontrar — e ele JÁ desencontrou duas |
 | 92 | Papel da porta no registro concorda com o CARIMBO dela | HARD + SOFT | o materializador ler o papel ERRADO e cortar maquinaria da porta pública |
 | 96 | Diretiva de contexto INJETADO não corta listagem em silêncio | HARD | a projeção que o harness injeta é lida pela sessão COMO SE FOSSE o conjunto — não há |
+| 108 | Pin do grafo de adoção concorda com o carimbo | HARD + SOFT | o grafo que o warm-up manda ler PRIMEIRO mentir sobre a versão do Onion instalada |
+| 110 | Índice da KB conta o que o disco tem | HARD + SOFT | o índice de docs/knowledge-base declarar uma contagem e listar outra, com arquivos fora dele |
 
 ## KG & proveniência
 
@@ -146,6 +150,7 @@ Conhecimento nasce no grafo e não morre em prosa; proveniência com catraca (po
 | 87 | PR que EDITA um `.kg.yaml` enxergou os `confirmed` dele | SOFT | propor contra o próprio corpus — o defeito medido em 2026-09-19 |
 | 89 | Rodada de radar selada reconcilia o corpus que superou (Aufhebung), com catraca | HARD + SOFT | a UNICA divida deste corpus que piora sozinha — rodada de radar selada como baseline sem |
 | 93 | KB de terceiro declara a QUE VERSÃO se aplica | HARD + SOFT | documentação que caduca sem dizer para qual versão ela valia |
+| 99 | Nó de .kg.yaml sem caminho de máquina, julgado pela classe | HARD + SOFT | caminho de máquina voltando ao corpus depois de a migração de provenance tirá-lo (com catraca). |
 
 ## Automação Graduada
 
@@ -173,7 +178,7 @@ Mapa, console, agent-card e canais de membro em sincronia com o SSOT da rede.
 
 ## Projeção & privacidade
 
-O que pode sair para superfícies públicas ou vendorizadas — nome de cliente e deep-link privado nunca vazam (nem a HOME crua do source privado, num artefato de plugin); e o compose commitado nunca publica porta em 0.0.0.0 nem sobe com segredo de fallback.
+O que pode sair para superfícies públicas ou vendorizadas — nome de cliente e deep-link privado nunca vazam; e o compose commitado nunca publica porta em 0.0.0.0 nem sobe com segredo de fallback.
 
 | Nº | Regra | Severidade | O que previne |
 |---:|-------|:----------:|---------------|
@@ -181,11 +186,12 @@ O que pode sair para superfícies públicas ou vendorizadas — nome de cliente 
 | 33 | Segurança de projeção no HISTÓRICO DE FEDERAÇÃO (mailbox-aware) | HARD | nome privado vazando no histórico de federação (mailbox) |
 | 34 | Site: a derivação nunca vira fonte | HARD + SOFT | o build do site (derivação) entrando no git como se fosse fonte |
 | 35 | Site público não linka deep-link do repo PRIVADO (404 garantido) | HARD | site público linkando deep-link de repo privado — 404 garantido |
-| 36 | Superfície VENDORIZADA sem nome comercial de cliente | HARD | nome comercial de cliente vazando em superfície vendorizada |
+| 36 | Superfície VENDORIZADA sem nome comercial de cliente | HARD + SOFT | nome comercial de cliente vazando em superfície vendorizada |
 | 45 | Link vendorizado não aponta caminho core-privado, com catraca | HARD + SOFT | link vivo em superfície vendorizada para caminho core-privado — morto no adotante |
-| 61 | Fronteira de MOAT: manifesto de plugin publicável não vaza meta-fábrica nem grafo privado | HARD | publicar a AUTO-REPLICAÇÃO (create-*/adopt/marketplace/decouple) ou o SSOT PRIVADO do core |
+| 61 | Fronteira de MOAT: manifesto de plugin publicável não vaza adoção, federação nem grafo privado | HARD | publicar a ADOÇÃO e a FEDERAÇÃO (adopt/federation-*/co-*/marketplace/decouple) ou o SSOT PRIVADO |
 | 64 | Compose sem bind local ou com segredo em fallback literal | HARD + SOFT | porta publicada em todas as interfaces (o Docker ignora o firewall do HOST — ufw/iptables |
-| 79 | Artefato de plugin não publica o repo-fonte PRIVADO como endereço | HARD | plugin/marketplace publicando a URL do source privado — 404 no instalador |
+| 100 | Superfície que viaja não cita ops/ como se o destinatário o tivesse | HARD + SOFT | porta/adotante recebendo instrução que aponta para ops/, que não viaja (com catraca). |
+| 106 | Superfície que viaja passa pela varredura de vazamento da publicação | HARD + SOFT | id de adotante com prefixo onion- ou caminho de máquina entrando por PR verde e só sendo barrado no fim, pelo motor de publicação das portas. |
 
 ## Processo com resíduo
 
@@ -197,10 +203,22 @@ O trabalho PROPOSTO carrega rastro material de ter sido revisado — o gate cria
 
 ## Integridade do próprio gate
 
-As demais categorias perguntam 'achei violação?'. Esta pergunta 'eu cheguei a olhar?' — porque varredura cega devolve zero violações, que é indistinguível de conformidade. Categoria nova em 2026-08-04, quando o lint rodou de dentro de um worktree de harness e varreu 0 dos 51 agentes sem emitir uma linha de aviso. A REGRA 86 entrou aqui em 2026-09-17 pelo mesmo motivo, um andar acima: um workflow que não PARSEIA não é um gate que falhou, é um gate que nunca rodou — e o repo o contava como existente. A REGRA 88 entrou em 2026-09-20 pela versão mais perversa da classe: o gate rodava, mas sem árvore — `bash <script do repo>` saía 127, o job reprovava TODO PR e a mensagem culpava o código revisado. Gate que nunca olhou, acusando.
+As demais categorias perguntam 'achei violação?'. Esta pergunta 'eu cheguei a olhar?' — porque varredura cega devolve zero violações, que é indistinguível de conformidade. Categoria nova em 2026-08-04, quando o lint rodou de dentro de um worktree de harness e varreu 0 dos 51 agentes sem emitir uma linha de aviso. A REGRA 86 entrou aqui em 2026-09-17 pelo mesmo motivo, um andar acima: um workflow que não PARSEIA não é um gate que falhou, é um gate que nunca rodou — e o repo o contava como existente. A REGRA 88 entrou em 2026-09-20 pela versão mais perversa da classe: o gate rodava, mas sem árvore — `bash <script do repo>` saía 127, o job reprovava TODO PR e a mensagem culpava o código revisado. Gate que nunca olhou, acusando. A REGRA 101 entrou em 2026-10-11 pela versão do veto: o hook que nem roda (script ausente, rc=127) deixava a ação passar — veto que não executou, contado como veto.
 
 | Nº | Regra | Severidade | O que previne |
 |---:|-------|:----------:|---------------|
 | 54 | A varredura ENXERGA o que existe (guarda-das-guardas) | HARD | gate que varre ZERO arquivo e mesmo assim reporta OK — verde sem ter olhado |
 | 86 | Workflow de CI PARSEIA como YAML | HARD | workflow inexecutável passando por existente, e guarda morta por sintaxe |
 | 88 | Job de workflow que EXECUTA arquivo do repo faz checkout | HARD + SOFT | job sem `actions/checkout` invocando script versionado; o bash sai 127 e o `rc != 0` |
+| 101 | Veto PreToolUse por exit 2 declara onFailure: block | HARD + SOFT | veto que falha ABERTO quando o hook nem roda (script ausente sai 127 e a ação passa). |
+
+## Aplicabilidade por papel
+
+Regras cujo objeto só existe em alguns papéis, declaradas por `# aplica-se:` no docstring. Fora desses
+papéis o lint **não as roda** e as conta à parte (`Não se aplica`), fora de HARD e SOFT: ausência
+legítima de objeto não é aviso. Toda lista contém `source`, então no core todas rodam.
+
+| Nº | Regra | Aplica-se a |
+|---:|-------|-------------|
+| 85 | Porta pública espelha o core, com catraca | source |
+| 92 | Papel da porta no registro concorda com o CARIMBO dela | source |

@@ -31,6 +31,9 @@ input=$(cat 2>/dev/null) || exit 0
 
 if command -v jq >/dev/null 2>&1; then
   cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null)
+  # o diretório em que o comando RODOU: o harness tira o `cd <dir> &&` que leva ao cwd da sessão, então
+  # um `gh pr create` de dentro de uma worktree chega aqui SEM `cd` (medido 2026-10-14, PRs #1110 e #1112)
+  hook_cwd=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null)
   out=$(printf '%s' "$input" | jq -r '(.tool_response.stdout // .tool_response.output // "")' 2>/dev/null)
 else
   # Sem jq a guarda se cala — declarar que NÃO SABE é o comportamento correto (certeza é campo, não tom).
@@ -117,10 +120,14 @@ case "$cmd" in *pipefail*) : ;; *)
             c = substr(s, i, 1)
             if (q == "") { if (c == "'"'"'" || c == "\"") { q = c } else { o = o c } }
             else if (c == q) { q = "" }
+            else if (q == "\"" && substr(s, i, 2) == "$?") { o = o "$?"; i++ }   # "rc=$?" LE o exit: o $? sobrevive
           }
           if (q != "") return s        # aspas ABERTAS no fim da linha: indeterminado -> crua
           return o
         }
+      function stmts(s,   t) {              # separa instrucoes: `||` e `&&` e `;` viram \034 (o `|` solto fica)
+        t = s; gsub(/\|\||&&|;/, "\034", t); return t
+      }
       function lastQ(s,   pos, off, ult) {
         off = 0; ult = 0
         while ((pos = index(substr(s, off + 1), "$?")) > 0) { ult = off + pos; off = ult + 1 }
@@ -142,10 +149,19 @@ case "$cmd" in *pipefail*) : ;; *)
         # de verdade. Lendo os dois em `nu`, `ls | wc -l; echo "rc=$?"` ficava sem `$?` nenhum e a
         # guarda CALAVA — o modo-de-falha nº2 que a FUNDOU, cegado pela cura de ordem. Achado por
         # passada adversarial, com main DISPARANDO e HEAD calado no mesmo comando.
-        p_ord = index(nu, "|"); q_ord = lastQ(cur)
-        mesmaLinha = (p_ord > 0 && q_ord > 0 && p_ord < q_ord)
-        if (cur ~ /\$\?/ && (mesmaLinha || prevNu ~ /\|/)) { found = 1; exit }
-        if (cur ~ /[^ \t]/) { prev = cur; prevNu = nu }       # linha em branco não quebra a vizinhança
+        # ⚠️ O `$?` LE O EXIT DA INSTRUCAO IMEDIATAMENTE ANTERIOR, nao de qualquer pipe da linha —
+        # 5a classe de falso-positivo, medida 3x num so dia (2026-10-11): `a | head; b >/dev/null
+        # 2>&1; echo rc=$?` acusava, mas o `$?` e do `b`. A linha agora se parte em INSTRUCOES
+        # (`;` `&&` `||`, lidas no texto sem aspas) e cada `$?` olha so a instrucao de antes —
+        # na propria linha, ou a ultima da linha anterior. A instrucao do proprio `$?` tambem conta
+        # se tiver pipe ANTES dele. Continua valendo "algum `$?`", nao so o ultimo.
+        n = split(stmts(nu), st, "\034")
+        for (k = 1; k <= n; k++) {
+          if (index(st[k], "$?") == 0) continue
+          antes = (k > 1) ? st[k - 1] : prevLast
+          if (antes ~ /\|/ || index(substr(st[k], 1, index(st[k], "$?")), "|") > 0) { found = 1; exit }
+        }
+        if (cur ~ /[^ \t]/) { prevLast = st[n] }       # linha em branco não quebra a vizinhança
       }
       END { exit(found ? 0 : 1) }'; then
     add 'EXIT-CODE-DE-PIPE: você leu `$?` logo depois de um pipe — ele é do ÚLTIMO elemento (o `tail`/`head`/`grep`), não do comando que interessa. Rode o comando sozinho e capture `$?` na linha seguinte, ou use `set -o pipefail`.'
@@ -155,13 +171,13 @@ esac
 # (2) glob dentro de path sob sudo — expande no shell do CHAMADOR, que pode não ter acesso.
 case "$cmd" in
   *sudo*)
-    if printf '%s' "$cmd" | grep -qE 'sudo[^|;]*(ls|cat|stat|head|tail|wc)[^|;]*/[^ ]*\*'; then
+    if grep -qE <<< "$cmd" 'sudo[^|;]*(ls|cat|stat|head|tail|wc)[^|;]*/[^ ]*\*'; then
       add 'GLOB-SOB-SUDO: o `*` expande no SEU shell ANTES do sudo — se você não tem acesso ao diretório, ele não casa nada e o comando recebe o literal. Use `sudo find <dir> -name "<padrão>"`, que expande DENTRO do sudo.'
     fi ;;
 esac
 
 # (3) erro engolido alimentando contagem/decisão — zero indistinguível de falha.
-if printf '%s' "$cmd" | grep -qE '2>/dev/null.*\|[[:space:]]*(wc[[:space:]]+-l|grep[[:space:]]+-c)'; then
+if grep -qE <<< "$cmd" '2>/dev/null.*\|[[:space:]]*(wc[[:space:]]+-l|grep[[:space:]]+-c)'; then
   add 'ERRO-ENGOLIDO-VIRANDO-NÚMERO: há `2>/dev/null` a montante de uma contagem — um comando que FALHOU e um objeto que NÃO EXISTE produzem o mesmo `0`. Mostre o stderr, ou use o helper: `source .claude/utils/safe-count.sh` → `count_files <dir> <glob>` / `count_matches <padrão> <arquivos>` / `count_lines <arquivo>` (alvo ausente = exit 2 + stderr, nunca zero silencioso).'
 fi
 
@@ -222,10 +238,10 @@ while IFS= read -r _stmt; do
                                           s/^[[:space:]]*//')"
     case "${_c}" in pgrep\ *|pkill\ *|pgrep|pkill) ;; *) continue ;; esac
     # MODO FULL por QUALQUER token de opção — cluster curto com `f`, ou a longa `--full`
-    printf '%s' "${_c}" | grep -qE '(^|[[:space:]])(-[a-zA-Z]*f[a-zA-Z]*|--full)([[:space:]]|$)' || continue
+    grep -qE <<< "${_c}" '(^|[[:space:]])(-[a-zA-Z]*f[a-zA-Z]*|--full)([[:space:]]|$)' || continue
     # DESARMES por opção da PRÓPRIA invocação: -A (ignora ancestrais, a cura real), -x (casa o NOME
     # do executável), -O/--older (o shell que roda o laço é NOVO)
-    if printf '%s' "${_c}" | grep -qE '(^|[[:space:]])(-[a-zA-Z]*[AxO][a-zA-Z]*|--ignore-ancestors|--exact|--older)([[:space:]]|$)'; then continue; fi
+    if grep -qE <<< "${_c}" '(^|[[:space:]])(-[a-zA-Z]*[AxO][a-zA-Z]*|--ignore-ancestors|--exact|--older)([[:space:]]|$)'; then continue; fi
     # COLCHETE: isenta só se a forma NUA não co-ocorrer. `bash x.sh & until ! pgrep -f '[x]'` tem o
     # `x` nu no lançamento, então o colchete não protege nada ali.
     # o ARGUMENTO termina no primeiro redirect — senão um `[` em `> /tmp/x[1].txt` isentaria a regra
@@ -325,9 +341,35 @@ fi
 # A cura é a forma, não o cuidado: HEREDOC CITADO (`git commit -F - <<'MSG'`) — as aspas simples no
 # delimitador desligam toda expansão. Aspas simples no `-m` também servem, mas quebram no primeiro
 # apóstrofo, que em pt-BR aparece.
+# ⚠️ A CRASE TEM DE ESTAR DENTRO DO ARGUMENTO ENTRE ASPAS DUPLAS do -m/-F — 2a classe de falso-positivo,
+# medida 3x em 2026-10-12: a 1a versão acusava QUALQUER crase do comando, e um `printf '…`x`…'` entre
+# aspas SIMPLES na mesma linha do commit gritava. Agora a varredura começa em cada -m"/-F" e para na aspa
+# dupla de fecho (barra invertida escapa); só crase nesse trecho conta. Aspa dupla que não fecha = GRITA
+# (indeterminado erra para o lado de falar).
+_crase_na_msg() {
+  awk 'BEGIN { RS = "\001" } {
+    s = $0; n = length(s); i = 1
+    while (i <= n) {
+      if (substr(s, i, 1) == "-" && (substr(s, i + 1, 1) == "m" || substr(s, i + 1, 1) == "F")) {
+        j = i + 2; while (j <= n && (substr(s, j, 1) == " " || substr(s, j, 1) == "\t")) j++
+        if (substr(s, j, 1) == "\"") {
+          k = j + 1; fechou = 0
+          while (k <= n) { c = substr(s, k, 1)
+            if (c == "\\") { k += 2; continue }
+            if (c == "`") { achou = 1; exit }
+            if (c == "\"") { fechou = 1; break }
+            k++ }
+          if (!fechou) { achou = 1; exit }
+          i = k
+        }
+      }
+      i++
+    }
+  } END { exit(achou ? 0 : 1) }' <<< "$1"
+}
 if grep -qE '(^|[[:space:];&|])git[[:space:]]+commit' <<< "${cmd}" \
    && grep -qE '\-(m|F)[[:space:]]*"' <<< "${cmd}" \
-   && grep -q '`' <<< "${cmd}"; then
+   && _crase_na_msg "${cmd}"; then
   add 'CRASE-EM-MENSAGEM-DE-COMMIT: há crase dentro de `-m "…"`/`-F "…"` — em aspas DUPLAS o shell EXECUTA o conteúdo da crase em vez de citá-lo (medido 2026-09-17: `docs/` virou `Is a directory` e a palavra sumiu da história; com um comando destrutivo ali dentro, ele teria RODADO). Use heredoc CITADO: `git commit -F - <<'"'"'MSG'"'"'` … `MSG` — as aspas simples no delimitador desligam toda expansão.'
 fi
 
@@ -338,9 +380,9 @@ fi
 #     considerou a hipótese — a guarda não tem o que ensinar.
 # Sobra exatamente a forma que me mordeu: descoberta nua cujo vazio eu ia ler como ausência.
 if [ -z "${out//[[:space:]]/}" ] \
-   && ! printf '%s' "$cmd" | grep -qE 'grep[[:space:]]+-[a-zA-Z]*[qc]' \
-   && ! printf '%s' "$cmd" | grep -qE '\|\|[[:space:]]*(echo|printf|true)|[[:space:]]else[[:space:]]' \
-   && printf '%s' "$cmd" | grep -qE '(^|[|;&[:space:]])(ls|find|git ls-files)([[:space:]]|$)'; then
+   && ! grep -qE <<< "$cmd" 'grep[[:space:]]+-[a-zA-Z]*[qc]' \
+   && ! grep -qE <<< "$cmd" '\|\|[[:space:]]*(echo|printf|true)|[[:space:]]else[[:space:]]' \
+   && grep -qE <<< "$cmd" '(^|[|;&[:space:]])(ls|find|git ls-files)([[:space:]]|$)'; then
   add 'VAZIO ≠ AUSÊNCIA: comando de descoberta devolveu NADA. Vazio pode ser (a) o objeto não existe, (b) o path/glob está errado, (c) você não tem acesso. São conclusões OPOSTAS. Confirme o caminho-pai antes de afirmar que algo não existe.'
 fi
 
@@ -380,14 +422,14 @@ _tem_gate_r56() {        # a REGRA 56 vem do LINT VENDORIZADO do PROJETO, não d
   local _v="${CLAUDE_PROJECT_DIR:-.}/.claude/valid""ation"
   [ -f "${_v}/review-artifact-check.sh" ] || [ -f "${_v}/lint-artifacts.sh" ]; }
 
-if printf '%s\n' "$cmd" | grep -qE '(^|[;&|][[:space:]]*|^[[:space:]]*)gh[[:space:]]+pr[[:space:]]+merge([[:space:]]|$)'; then
+if grep -qE <<< "$cmd" '(^|[;&|][[:space:]]*|^[[:space:]]*)gh[[:space:]]+pr[[:space:]]+merge([[:space:]]|$)'; then
     if _tem_check_revisor; then
       add 'MERGE-SEM-FONTE-LIDA: `onion-review` sai VERDE POR DESENHO quando o revisor falha (soft-pass) — `pass` ali NÃO significa que houve revisão. A fonte é a linha `onion-review-verdict` em `gh pr checks <N>`. Se você não leu ESSA linha, você não sabe se este PR foi revisado.'
     else
       add 'MERGE-SEM-REVISOR: este repo NÃO tem o workflow do revisor Onion, logo o check `onion-review-verdict` NÃO existe aqui — não vá procurá-lo. O merge não tem revisor automático: leia os checks que ESTE repo tem (`gh pr checks <N>`). Para ganhar o revisor: `/meta:adopt` (ou a oferta de CI, se já adotado).'
     fi
 fi
-# O AVISO DO CREATE OLHA O ARTEFATO E O PAPEL, NÃO SÓ A STRING (sinal do onion-kg-ssot, 2026-10-07).
+# O AVISO DO CREATE OLHA O ARTEFATO E O PAPEL, NÃO SÓ A STRING (sinal de um adotante, 2026-10-07).
 # A 1ª redação casava o comando e nunca conferia nada, e mediu-se o defeito pelos DOIS lados no
 # mesmo dia: (1) o PR #3 de lá tinha o resíduo commitado ANTES do `gh pr create` e o aviso disparou
 # igual — avisar quem seguiu o ritual é a fadiga que este arquivo combate; (2) num repo com papel
@@ -401,8 +443,10 @@ _pr_dir() {
   local d
   d="$(printf '%s\n' "$cmd" | sed -n 's/.*\bcd[[:space:]]\{1,\}\([^;&|[:space:]]\{1,\}\).*/\1/p' | tail -1)"
   d="${d%\"}"; d="${d#\"}"; d="${d%\'}"; d="${d#\'}"
-  case "$d" in ''|*'$'*) d="${CLAUDE_PROJECT_DIR:-.}" ;; esac
-  [ -d "$d" ] || d="${CLAUDE_PROJECT_DIR:-.}"
+  # sem `cd` explícito, o cwd do payload (onde o comando rodou) vem antes do projeto: o checkout principal
+  # está na main e não tem o resíduo de branch nenhuma, e o aviso saía falso para todo PR de worktree.
+  case "$d" in ''|*'$'*) d="${hook_cwd:-${CLAUDE_PROJECT_DIR:-.}}" ;; esac
+  [ -d "$d" ] || d="${hook_cwd:-${CLAUDE_PROJECT_DIR:-.}}"
   printf '%s' "$d"; }
 _pr_branch() {  # $1=dir
   local b
@@ -413,9 +457,9 @@ _residuo_commitado() {  # $1=dir $2=branch — o resíduo da REGRA 56 está na b
   [ -n "$2" ] || return 1
   git -C "$1" cat-file -e "$2:docs/evolution/review/$(printf '%s' "$2" | tr / -).md" 2>/dev/null; }
 _repo_derivado() {  # o MESMO predicado da REGRA 56 (review-artifact-check.sh): fora de escopo ali
-  grep -qE '^(role:[[:space:]]*(adopted|hub|standalone)|decoupled_from:)' "$1/.claude/.onion-version" 2>/dev/null; }
+  grep -qE '^(role:[[:space:]]*(adopted|hub|standalone)|decoupled_from:|kind:[[:space:]]*door)' "$1/.claude/.onion-version" 2>/dev/null; }
 
-if printf '%s\n' "$cmd" | grep -qE '(^|[;&|][[:space:]]*|^[[:space:]]*)gh[[:space:]]+pr[[:space:]]+create([[:space:]]|$)'; then
+if grep -qE <<< "$cmd" '(^|[;&|][[:space:]]*|^[[:space:]]*)gh[[:space:]]+pr[[:space:]]+create([[:space:]]|$)'; then
     _prd="$(_pr_dir)"; _prb="$(_pr_branch "${_prd}")"
     if _residuo_commitado "${_prd}" "${_prb}"; then
       :   # ritual cumprido: resíduo commitado na branch do PR — calar é o que impede a fadiga
@@ -458,7 +502,7 @@ fi
 # Agora: tokeniza POR STATEMENT (o mesmo split da (3b)), entende as opções globais do git, e aplica a
 # regra de posição CERTA para cada subcomando. Acentos são normalizados antes de segmentar — sem isso
 # `fix/rotação-de-chaves` truncava no captor e passava.
-if printf '%s\n' "$cmd" | grep -qE '(^|[;&|][[:space:]]*|^[[:space:]]*)git([[:space:]]+(-C|-c)[[:space:]]+[^[:space:]]+|[[:space:]]+--git-dir=[^[:space:]]+)*[[:space:]]+(checkout|switch|branch|worktree)([[:space:]]|$)'; then
+if grep -qE <<< "$cmd" '(^|[;&|][[:space:]]*|^[[:space:]]*)git([[:space:]]+(-C|-c)[[:space:]]+[^[:space:]]+|[[:space:]]+--git-dir=[^[:space:]]+)*[[:space:]]+(checkout|switch|branch|worktree)([[:space:]]|$)'; then
   _wl="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/validation/lib/pt-br-words.txt"
   if [ -f "${_wl}" ]; then
     while IFS= read -r _bn; do

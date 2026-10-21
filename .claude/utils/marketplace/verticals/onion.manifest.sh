@@ -1,6 +1,6 @@
 # onion — o NÚCLEO do Sistema Onion como plugin: orquestrador mestre, runtime de knowledge graph
 # (kg + radar soberano + freshness), sessões, diário, orquestração, condução (wizard/onboarding/retro),
-# validação de meta-specs, co-evolução upstream e os adapters SDAAL (task-manager, forge).
+# validação de meta-specs e os adapters SDAAL (task-manager, forge).
 # 2026-09-04 (F2 da revisão para o diretório oficial): ABSORVEU onion-work-tools — a pesquisa R1 mostrou que o
 # canal premia bundle vertical coeso, e work-tools era um saco de ferramentas que duplicava skill/motor/KB do núcleo.
 # 2026-09-06: ABSORVEU a CONDUÇÃO DE PLANO-GRAFO (/meta:drive + /meta:realign + os dois motores + o predicado
@@ -14,13 +14,16 @@
 # ficaria NU no plugin e cai na classe ALLOWED-TOOLS da REGRA 74 — permissão que não casa no consumidor,
 # comando NASCIDO MORTO. Some-se a isso a pergunta de desenho que o fio já nomeia (onde o INSTALADOR
 # guarda fila e grafo). Ver Q_KG_INBOX_FORA_DO_PLUGIN em docs/evolution/research/librechat-kg-runtime-2026-08/.
-# REGRA 61: manifesto publicável NUNCA lista meta-fábrica (create-*/adopt/marketplace/decouple/evolve/absorb-skill/
-# federation-*) nem docs/onion/graph/*. co-evolve/co-relay (upstream) são permitidos por desenho.
+# REGRA 61: manifesto publicável NUNCA lista adoção nem federação (adopt/federation-*/co-*/marketplace/decouple)
+# nem docs/onion/graph/*. ⚠️ 2026-10-10 (F2 das portas, D_MATRIZ_DE_PORTAS_2026_10): plugins = a superfície do
+# standalone. /meta:co-evolve e /meta:co-relay SAÍRAM deste núcleo (eram "upstream permitido por desenho"; a
+# matriz os nomeia entre o que o standalone não leva), junto com a capacidade co-evolution-upstream. A
+# meta-fábrica (create-*/evolve/forge...) deixou de ser moat e PODE entrar; empacotá-la é da F4 (SAC-93).
 
 PLUGIN_NAME="onion"
 PLUGIN_VERSION="0.1.0"
-PLUGIN_DESC="Núcleo operacional do Sistema Onion: o orquestrador mestre (skill onion), runtime de knowledge graph (kg + radar soberano + kg-freshness), sessões e diário, orquestração de subagentes, condução (wizard/onboarding/retro), validação de meta-specs, co-evolução upstream e os adapters SDAAL de task-manager e forge."
-KEYWORDS=(onion orchestration knowledge-graph sdaal dogfood elenxo runtime diary metaspec co-evolution)
+PLUGIN_DESC="Núcleo operacional do Sistema Onion: o orquestrador mestre (skill onion), runtime de knowledge graph (kg + radar soberano + kg-freshness), sessões e diário, orquestração de subagentes, condução (wizard/onboarding/retro), validação de meta-specs e os adapters SDAAL de task-manager e forge."
+KEYWORDS=(onion orchestration knowledge-graph sdaal dogfood elenxo runtime diary metaspec)
 
 # Ordem: o absorvido PRIMEIRO, o dono DEPOIS — na colisão de basename (README.md/help.md) o assembler deixa o último vencer.
 COMMANDS=(
@@ -36,8 +39,6 @@ COMMANDS=(
   ".claude/commands/meta/constellation.md"
   ".claude/commands/meta/setup-integration.md"
   ".claude/commands/meta/setup-code-review.md"
-  ".claude/commands/meta/co-evolve.md"
-  ".claude/commands/meta/co-relay.md"
   ".claude/commands/meta/backlog.md"
   ".claude/commands/meta/drive.md"
   ".claude/commands/meta/realign.md"
@@ -55,6 +56,9 @@ COMMANDS=(
   ".claude/commands/meta/kg-inbox.md"
   ".claude/commands/meta/radar.md"
   ".claude/commands/meta/census.md"
+  # 2026-10-14: o maestro classificou o /meta:decide em `full` (todos os papéis menos o mini); a REGRA 37
+  # (Mapa role→bundle (roles.yaml) consistente com os verticais) o cobrou aqui na mesma hora.
+  ".claude/commands/meta/decide.md"
 )
 AGENTS=(
   ".claude/agents/meta/metaspec-gate-keeper.md"
@@ -76,6 +80,9 @@ HOOKS=(
   ".claude/hooks/pretooluse-env-guard.sh"
 )
 UTILS=(
+  # A classe do caminho de máquina (machine_path.py), que o kg-contract-check.sh do /meta:decide importa de
+  # `validation/../utils/kg` (2026-10-14). Sem ela o checador sai 2 ("não dá para julgar") onde o vendor existe.
+  ".claude/utils/kg"
   ".claude/utils/diagnose"
   ".claude/utils/task-manager"
   ".claude/utils/forge"
@@ -83,6 +90,10 @@ UTILS=(
   # dead-ref, que é a REGRA 27 (Dependência de script de comando empacotado) na forma mais crua:
   # entregar metade do comando. UTILS aceita DIRETÓRIO (o assemble valida com `-d`).
   ".claude/utils/census"
+  # Helper que a skill onion-orchestration manda rodar no passo 8 (SAC-105, 2026-10-11). Mesma classe
+  # do workflow-syntax-check.sh abaixo: sem ele aqui, a skill viaja com um caminho que não existe no
+  # bundle. Achado pela passada adversarial do PR, não pelo --affected (que não seleciona plugin_bundle).
+  ".claude/utils/orchestration"
 )
 VALIDATION=(
   # ⚠️ EMPACOTAR o script que a skill CITA, senão a guarda nasce MORTA no consumidor. Medido em
@@ -92,6 +103,9 @@ VALIDATION=(
   # gate pegava: a REGRA 74 (Caminho .claude/ NU dentro de plugin só resolve no core) cobre caminho
   # NU, e este fora reescrito; e o plugin-dead-link-check.sh exclui `${…}` por desenho.
   ".claude/validation/workflow-syntax-check.sh"
+  # SAC-151 (2026-10-15): o /meta:radar manda o juiz-fixo passar pelo gate de superação; o script carrega
+  # a própria cópia do bloco (o workflow não viaja), e a bancada confere que ela é idêntica à do workflow.
+  ".claude/validation/judge-verdict-check.sh"
   ".claude/validation/kg-radar.sh"
   ".claude/validation/kg-backlog-project.sh"
   ".claude/validation/kg-fixture-paths.sh"
@@ -99,6 +113,10 @@ VALIDATION=(
   ".claude/validation/kg-drive-project.sh"
   ".claude/validation/kg-realign-project.sh"
   ".claude/validation/kg-seal-exception.sh"
+  # O executor do degrau AUTOMATE (2026-10-14): o /meta:drive o injeta na carga (`--status`) e o manda rodar
+  # em cada passo do laço. Ele acha o radar, o censo e o tm.sh PELO PRÓPRIO ARQUIVO; ops/ é core-only, e sem
+  # ops/merge-serial.sh (core-only) o merge é recusado — no consumidor do plugin o degrau para em PR verde.
+  ".claude/validation/drive-automate.sh"
   ".claude/validation/lib/status-factor.awk"
   ".claude/validation/kg-console.sh"
   ".claude/validation/kg-view.sh"
@@ -117,6 +135,12 @@ VALIDATION=(
   ".claude/validation/inventory.sh"
   ".claude/validation/graph.sh"
   ".claude/validation/kg-census-extract.sh"
+  # Motores do /meta:decide (2026-10-14): o medidor que a carga injeta e o selador que grava a resposta.
+  ".claude/validation/decide-census.sh"
+  ".claude/validation/kg-decide-seal.sh"
+  # o selador chama o checador do contrato quando o repo tem o vendor kg-ssot (sem ele, só o radar julga);
+  # o assemble-plugin recusou o bundle sem ele: "o plugin nasceria morto no adotante".
+  ".claude/validation/kg-contract-check.sh"
 )
 TEMPLATES=()
 DOCS=(
@@ -146,7 +170,6 @@ PROVIDES=(
   "metaspec-validation"
   "freshness-audits"
   "constellation-map"
-  "co-evolution-upstream"
   "plan-graph-drive"
   "plan-graph-realign"
   "guided-conduction"

@@ -16,7 +16,8 @@
 #           branch que a Fase 2 já cria; o --update dedica chore/onion-update-<pin>)
 #
 # Never-clobber: staja SÓ a superfície Onion — código de produto uncommitted do maestro fica de fora.
-# commit --no-verify (worktree legacy sem node_modules: husky/lint-staged daria ENOENT e REVERTERIA).
+# commit --no-verify por DEFAULT (worktree legacy sem node_modules: husky/lint-staged daria ENOENT e
+# REVERTERIA); ONION_DURABLE_VERIFY=1 roda o gate do alvo (o --update/--promote-hub em branch dedicada).
 # Gracioso: DEST não-git → aviso + exit 0. Nada a commitar → exit 0 (idempotente).
 # ONION_REQUIRED_LIST=<arquivo> (opcional; ONION_REQUIRED_NUL=1 = separado por NUL): caminhos que TÊM de estar no commit — staja com
 #   `-f` (atravessa .gitignore) e confere depois; faltou algum → exit 3 nomeando. Ver o bloco abaixo.
@@ -53,12 +54,53 @@ git -C "${DEST}" rev-parse --verify "${BR}" >/dev/null 2>&1 \
 # acrescenta os ARTEFATOS GERADOS na adoção, que não viajam do core: CLAUDE.md, docs/onion, os três
 # contextos de domínio, .githooks. Propósitos diferentes — a SSOT diz o que COPIA, esta diz o que se
 # COMMITA no alvo. Unificá-las quebraria a durabilidade dos gerados.
-ONION_PATHS=(.claude docs/meta-specs docs/knowledge-base docs/sdaal docs/evolution \
+# ⚠️ `vendor/kg-ssot` entra pelo mesmo motivo do manifesto (SAC-149, 2026-10-15): o leitor do contrato do
+# .kg.yaml passou a viajar, e sem ele nesta lista a ADOÇÃO nova o deixava UNTRACKED — o disco do maestro
+# julgava o grafo e o clone do time saía rc 2. Medido pela família `adopter_shape` (ela roda num CLONE).
+ONION_PATHS=(.claude docs/meta-specs docs/knowledge-base docs/sdaal docs/evolution vendor/kg-ssot \
              docs/onion docs/business-context docs/technical-context docs/compliance-context \
              CLAUDE.md CLAUDE.onion.md .gitattributes .prettierignore .githooks .env.example.onion \
              LICENSE-ONION LICENSE-ONION-DOCS)
 add=(); for p in "${ONION_PATHS[@]}"; do [ -e "${DEST}/${p}" ] && add+=("${p}"); done
 [ "${#add[@]}" -gt 0 ] && git -C "${DEST}" add -- "${add[@]}" 2>/dev/null
+# O CONTRATO DO .kg.yaml ATRAVESSA `vendor/` IGNORADO (passada adversarial, 2026-10-15): repo PHP/Composer (e
+# alguns Go) ignora `vendor/`, e o `git add` acima pula o caminho ignorado EM SILÊNCIO (o rc 1 morre no 2>/dev/null)
+# — medido com este helper: rc 0, "instalação commitada", 0 arquivos de vendor/kg-ssot rastreados. O --update já
+# força pela lista exigida; a adoção nova não forçava. Teto declarado: um vendor/kg-ssot PRÓPRIO do alvo e
+# ignorado de propósito também seria forçado (nenhum adotante medido assim; os dois com vendor próprio o rastreiam).
+if [ -d "${DEST}/vendor/kg-ssot" ] && git -C "${DEST}" check-ignore -q vendor/kg-ssot/LICENSE 2>/dev/null; then
+  git -C "${DEST}" add -f -- vendor/kg-ssot 2>/dev/null \
+    || echo "⚠️  vendor/kg-ssot está ignorado pelo .gitignore do alvo e o git add -f falhou — o clone do time fica sem o contrato do .kg.yaml." >&2
+fi
+# `.gitignore` NÃO RASTREADO (SAC-149, 2026-10-15, medido pela família `adopter_shape` num greenfield sem
+# .gitignore): o `ensure-secret-gitignore.sh` o cria com os padrões de segredo, e sem este passo ele ficava
+# UNTRACKED — o disco do maestro protegia o `.env`, o clone do time não. Entra quando NÃO está no HEAD nem no
+# índice. Tetos declarados (passada adversarial): um .gitignore local que o usuário nunca commitou entra INTEIRO,
+# com as linhas dele (aparece no diff do PR da adoção); e o .gitignore JÁ RASTREADO fica de fora, então as linhas
+# de segredo que a adoção acrescentou a ele ficam só no disco até o dono commitá-las.
+if [ -f "${DEST}/.gitignore" ] && ! git -C "${DEST}" cat-file -e HEAD:.gitignore 2>/dev/null \
+   && [ -z "$(git -C "${DEST}" ls-files -- .gitignore 2>/dev/null)" ]; then
+  git -C "${DEST}" add -- .gitignore 2>/dev/null
+fi
+
+# ── PROJEÇÕES QUE CONTAM O ÍNDICE só existem DEPOIS do add (adoção greenfield, 2026-10-13) ─────────
+# `testing-inventory.md` (REGRA 80) e `testing-state.md` (REGRA 81) contam `git ls-files`. No greenfield
+# o passo (8) do adopt roda com o índice VAZIO: os dois saem vazios, o helper os remove (certo: 0-byte
+# é drift), e o alvo nasce com 2 HARD. A sessão da adoção curou rodando o helper de novo depois do
+# `git add`. Aqui é esse mesmo movimento, no único lugar onde o índice já está populado e o commit
+# ainda não saiu. Idempotente: no --update o índice já tinha tudo e a regeneração não muda nada.
+# rc≠0 do helper NÃO aborta o commit durável (a instalação vale mais que a projeção; o gate do alvo
+# cobra), mas é dito. Helper ausente ao lado deste (sandbox da bancada que copia só este script) = pula.
+_regen="$(dirname "${BASH_SOURCE[0]}")/regen-ssot-projections.sh"
+if [ -f "${_regen}" ] && [ -d "${DEST}/.claude/validation" ]; then
+  if bash "${_regen}" "${DEST}" >/dev/null 2>&1; then
+    for p in docs/onion .claude/validation/lint-rules.md; do
+      [ -e "${DEST}/${p}" ] && git -C "${DEST}" add -- "${p}" 2>/dev/null
+    done
+  else
+    echo "⚠️  regen-ssot-projections.sh saiu rc≠0 após o add — as projeções do índice podem faltar no commit (o gate do alvo cobra REGRAS 80/81)." >&2
+  fi
+fi
 
 # ── ARQUIVO EXIGIDO atravessa o .gitignore (sinal de campo de um hub, 2026-10-04) ──────────────────
 # `git add <dir>` PULA em silêncio todo arquivo NOVO que um .gitignore cubra — sem erro, rc=0. Num
@@ -112,7 +154,7 @@ case "${OP}" in
   *)      _subj="${OP} no pin ${PIN}" ;;
 esac
 [ -n "${SUBJECT:-}" ] && _subj="${SUBJECT}"
-# ASSINATURA (2026-10-06, medido nas adoções do onion-curation e do onion-kg-ssot): o commit de adoção saía
+# ASSINATURA (2026-10-06, medido nas adoções de dois adotantes): o commit de adoção saía
 # SEM a assinatura, e as duas sessões fizeram amend à mão. Vale a do PRÓPRIO adotante (`attribution.commit` do
 # settings.json DELE, que o merge never-clobber preserva — PR #936); sem ela, o commit sai sem assinatura.
 _sig=""
@@ -123,6 +165,15 @@ except Exception: print("")' "${DEST}/.claude/settings.json")"
 fi
 _msg=(-m "chore(onion): ${_subj}")
 [ -n "${_sig}" ] && _msg+=(-m "${_sig}")
-git -C "${DEST}" commit --no-verify "${_msg[@]}" >/dev/null 2>&1 \
-  && { echo "Onion: instalação commitada em ${BR} (durável — imune a descarte de working-tree)."; exit 0; } \
-  || { echo "⚠️  commit durável falhou em ${DEST} (${BR})." >&2; exit 1; }
+# ── --no-verify é o DEFAULT, e ONION_DURABLE_VERIFY=1 o desliga (F1 das portas, SAC-89, 2026-10-09) ──
+# O default existe pela adoção: o 1º commit de uma worktree legacy sem node_modules morre no husky
+# (ENOENT) e o lint-staged REVERTE. Mas o --update e o --promote-hub commitam num alvo que JÁ tem o
+# gate do Onion instalado, numa branch dedicada que vai a PR — ali pular o gate é pular a única
+# checagem local do adotante. Com VERIFY=1 o hook roda; se ele recusa, o erro dele é mostrado e o
+# exit é 1: a mudança fica aplicada e NÃO commitada na branch dedicada, à vista, para o maestro curar.
+_nv=(--no-verify)
+[ "${ONION_DURABLE_VERIFY:-0}" = 1 ] && _nv=()
+_cout="$(git -C "${DEST}" commit "${_nv[@]}" "${_msg[@]}" 2>&1)" \
+  && { echo "Onion: instalação commitada em ${BR} (durável — imune a descarte de working-tree)$([ "${#_nv[@]}" = 0 ] && echo '; gate do alvo RODOU')."; exit 0; } \
+  || { echo "⚠️  commit durável falhou em ${DEST} (${BR})$([ "${#_nv[@]}" = 0 ] && echo ' — o GATE do alvo recusou; a mudança segue aplicada e não commitada nesta branch')." >&2
+       printf '%s\n' "${_cout}" | tail -15 | sed 's/^/    /' >&2; exit 1; }

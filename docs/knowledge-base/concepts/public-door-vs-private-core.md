@@ -88,6 +88,21 @@ identidade/contratos e federa apenas a comunicação) + `fonte≠derivação`) �
 | **Destilação curada** | `onion-mini`, `onion-personal` | doutrina **reescrita** (essência), não KBs verbatim; nunca vendoriza `.claude/` | co-evolução curada |
 | **App de runtime** | `onion-bridge`, `onion-site`, `onion-app`, `onion-personal-app` | **zero** doutrina — janela sobre um SSOT ao vivo (framework vs cérebro pessoal) / deploy puro | split como repo-fonte |
 
+> ⚠️ **Superado em parte pela matriz das portas (decisão do maestro de 2026-10-09, nó
+> `D_MATRIZ_DE_PORTAS_2026_10`).** Duas linhas desta tabela deixam de valer como destino, e seguem
+> valendo como estado até a fase que as muda:
+> - **`onion-standalone`** passa a **levar** a meta-fábrica; sai dele só adoção e federação. O corte
+>   novo **entrou na F2 do plano das portas (2026-10-10)**: `roles.yaml` particiona os comandos de
+>   `meta/` em conjuntos e o `vendor-manifest.sh --list standalone` mostra o que a porta leva. Vale a
+>   partir da próxima materialização dela. O que a distingue de um **adotante** com o mesmo corte é
+>   `kind: door` no carimbo: desde 2026-10-13 é esse campo, e não o `role: standalone`, que liga o modo
+>   porta no lint e na REGRA 92 (Papel da porta no registro concorda com o CARIMBO dela).
+> - **`onion-mini`** deixa de ser destilação e passa a porta **gerada do core por allowlist** (vendoriza
+>   um recorte de `.claude/`). O caminho existe desde a F5 (2026-10-10): README, CLAUDE.md e skill onion
+>   próprios, verificação sem lint (allowlist exata, sem ponteiro morto, sem caminho de máquina), e a
+>   destilação antiga arquivada numa tag do próprio repo na 1ª publicação. Ela segue como artefato à
+>   parte (o GPT a usa); a publicação é do maestro.
+
 **Os KGs são soberanos por repo.** Os `.kg.yaml` do core (investigações/domínio) são privados e **não
 viajam** (só destilado circula). Um door que investigue gera os **seus** `.kg.yaml` locais — estado dele,
 não fatia do core. **Litmus:** doutrina editada em **um** lugar (core); cada repo é projeção que cita e se
