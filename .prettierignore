@@ -1,5 +1,6 @@
 # === onion — vendor + SSOT gerado (provisionado por /meta:adopt; não remover) ===
 .claude/
+vendor/
 docs/meta-specs/
 docs/sdaal/
 docs/knowledge-base/
@@ -7,3 +8,4 @@ docs/knowledge-base/
 docs/onion/inventory.md
 # Snapshot do IBGE gerado por apps/api/scripts/build-ibge-seed.ts — dado, não código
 apps/api/drizzle/data/
+vendor/kg-ssot/

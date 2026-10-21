@@ -6,11 +6,11 @@
 > [Doutrina do Catálogo VPS](../concepts/onion-vps-catalog-doctrine.md) (a doutrina decide *o que entra*;
 > este esqueleto descreve *como o repo do serviço se estrutura*).
 
-Convenção **existente** para o repo de cada ferramenta compartilhada da VPS do core (`srv1812846`),
+Convenção **existente** para o repo de cada ferramenta compartilhada da VPS do core (`<host-da-vps>`),
 documentada aqui a partir da referência viva. Este documento não inaugura o padrão — ele o registra
 para que o próximo repo-de-ferramenta nasça reto sem reconstruir a decisão do zero.
 
-**Referência viva**: `/home/marcio/onion-vps-logto/` (fora deste repo — instância
+**Referência viva**: `⟨home do operador⟩/onion-vps-logto/` (fora deste repo — instância
 local, não submódulo). Todo exemplo abaixo é citado dali. Quando este documento e o repo divergirem,
 **o repo vivo é a fonte de verdade**; atualize este KB para refletir a divergência.
 
@@ -313,6 +313,6 @@ não capacidade ganha. Aplique o esqueleto (ou a correção de uma peça faltant
   `127.0.0.1` (§4)
 - `onion-adr-sdaal-nested-two-level-2026-07` (core-only) — recursão canal→solução (contexto de
   quando um domínio vira adapter aninhado, ex. `MESSAGING_PROVIDER`/`MESSAGING_WHATSAPP_PROVIDER`)
-- `/home/marcio/onion-vps-logto/` — referência viva citada em todo este documento
-- `/home/marcio/onion-evolve/ops/bridge-auth/logto-provision.sh` — referência de `provision.sh`
+- `⟨home do operador⟩/onion-vps-logto/` — referência viva citada em todo este documento
+- `ops/bridge-auth/logto-provision.sh` (core-only) — referência de `provision.sh`
   (lado Onion consumidor, não o repo-esqueleto)

@@ -1,0 +1,193 @@
+{
+  "description": "A camada semântica do radar, em optional/: o contrato ainda não a torna MUST, e o leitor de referência não a implementa. Esperado escrito a partir do comportamento documentado do radar (o leitor do framework onde o formato nasceu): REFUTES sobre nó confirmed é contradição e reprova; só alertam o SUPERSEDES de um nó vivo sobre um alvo que segue valendo (superseder open não cobra, a relação ainda não assentou), a pergunta que recebe SUPERSEDES e segue aberta, decision done em DEV e o nó de frescor rastreado (verified_against ou plane PROD) sem verified_at (STALE-MISSING). Desde o v4.1, também os avisos que ficam só do radar porque dependem de referência fora do nó ou de heurística: STALE-OLD (meta.baseline), revisita vencida (data de hoje; o caso usa uma data fixa no passado), relato sem marca de testemunho (heurística sobre o texto de verified_against) e as cinco checagens de completude da camada domain.",
+  "layer": "semantic",
+  "pending_on": [],
+  "cases": [
+    {
+      "file": "bad-refutes-confirmed.kg.yaml",
+      "description": "REFUTES sobre um nó que segue confirmed: contradição",
+      "valid": false,
+      "codes": [
+        "semantic.contradiction"
+      ]
+    },
+    {
+      "file": "valid-refutes-refuted.kg.yaml",
+      "description": "REFUTES sobre um nó já refuted: reconciliado",
+      "valid": true,
+      "codes": []
+    },
+    {
+      "file": "valid-refutes-superseded.kg.yaml",
+      "description": "REFUTES sobre um nó superseded: reconciliado",
+      "valid": true,
+      "codes": []
+    },
+    {
+      "file": "warn-supersedes-unreconciled.kg.yaml",
+      "description": "SUPERSEDES de um nó confirmed sobre um nó que segue confirmed: o radar só alerta (Aufhebung por reconciliar)",
+      "valid": true,
+      "codes": [],
+      "warnings": [
+        "semantic.supersedes-unreconciled"
+      ]
+    },
+    {
+      "file": "valid-supersedes-reconciled.kg.yaml",
+      "description": "SUPERSEDES com o alvo superseded: Aufhebung completa",
+      "valid": true,
+      "codes": []
+    },
+    {
+      "file": "valid-supersedes-open-superseder.kg.yaml",
+      "description": "SUPERSEDES de um nó open: a relação ainda não assentou, e o alvo segue confirmed sem alerta",
+      "valid": true,
+      "codes": []
+    },
+    {
+      "file": "warn-answered-question-open.kg.yaml",
+      "description": "pergunta que recebe SUPERSEDES de um nó confirmed e segue open: o radar só alerta (respondida pede done)",
+      "valid": true,
+      "codes": [],
+      "warnings": [
+        "semantic.answered-question-open"
+      ]
+    },
+    {
+      "file": "valid-answered-question-done.kg.yaml",
+      "description": "a mesma pergunta fechada como done: nada a alertar",
+      "valid": true,
+      "codes": []
+    },
+    {
+      "file": "warn-decision-done-in-dev.kg.yaml",
+      "description": "decision done em plane DEV: o radar só alerta (pede verificação em PROD)",
+      "valid": true,
+      "codes": [],
+      "warnings": [
+        "semantic.decision-done-dev"
+      ]
+    },
+    {
+      "file": "valid-decision-done-in-prod.kg.yaml",
+      "description": "decision done em plane PROD, com verified_at: nada a alertar",
+      "valid": true,
+      "codes": []
+    },
+    {
+      "file": "warn-stale-missing-verified-against.kg.yaml",
+      "description": "nó com verified_against e sem verified_at: o radar só alerta (frescor STALE-MISSING)",
+      "valid": true,
+      "codes": [],
+      "warnings": [
+        "semantic.stale-missing"
+      ]
+    },
+    {
+      "file": "warn-stale-missing-plane-prod.kg.yaml",
+      "description": "nó confirmed em plane PROD sem verified_at: o radar alerta STALE-MISSING, e o SHOULD do contrato também pede verified_at",
+      "valid": true,
+      "codes": [],
+      "warnings": [
+        "form.required.node.verified_at",
+        "semantic.stale-missing"
+      ]
+    },
+    {
+      "file": "valid-fresh-verified-against.kg.yaml",
+      "description": "nó com verified_against e verified_at: frescor em dia",
+      "valid": true,
+      "codes": []
+    },
+    {
+      "file": "warn-stale-old.kg.yaml",
+      "description": "claim verificada antes da baseline do grafo: a verdade pode ter envelhecido (STALE-OLD)",
+      "valid": true,
+      "codes": [],
+      "warnings": [
+        "semantic.stale-old"
+      ]
+    },
+    {
+      "file": "valid-fresh-after-baseline.kg.yaml",
+      "description": "claim verificada depois da baseline: nada a alertar",
+      "valid": true,
+      "codes": []
+    },
+    {
+      "file": "warn-review-overdue.kg.yaml",
+      "description": "meta.review_after vencido (data fixa no passado, para o caso não envelhecer): revisita vencida",
+      "valid": true,
+      "codes": [],
+      "warnings": [
+        "semantic.review-overdue"
+      ]
+    },
+    {
+      "file": "warn-testimony-unmarked.kg.yaml",
+      "description": "verified_against é relato (começa por relato-) e o nó não se marca evidence_class: testimony",
+      "valid": true,
+      "codes": [],
+      "warnings": [
+        "semantic.testimony-unmarked"
+      ]
+    },
+    {
+      "file": "valid-testimony-marked.kg.yaml",
+      "description": "o mesmo relato marcado como testemunho: nada a alertar",
+      "valid": true,
+      "codes": []
+    },
+    {
+      "file": "valid-domain-complete.kg.yaml",
+      "description": "camada domain completa: estados com dona, transições nos dois sentidos, evento usado, regra ancorada, uma fonte",
+      "valid": true,
+      "codes": []
+    },
+    {
+      "file": "warn-domain-absorbing-state.kg.yaml",
+      "description": "estado que recebe TRANSITIONS e não emite nenhuma (limbo ou terminal?)",
+      "valid": true,
+      "codes": [],
+      "warnings": [
+        "semantic.domain-absorbing-state"
+      ]
+    },
+    {
+      "file": "warn-domain-state-without-owner.kg.yaml",
+      "description": "estado que nenhuma entity possui por HAS_STATE",
+      "valid": true,
+      "codes": [],
+      "warnings": [
+        "semantic.domain-state-without-owner"
+      ]
+    },
+    {
+      "file": "warn-domain-event-without-effect.kg.yaml",
+      "description": "evento que não origina aresta nem dispara transição",
+      "valid": true,
+      "codes": [],
+      "warnings": [
+        "semantic.domain-event-without-effect"
+      ]
+    },
+    {
+      "file": "warn-domain-rule-without-trace.kg.yaml",
+      "description": "regra sem TRACES_TO: não ancorada em artefato",
+      "valid": true,
+      "codes": [],
+      "warnings": [
+        "semantic.domain-rule-without-trace"
+      ]
+    },
+    {
+      "file": "warn-domain-multiple-sources.kg.yaml",
+      "description": "nó de domínio que lê de duas fontes (1 átomo = 1 fonte)",
+      "valid": true,
+      "codes": [],
+      "warnings": [
+        "semantic.domain-multiple-sources"
+      ]
+    }
+  ]
+}

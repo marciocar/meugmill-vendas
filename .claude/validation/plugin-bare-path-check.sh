@@ -42,13 +42,37 @@ _scan() {
   local prev=""
   # baseline anterior (catraca): a versão commitada em origin/main, se houver
   prev="$(git -C "${REPO}" show "origin/main:${BASELINE_REL}" 2>/dev/null || true)"
-  PREV_BASELINE="${prev}" python3 - "${REPO}" "$1" "$2" "$3" "${BASELINE}" "${BASELINE_REL}" <<'PY'
+  # Na PUBLICAÇÃO a raiz é temporária (não é git): o anterior vem de fora — o baseline do pin PUBLICADO
+  # antes, que o publish-door.sh entrega por ONION_BAREPATH_PREV_FILE (achado I2 da passada da F4).
+  if [ -n "${ONION_BAREPATH_PREV_FILE:-}" ] && [ -f "${ONION_BAREPATH_PREV_FILE}" ]; then
+    prev="$(cat "${ONION_BAREPATH_PREV_FILE}")"
+  fi
+  # ALVO DO CONSUMIDOR (F4 das portas, 2026-10-10): plugin de META-FÁBRICA escreve no `.claude/` do
+  # PROJETO de quem instala (`.claude/agents/<cat>/`, `.claude/commands/`…) — ali o caminho nu não é
+  # ponteiro morto, é o DESTINO. Medido no 1º bundle do onion-meta: 145 HARD, a maioria destino — e 9 de LEITURA, que a 1ª isenção larga escondia (achado I1). O
+  # plugin DECLARA no manifesto quais raízes são alvo (CONSUMER_TARGET_ROOTS); só agents/commands/
+  # skills/hooks/utils são aceitas (validation/kb/templates são do plugin, nunca do projeto), e o que a
+  # isenção cobre sai num SOFT agregado — visível, nunca calado. Plugin sem a declaração: nada muda.
+  local targets="" m
+  for m in "${REPO}"/.claude/utils/marketplace/verticals/*.manifest.sh; do
+    [ -f "${m}" ] || continue
+    case "$(basename "${m}")" in __*) continue ;; esac
+    targets="${targets}$(bash -c '. "$1" >/dev/null 2>&1; [ -n "${PLUGIN_NAME:-}" ] && [ -n "${CONSUMER_TARGET_ROOTS[*]:-}" ] && printf "%s=%s;" "${PLUGIN_NAME}" "${CONSUMER_TARGET_ROOTS[*]}"' _ "${m}")"
+  done
+  CONSUMER_TARGETS="${targets}" PREV_BASELINE="${prev}" python3 - "${REPO}" "$1" "$2" "$3" "${BASELINE}" "${BASELINE_REL}" <<'PY'
 import os, re, sys
 repo, fmt, summary, emit, baseline, baseline_rel = sys.argv[1], sys.argv[2], sys.argv[3] == "1", sys.argv[4] == "1", sys.argv[5], sys.argv[6]
 prev = set(l.strip() for l in os.environ.get("PREV_BASELINE", "").splitlines() if l.strip() and not l.startswith("#"))
 ROOTS = "utils|commands|agents|skills|hooks|kb|validation|templates"
 PAT = re.compile(r"(?<![A-Za-z0-9_${}./-])\.claude/(?:" + ROOTS + r")(?:/[A-Za-z0-9_.@+*{}-]+)*")
 found = []   # (rel, ref, in_allowed_tools, lineno)
+TARGET_OK = {"agents", "commands", "skills", "hooks", "utils"}
+targets = {}
+for kv in os.environ.get("CONSUMER_TARGETS", "").split(";"):
+    if "=" in kv:
+        k, v = kv.split("=", 1)
+        targets[k] = set(v.split()) & TARGET_OK
+consumer = {}   # plugin -> nº de refs isentas como alvo do consumidor
 pdir = os.path.join(repo, "plugins")
 if os.path.isdir(pdir):
     for plugin in sorted(os.listdir(pdir)):
@@ -68,6 +92,20 @@ if os.path.isdir(pdir):
                     for m in PAT.finditer(line):
                         ref = m.group(0).rstrip(".,;:)")
                         at = in_fm and line.lstrip().startswith("allowed-tools")
+                        # A isenção é ESTREITA (passada adversarial da F4, achado I1): a 1ª versão isentava
+                        # toda ref de raiz declarada, e escondia no SOFT agregado ponteiros de LEITURA mortos
+                        # no consumidor (`.claude/utils/task-manager/`, `.claude/commands/common/templates/`).
+                        # Só é DESTINO: nunca em allowed-tools; a raiz nua (`.claude/agents`); uma categoria
+                        # de um nível (`.claude/agents/<cat>`; mais fundo que isso, como `common/templates`, é conteúdo); ou um
+                        # caminho com placeholder (`{{…}}`, `<…>`, `X`, `*`). O resto segue julgado.
+                        _parts = ref.split("/")
+                        _dest = (not at) and _parts[1] in targets.get(plugin, ()) and (
+                            len(_parts) == 2
+                            or (len(_parts) == 3 and _parts[1] in ("agents", "commands", "skills"))
+                            or re.search(r"\{\{|<|>|\*|(^|/)X(/|\.|$)", ref) is not None)
+                        if _dest:
+                            consumer[plugin] = consumer.get(plugin, 0) + 1
+                            continue
                         found.append((rel, ref, at, i))
 if emit:
     print("# Baseline de caminhos .claude/ NUS dentro de plugins/ — PASSIVO TOLERADO (REGRA 74).")
@@ -100,9 +138,12 @@ if summary:
 elif fmt == "tsv":
     for r in rows: print("\t".join(r))
     if passivo: print(f"SOFT\tPASSIVO\t{baseline_rel}\t{passivo} caminho(s) .claude/ nu(s) em plugins/ tolerados pelo baseline — a métrica de saúde é este número DIMINUINDO")
+    for p, n in sorted(consumer.items()):
+        print(f"SOFT\tALVO-DO-CONSUMIDOR\tplugins/{p}\t{n} caminho(s) .claude/ nu(s) tratados como DESTINO no projeto de quem instala (CONSUMER_TARGET_ROOTS={' '.join(sorted(targets.get(p, ())))} no manifesto)")
 else:
     for r in rows: print(f"{r[0]} [{r[1]}] {r[2]}: {r[3]}")
     if passivo: print(f"SOFT [PASSIVO] {passivo} tolerado(s) pelo baseline")
+    for p, n in sorted(consumer.items()): print(f"SOFT [ALVO-DO-CONSUMIDOR] plugins/{p}: {n} caminho(s) tratados como destino no projeto de quem instala")
 PY
 }
 

@@ -56,7 +56,9 @@ def stamp(t, nid, vag):
     if i is None: return t, False
     blk = t[i:j]
     if 'verified_at:' in blk:
-        blk = re.sub(r'verified_at:\s*\S+', f'verified_at: {HOJE}', blk, count=1)
+        # data ENTRE ASPAS (contrato v3 do .kg.yaml, 2026-10-08): sem aspas é data em YAML 1.1 e o gate
+        # do contrato acusa yaml.unquoted-date — o carimbo do censo não pode sujar o grafo que ele mede.
+        blk = re.sub(r'verified_at:\s*\S+', f'verified_at: "{HOJE}"', blk, count=1)
         blk = re.sub(r"verified_against:\s*(?:'(?:[^']|'')*'|\"[^\"]*\")", f"verified_against: '{vag}'", blk, count=1)
         # DEDUPE (lei do carimbo, 2ª mordida 2026-09-01): rodadas sucessivas deixavam pares extras
         # (o radar reprova verified_against repetido) — só o PRIMEIRO par sobrevive.
@@ -70,23 +72,52 @@ def stamp(t, nid, vag):
     m = re.search(r'\n(\s+)label:', blk)
     if not m: return t, False
     ind = m.group(1)
-    blk = blk[:m.start()] + f"\n{ind}verified_at: {HOJE}\n{ind}verified_against: '{vag}'" + blk[m.start():]
+    blk = blk[:m.start()] + f"\n{ind}verified_at: \"{HOJE}\"\n{ind}verified_against: '{vag}'" + blk[m.start():]
     return t[:i] + blk + t[j:], True
 
 def seal(consol):
     d = json.load(open(consol))
     meds = d['medidos'] if 'medidos' in d else d
-    apr, rep = set(), {}
+    apr, rep, sups = set(), {}, {}
     for v in d.get('juizo', []):
         apr.update(v['aprovados'])
-        for x in v['reprovados']: rep[x['node_id']] = x['motivo']
+        for x in v['reprovados']:
+            rep[x['node_id']] = x['motivo']
+            # SAC-151: reprovação que ACHOU o que supera vira NÓ (não comentário) — só a que o motor
+            # não recusou (`recusada` = sem critério pré-registrado ou sem superação: fica só listada).
+            # 2ª leva: e só a de `classe: entrega` — `nenhuma` (ou classe ausente, de motor antigo) não vira
+            # nó de superação, porque consolo preenchido para passar não é o que supera (PR #30 de um adotante).
+            s_ = x.get('superacao') or {}
+            if s_.get('achada') is True and s_.get('classe') == 'entrega' and not x.get('recusada'): sups[x['node_id']] = x
     terms = derived_terms()
     RUN = f"/meta:census {HOJE}" + (f" ({d.get('run_id','')})" if d.get('run_id') else '')
-    files, stamped, sup, skip = {}, 0, 0, []
+    files, stamped, sup, skip, overc = {}, 0, 0, [], 0
     load = lambda p: files.setdefault(p, open(os.path.join(ROOT, p)).read())
     for m in meds:
         m['juiz'] = 'REPROVADO' if m['node_id'] in rep else ('APROVADO' if m['node_id'] in apr else 'N/A')
-        if m['juiz'] == 'REPROVADO': skip.append(m['node_id']); continue
+        if m['juiz'] == 'REPROVADO':
+            skip.append(m['node_id'])
+            x = sups.get(m['node_id'])
+            p = m['kg_file'].lstrip('/')
+            if x:
+                t = load(p)
+                # id COMPLETO (não cortado: dois nós com o mesmo prefixo colidiam e um sumia calado) e
+                # conferência EXATA da linha do id, não substring (achados do refutador, 2026-10-15)
+                nid_sup = f"C_SUPERACAO_{HOJE.replace('-','')}_{re.sub(r'[^A-Za-z0-9_]', '_', m['node_id'])}"
+                if f"- id: {nid_sup}\n" in t: skip.append(m['node_id'] + ':superacao-ja-existe')
+                elif '\nedges:' not in t: skip.append(m['node_id'] + ':superacao-sem-edges')
+                else:
+                    # CORTA ANTES DE ESCAPAR: cortar depois partia o `''` ao meio e o YAML saía inválido
+                    _sq = lambda v, n: sanitize(' '.join(str(v).split())[:n], terms)
+                    crit = x.get('criterio') or {}
+                    node = (f"  - id: {nid_sup}\n    node_type: claim\n    plane: DEV\n    status: open\n    impact: 3\n    confidence: 0.6\n"
+                            f"    label: '{_sq(x['superacao'].get('o_que',''), 280)}'\n"
+                            f"    narrative: '{RUN}: o juiz reprovou {m['node_id']} pelo critério {_sq(crit.get('id',''), 60)} e achou o que supera. Medida: {_sq(x['superacao'].get('medida',''), 900)}'\n"
+                            f"    trace: '{_sq(crit.get('comando',''), 400)}'\n\nedges:")
+                    t = t.replace('\nedges:', '\n' + node, 1)
+                    t = t.rstrip() + f"\n  - from: {nid_sup}\n    to: {m['node_id']}\n    edge_type: TRACES_TO\n"
+                    files[p] = t; overc += 1
+            continue
         p = m['kg_file'].lstrip('/')
         if m['verdict'] == 'CONFIRMED':
             vag = f"{RUN}: {m['claims_measured']}/{m['claims_total']} claims; juiz {m['juiz']}. {sanitize(m['method'],terms)[:80]} => {sanitize(m['observed'],terms)[:100]}…"
@@ -98,10 +129,21 @@ def seal(consol):
             nid_new = f"E_CENSO{HOJE.replace('-','')[4:]}_{m['node_id'][:34]}"
             if nid_new in t: continue
             if '\nedges:' not in t: skip.append(m['node_id'] + ':sem-edges'); continue
+            # Nó novo nasce no CONTRATO v3 (2026-10-08): data entre aspas, label ≤ 280 com o resto em
+            # narrative, e provenance — o que foi lido (o nó medido, o método do worker) e por quem.
+            _div = sanitize(m['divergence'], terms).replace("'", "''")
+            _lab = f"MEDIDO {HOJE}, o vivo superou o nó {m['node_id']}"
+            _src = f"{p}#{m['node_id']} medido contra o vivo".replace("'", "''")
+            _met = f"juízes: {RUN}, juiz {m['juiz']}".replace("'", "''")
+            _loc = sanitize(m['method'], terms)[:200].replace("'", "''")
             node = (f"  - id: {nid_new}\n    node_type: evidence\n    plane: PROD\n    status: confirmed\n"
-                    f"    impact: 4\n    confidence: 0.9\n    verified_at: {HOJE}\n"
+                    f"    impact: 4\n    confidence: 0.9\n    verified_at: \"{HOJE}\"\n"
                     f"    verified_against: '{RUN}: DRIFTED {m['claims_measured']}/{m['claims_total']} — {sanitize(m['method'],terms)[:90]}'\n"
-                    f"    label: 'MEDIDO {HOJE}, o vivo superou o no: {sanitize(m['divergence'],terms)[:300]}'\n\nedges:")
+                    f"    label: '{_lab[:280]}'\n"
+                    f"    narrative: '{_div[:1200]}'\n"
+                    f"    provenance:\n      source: '{_src}'\n      locator: '{_loc}'\n      method: '{_met}'\n"
+                    # locality (contrato v4.2, SAC-97): o source é o próprio grafo do repo (kg_file relativo)
+                    f"      locality: 'repo'\n\nedges:")
             t = t.replace('\nedges:', '\n' + node, 1)
             # TIPO DA ARESTA PELA REALIDADE (lei de 2026-09-02, regra do proprio radar): SUPERSEDES
             # diz "deixou de valer" e exige flip do alvo — mas um DRIFTED cuja realidade e GATED ou
@@ -114,6 +156,17 @@ def seal(consol):
             t, ok2 = stamp(t, m['node_id'], f"{RUN}: DRIFTED — ver {nid_new} ({et}: {nota}); label preservado como historia")
             if not ok2: skip.append(m['node_id'] + ':stamp-alvo-FALHOU')  # nunca silencioso (3ª mordida)
             files[p] = t; sup += 1
+    # o radar não acusa YAML quebrado em todos os casos (medido 2026-10-15: label com `''` partido passou
+    # com radar 0); quando o PyYAML existe, o seal confere a forma ANTES de gravar e aborta se quebrou
+    try:
+        import yaml
+        for p, t in files.items():
+            try: yaml.safe_load(t)
+            except yaml.YAMLError as e:
+                print(f"census-seal: YAML INVÁLIDO gerado para {p} — selagem ABORTADA antes de gravar: {str(e)[:160]}", file=sys.stderr)
+                sys.exit(2)
+    except ImportError:
+        pass
     for p, t in files.items(): open(os.path.join(ROOT, p), 'w').write(t)
     for p in files:
         rc = subprocess.run(['bash', os.path.join(SCRIPTS, '.claude/validation/kg-radar.sh'),
@@ -123,7 +176,7 @@ def seal(consol):
             print(f"census-seal: RADAR REPROVOU {p} — selagem ABORTADA antes de commit; corrija e re-rode.", file=sys.stderr)
             sys.exit(2)
     json.dump(d, open(consol, 'w'), ensure_ascii=False, indent=1)
-    print(f"census-seal: carimbados={stamped} superseded={sup} reprovados/pulados={len(skip)} grafos={len(files)} (radar 0 em todos)")
+    print(f"census-seal: carimbados={stamped} superseded={sup} reprovados/pulados={len(skip)} superacoes={overc} recusadas={d.get('reprovacoes_recusadas', 0)} grafos={len(files)} (radar 0 em todos)")
 
 def listing(consol, out, frescos_path):
     d = json.load(open(consol)); meds = d['medidos']

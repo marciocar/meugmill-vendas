@@ -77,14 +77,28 @@ A moral vai na doutrina porque é a classe que a forja mais vai encontrar: **ant
 guarda, medir se ela já existe** — `grep -n 'REGRA' lint-artifacts.sh` custa um segundo, e afirmar
 lacuna sem isso custa uma regra inteira e uma decisão do maestro tomada em falso.
 
-### 4. Core-only até a face que viaja ser MEDIDA
+### 4. A face que viaja foi ABERTA pelo maestro, e o que segue medido
 
-A forja é Camada 1 (autoria do framework), logo core-only. A face que viaja fica **gated**, e o
-gatilho é nomeado: a cura da REGRA 74 (Caminho .claude/ NU dentro de plugin só resolve no core, com
-catraca) nos arquivos acusados **mais** uma medição consumer-side que hoje não existe neste repo.
-`install ≠ adopt` e a distinção morde: no adotante `.claude/utils` viaja inteiro e o caminho resolve;
-quem nasce sem motor é a superfície de plugin e o papel `standalone`. Confundir os dois foi achado de
-passada adversarial, não hipótese.
+Até 2026-10-14 a forja era só do core (Camada 1, autoria do framework), com a face que viaja gated pelo
+gatilho: a cura da REGRA 74 (Caminho .claude/ NU dentro de plugin só resolve no core, com catraca) nos
+arquivos acusados **mais** uma medição do lado de quem consome. O maestro a abriu nessa data para que o
+time de um hub forje os próprios componentes internos. A medição do lado do consumidor existe desde então:
+o `forge-census.sh` roda num hub adotado e mediu 59 candidatos lá, no ensaio de uma aula prática.
+
+O que continua valendo, porque `install ≠ adopt` e a distinção morde: no adotante `.claude/utils` viaja
+inteiro e o caminho resolve; quem nasce sem motor é a superfície de **plugin**, e ali a REGRA 74 segue
+cobrando. E uma fronteira medida: o censo só reconhece a bancada (peça 7) dentro do `lint-selftest.sh`, que
+é arquivo do framework; no adotante, editá-lo vira conflito no próximo `--update`. Até uma bancada local
+ter lugar próprio, o censo de um componente forjado fora do core marca a peça 7 como ausente, e isso é
+declaração do censo, não defeito do componente.
+
+> **O refutador que reprova aponta o que supera** (SAC-151, maestro 2026-10-15: "um juiz de sim ou
+> não sem tentar superação em uma pesquisa pode restringir possibilidades de crescimento e
+> inovação; é preciso ter medição e critérios claros"). O subagente que REFUTA a forja devolve, para
+> cada reprovação, o critério pré-registrado com o comando que a checa e a superação
+> `{classe, achada, o_que, medida}`. Ou seja, a peça que já existe, o molde ou a variante que entregaria o que o comando prometia. A sessão confere com
+> `bash .claude/validation/judge-verdict-check.sh <vereditos.json>` (rc 1 = reprovação recusada e
+> contada), e a superação achada vira nó.
 
 ## O que esta doutrina NÃO promete
 

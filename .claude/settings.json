@@ -86,6 +86,35 @@
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-degraded-notice.sh\""
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/background-task-probe.sh\"",
+            "timeout": 5,
+            "statusMessage": "Medindo tarefas de fundo (Onion)"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-currency-check.sh\"",
+            "timeout": 15,
+            "statusMessage": "Conferindo se a base está nas versões atuais (Onion)"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/house-code-gloss.sh\" prompt",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "SessionEnd": [
@@ -129,27 +158,52 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/pretooluse-protect-main.sh\""
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/pretooluse-protect-main.sh\"",
+            "onFailure": "block"
           },
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/pretooluse-merge-gate.sh\""
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/pretooluse-merge-gate.sh\"",
+            "onFailure": "block"
           }
         ]
       },
       {
+        "matcher": "Read|Grep|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/pretooluse-env-guard.sh\"",
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/pretooluse-moat-gate.sh\"",
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/pretooluse-direct-provider-api.sh\"",
+            "onFailure": "block"
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Edit|Write|Bash",
         "hooks": [
           {
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/kg-read-leg.sh\""
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/pretooluse-env-guard.sh\""
           }
         ]
       }
@@ -161,7 +215,8 @@
             "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/premodelswitch-guard.sh\"",
             "timeout": 5,
-            "statusMessage": "Guarda de modelo da sessão (Onion): veta downgrade fora do lineup"
+            "statusMessage": "Guarda de modelo da sessão (Onion): veta downgrade fora do lineup",
+            "onFailure": "block"
           }
         ]
       }
@@ -201,7 +256,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/background-state-needs-evidence.sh\""
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/house-code-gloss.sh\" stop",
+            "timeout": 10
           }
         ]
       }

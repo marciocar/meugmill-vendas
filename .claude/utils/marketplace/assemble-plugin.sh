@@ -28,6 +28,8 @@
 #
 # Uso       : assemble-plugin.sh <manifest> [source-root] [dest-dir]
 #             source-root default = git toplevel; dest default = <root>/plugins/<PLUGIN_NAME>
+#             (no CORE esse default é ignorado pelo git desde a F4 das portas: o plugin publicado
+#             mora no repo onion-plugins, montado pelo /meta:publish (core-only) — nunca versionado aqui)
 #             Determinístico + idempotente: mesmo HEAD → mesmo output.
 #
 # Gracioso  : manifesto/source inválido ou componente-fonte ausente → exit 2.
@@ -108,24 +110,41 @@ for h in "${HOOKS[@]}"; do [ -f "${SRC}/${h}" ] || { echo "ERRO: hook fonte ause
 for d in "${DOCS[@]}"; do [ -f "${SRC}/${d}" ] || { echo "ERRO: doc-KB fonte ausente (arquivo): ${d}" >&2; exit 2; }; done
 
 # Montagem limpa (idempotente).
-# ── O ESTADO COMMITADO, LIDO ANTES DE QUALQUER ESCRITA ────────────────────────────────────────
-# A versão é um FATO COMMITADO, não uma derivação de histórico — e os dois insumos (a versão
-# publicada e o `tree_sha` que ela descreve) vivem NA ÁRVORE. Por isso qualquer checkout da mesma
-# árvore deriva o mesmo número, que é exatamente o que a REGRA 19 precisa para comparar.
+# ── O ESTADO PUBLICADO, LIDO ANTES DE QUALQUER ESCRITA ────────────────────────────────────────
+# A versão é um FATO PUBLICADO, não uma derivação de histórico: os dois insumos (a versão que o
+# instalador já tem e o `tree_sha` que ela descreve) vivem no plugin PUBLICADO.
 #
-# ⚠️ LÊ DO CANÔNICO (`${SRC}/plugins/<name>`), NUNCA DO `DEST`. Os dois consumidores desta função
-#    são o pre-commit (DEST = o canônico) e a REGRA 19 (DEST = um mktemp descartável). Se o
-#    anterior viesse do DEST, a regeneração em temp não teria anterior e o gate reprovaria SEMPRE.
-#    Lendo do canônico, os dois leem a MESMA coisa e concordam por construção.
+# ⚠️ DE ONDE VEM O ANTERIOR MUDOU NA F4 DAS PORTAS (2026-10-10, SAC-93). Até ali o anterior era o
+#    `plugins/<nome>` VERSIONADO DENTRO DO CORE, e a REGRA 19 (Plugins de vertical sincronizados com as fontes) regenerava em temp para comparar —
+#    cada PR que tocava uma fonte bundlada tinha de regenerar e commitar o plugin (o auto-fix do
+#    pre-commit, conflitos de projeção no rebase). O `plugins/` saiu do core; o anterior agora é o
+#    PUBLICADO, em ordem:
+#      1. `ONION_PLUGIN_PRIOR_DIR` — o diretório de um plugin publicado (com `.claude-plugin/`),
+#         para quem monta FORA do clone da porta (a bancada; um ensaio à mão);
+#      2. o próprio `DEST`, quando ele já é o plugin publicado — o caso da publicação: o
+#         `materialize-marketplace-repo.sh` monta DENTRO do clone de `onion-plugins`, que começa
+#         EXATAMENTE em origin/<ramo> (o `publish-door.sh` recusa clone fora disso). O que está ali
+#         é o que o instalador tem.
+#    Sem nenhum dos dois, é a PRIMEIRA geração: fica a versão do manifesto.
 #
-# ⚠️ E A POSIÇÃO É PARTE DA CURA, não organização: isto TEM de vir antes do `rm -rf "${DEST}"` da
-#    linha abaixo. Quando DEST É o canônico (o caso do pre-commit), aquele `rm -rf` APAGA o fato
-#    commitado — e a 1ª versão desta cura lia depois dele e derivava `0.1.0`, zerando a versão de
-#    um plugin com 255 publicadas. Medido no primeiro dogfood, antes de qualquer commit.
-_canon="${SRC}/plugins/${PLUGIN_NAME}/.claude-plugin"
+# ⚠️ E A POSIÇÃO É PARTE DA CURA: isto TEM de vir antes do `rm -rf "${DEST}"` da linha abaixo.
+#    Quando DEST é o plugin publicado, aquele `rm -rf` APAGA o fato — e uma versão anterior desta
+#    cura lia depois dele e derivava `0.1.0`, zerando a versão de um plugin com 255 publicadas
+#    (medido no primeiro dogfood, 2026-09). Toda leitura do anterior mora antes da 1ª escrita.
+_canon="${ONION_PLUGIN_PRIOR_DIR:-${DEST}}/.claude-plugin"
 _prior_version=""; _prior_tree=""
 [ -f "${_canon}/plugin.json" ]     && _prior_version="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'   "${_canon}/plugin.json"     | head -1)"
 [ -f "${_canon}/provenance.json" ] && _prior_tree="$(sed -n    's/.*"tree_sha"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "${_canon}/provenance.json" | head -1)"
+# O ANTERIOR TEM DE SER DESTE PLUGIN (passada adversarial da F4, achado I3): com ONION_PLUGIN_PRIOR_DIR
+# exportado no shell, o materialize de TODOS os plugins herdava a versão de UM (medido: 0.1.51 em cinco
+# plugins que não eram o onion-meta). Nome divergente = não há anterior válido — avisa e segue do manifesto.
+if [ -f "${_canon}/plugin.json" ]; then
+  _prior_name="$(sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "${_canon}/plugin.json" | head -1)"
+  if [ "${_prior_name}" != "${PLUGIN_NAME}" ]; then
+    printf 'assemble-plugin: o anterior em %s é do plugin "%s", não de "%s" — ignorado (a versão parte do manifesto)\n' "${_canon%/.claude-plugin}" "${_prior_name}" "${PLUGIN_NAME}" >&2
+    _prior_version=""; _prior_tree=""
+  fi
+fi
 
 rm -rf "${DEST}" 2>/dev/null
 mkdir -p "${DEST}/.claude-plugin" "${DEST}/commands" "${DEST}/agents" 2>/dev/null \
@@ -230,15 +249,17 @@ for fp in sorted(glob.glob(os.path.join(src, ".claude", "settings*.json"))):
                 cmd = hk.get("command", "")
                 for bn in bundled:
                     if bn in cmd and bn not in [x[0] for x in events.get(event, [])]:
-                        # (basename, matcher) — o matcher do core viaja; sem ele PostToolUse roda em TODA tool (REGRA 73)
-                        events.setdefault(event, []).append((bn, grp.get("matcher")))
+                        # (basename, matcher, onFailure) — o matcher do core viaja; sem ele PostToolUse roda em
+                        # TODA tool (REGRA 73). O onFailure também: sem ele o veto empacotado falha ABERTO quando
+                        # o hook não roda (REGRA 101, SAC-83 — medido ao vivo em 2026-10-11).
+                        events.setdefault(event, []).append((bn, grp.get("matcher"), hk.get("onFailure")))
 result = {"hooks": {}}
 for event, bns in events.items():
     result["hooks"][event] = [
-        ({"matcher": matcher} if matcher else {}) | {"hooks": [{"type": "command", "command": f'bash "${{CLAUDE_PLUGIN_ROOT}}/hooks/{bn}"'}]}
-        for bn, matcher in bns
+        ({"matcher": matcher} if matcher else {}) | {"hooks": [{"type": "command", "command": f'bash "${{CLAUDE_PLUGIN_ROOT}}/hooks/{bn}"'} | ({"onFailure": onf} if onf else {})]}
+        for bn, matcher, onf in bns
     ]
-mapped = {bn for bns in events.values() for bn, _m in bns}
+mapped = {bn for bns in events.values() for bn, _m, _o in bns}
 missing = [bn for bn in bundled if bn not in mapped]
 if missing:
     sys.stderr.write("AVISO assemble: hook(s) sem evento no settings.json do core (NÃO registrados): %s\n" % ", ".join(missing))
@@ -439,6 +460,11 @@ EOF
 # mergeados SEM rebase entre si publicam o mesmo número. O fluxo de merge desta casa exige branch
 # atualizada, e com rebase o segundo lê a versão do primeiro e segue para N+2. Está escrito aqui
 # porque guarda com teto não-declarado vira promessa.
+#
+# F4 DAS PORTAS (2026-10-10): o "fato commitado" virou o fato PUBLICADO. A fórmula não mudou; mudou
+# de onde vêm os dois insumos — do plugin que o instalador já tem (o clone de onion-plugins, ou
+# `ONION_PLUGIN_PRIOR_DIR`), não mais de um `plugins/` versionado no core. O teto dos PRs
+# concorrentes deixou de existir: só a publicação deriva versão, e ela é serial (um escritor, I3).
 #
 # `ONION_PLUGIN_VERSION_DERIVED=0` desliga (bancada/legado): fica a versão do manifesto.
 if [ "${ONION_PLUGIN_VERSION_DERIVED:-1}" = "1" ]; then

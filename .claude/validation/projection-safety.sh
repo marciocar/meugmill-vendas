@@ -43,17 +43,48 @@
 #  P4 — O TERMO CONTA EM QUALQUER POSIÇÃO, inclusive dentro de identificadores.
 #       Lição de campo (leva 3 da modelagem): nome de cliente vazou para o `id:`
 #       de um nó, não só para o label — scrub que só olha prosa não vê.
+#  P7 — ID DE NÓ E CAMINHO DE GRAFO (`--kg-identifiers`, SAC-99, 2026-10-11): o id e o caminho de
+#       todo .kg.yaml saem para as projeções geradas, então são varridos no corpus inteiro, com os
+#       termos derivados MAIS os da fonte privada (P8). Detalhe e teto no bloco P7, mais abaixo.
 #  P5 — LISTA VAZIA É SUSPEITA, não sucesso. Se a derivação não produzir termo
 #       algum, a guarda não tem o que proteger e passaria verde para sempre —
 #       exatamente o NO-OP silencioso. Zero termos → FALHA ALTO.
+#  P8 — A FONTE PRIVADA DE TERMOS MORA FORA DA ÁRVORE (decisão do maestro, 2026-10-13: o core
+#       ficou PÚBLICO e a árvore foi limpa). Os nomes comerciais que antes viviam como anotação no
+#       `name:` do members.yaml e no `client-terms.txt` versionado eram, num repo público, o próprio
+#       vazamento. Agora vêm de `${ONION_CLIENT_TERMS_FILE:-$HOME/.config/onion/client-terms.txt}`
+#       (no CI, um secret materializado em arquivo temporário). Formato, um por linha (`#` comenta):
+#         `<termo>`                 — termo DECLARADO (REGRA 36 e P7, como o antigo client-terms.txt);
+#         `<termo><TAB><id-membro>` — nome comercial DE UM MEMBRO (equivale à antiga anotação
+#                                     CONFIDENCIAL/PRIVADO do `name:`: entra nos termos derivados,
+#                                     nas superfícies públicas e no modo --federation com o dono).
+#       Arquivo LEGÍVEL = fonte presente (inclusive vazio: ato deliberado, é o que a bancada usa para
+#       reproduzir o comportamento sem termos). Arquivo AUSENTE = a guarda DECLARA que não verificou
+#       (`SOFT NAO-VERIFICADO`), roda com o que tiver, e nunca vira HARD de NO-OP por isso: nem verde
+#       mudo, nem reprovar tudo.
+#  P9 — O DEFAULT DA FONTE PRIVADA SÓ VALE NA FONTE (2026-10-13, medido no update de um adotante
+#       de campo, papel hub, pin bd769f168411): a P8 lia `~/.config/onion/client-terms.txt` em
+#       QUALQUER repo da máquina, e a lista é a dos clientes DO CORE. No adotante ela acusou HARD da
+#       REGRA 36 (6 no relato do adotante, 5 na cópia medida) em arquivos PRÓPRIOS dele (a KB das
+#       integrações dele), onde o nome do parceiro dele é legítimo. Antes da P8 a lista morava dentro do core e não existia no adotante: a P8 mudou o
+#       lugar e, sem querer, o ALCANCE. Agora: papel `source` (sem stamp, ou stamp `role: source`) e
+#       PORTA (`kind: door`, em qualquer papel) → default `~/.config/...`; qualquer outro → SEM default.
+#       A lista só entra fora da fonte se for passada EXPLICITAMENTE (ONION_CLIENT_TERMS_FILE ou --client-terms), e
+#       `--ct-state` diz qual dos três estados vigora (source-default | explicit | role-off) para o
+#       chamador DECLARAR. Explícita vence o papel em qualquer repo: o CI do core continua protegido
+#       mesmo que um stamp falso apareça na árvore.
 # ─────────────────────────────────────────────────────────────────────────────
 #
 # Uso:
 #   projection-safety.sh [<superfície>...]     # default: site/
 #   projection-safety.sh --emit-terms          # imprime os termos derivados
+#   projection-safety.sh --emit-declared       # P8: imprime TODOS os termos da fonte privada (rc 3 = fonte ausente · rc 4 = papel sem default, P9)
+#   projection-safety.sh --ct-state            # P9: imprime source-default | explicit | role-off (rc 0)
+#   projection-safety.sh --client-terms <path> # P8: fonte privada alternativa (senão ONION_CLIENT_TERMS_FILE / ~/.config)
 #   projection-safety.sh --members <path> ...  # fonte alternativa (fixtures)
+#   projection-safety.sh --kg-identifiers [<raiz>...]  # P7: ids de nó e caminhos de grafo (default: docs/)
 #
-# Saída: 0 = limpo · 1 = violação HARD ou pressuposto quebrado
+# Saída: 0 = limpo (ou NÃO VERIFICADO declarado) · 1 = violação HARD ou pressuposto quebrado · 3 = --emit-declared sem fonte · 4 = --emit-declared em papel sem default (P9)
 
 set -u
 
@@ -62,16 +93,43 @@ MEMBERS="${REPO_DIR}/docs/evolution/federation/members.yaml"
 MARKERS='CONFIDENCIAL|PRIVADO'          # P1 — vocabulário fechado
 EMIT_ONLY=0
 FEDERATION=0
+KG_IDS=0
 FORMAT=human
 TERMS_FILE=""                           # #7 do relay: lista de termos DECLARADA (client-safe do adotante)
+EMIT_DECLARED=0
+# P8 + P9: a fonte privada. Explícita (env) vale em qualquer papel; o default `~/.config` SÓ na fonte.
+# O papel é lido do stamp do repo onde a guarda roda (o mesmo REPO_DIR do members.yaml), com a mesma
+# leitura do onion-version.sh: sem stamp = source; stamp sem `role:` = adopted; `decoupled_from:` = não-fonte.
+_ps_stamp="${REPO_DIR}/.claude/.onion-version"
+PS_ROLE="source"
+if [ -f "${_ps_stamp}" ]; then
+  PS_ROLE="$(awk '/^role:/{print $2; exit}' "${_ps_stamp}" 2>/dev/null)"
+  [ -n "${PS_ROLE}" ] || PS_ROLE="adopted"
+  grep -qE '^[[:space:]]*decoupled_from:' "${_ps_stamp}" 2>/dev/null && PS_ROLE="decoupled"
+  # PORTA (`kind: door`, só o materializador escreve), em QUALQUER papel: é projeção do core, nenhum
+  # arquivo ali é próprio de outro dono — a lista do core vale nela como na fonte.
+  grep -qE '^[[:space:]]*kind:[[:space:]]*door([[:space:]]|$)' "${_ps_stamp}" 2>/dev/null && PS_ROLE="source"
+fi
+if [ -n "${ONION_CLIENT_TERMS_FILE:-}" ]; then
+  CLIENT_TERMS_FILE="${ONION_CLIENT_TERMS_FILE}"; CT_STATE="explicit"
+elif [ "${PS_ROLE}" = "source" ]; then
+  CLIENT_TERMS_FILE="${HOME:-/nonexistent}/.config/onion/client-terms.txt"; CT_STATE="source-default"
+else
+  CLIENT_TERMS_FILE=""; CT_STATE="role-off"
+fi
+EMIT_CT_STATE=0
 SURFACES=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --emit-terms) EMIT_ONLY=1; shift ;;
     --federation) FEDERATION=1; shift ;;
+    --kg-identifiers) KG_IDS=1; shift ;;      # SAC-99: ids de nó e nomes de grafo (ver bloco P7)
     --members)    MEMBERS="$2"; shift 2 ;;
     --terms)      TERMS_FILE="$2"; shift 2 ;;   # gate client-safe genérico: o adotante declara os PRÓPRIOS termos (nomes de cliente)
+    --emit-declared) EMIT_DECLARED=1; shift ;;  # P8: os termos da fonte privada (rc 3 sem fonte)
+    --client-terms)  CLIENT_TERMS_FILE="$2"; CT_STATE="explicit"; shift 2 ;;
+    --ct-state)      EMIT_CT_STATE=1; shift ;;   # P9: qual fonte vigora (o chamador declara)
     --format)     FORMAT="$2"; shift 2 ;;
     -h|--help)    sed -n '1,50p' "$0"; exit 0 ;;
     *)            SURFACES+=("$1"); shift ;;
@@ -83,11 +141,54 @@ done
 # ficavam FORA da auditoria default, então a guarda nasceu cega justamente para a superfície do seu
 # próprio incidente de origem. Agora entram por padrão (ambos estavam limpos ao serem incluídos —
 # ampliar cobertura aqui não trocou verde por vermelho, só deixou de ser cego).
+N_USER_SURFACES=${#SURFACES[@]}   # o P7 (--kg-identifiers) tem raiz default própria: docs/
 if [ ${#SURFACES[@]} -eq 0 ]; then
   SURFACES=("${REPO_DIR}/site")
   for extra in "${REPO_DIR}/docs/onion/federation-console.html" "${REPO_DIR}/docs/onion/federation-map.md"; do
     [ -e "${extra}" ] && SURFACES+=("${extra}")
   done
+fi
+
+# ── P8: a fonte privada de termos (fora da árvore) ───────────────────────────
+# ct_present: o arquivo é LEGÍVEL (vazio conta como presente — ato deliberado).
+# ct_lines: linhas úteis. ct_declared: a 1ª coluna de toda linha (o termo). ct_owned: `<id>\t<termo>`
+# das linhas com dono. NENHUMA destas imprime o termo em log: quem as chama só varre.
+ct_present() { [ -n "${CLIENT_TERMS_FILE}" ] && [ -r "${CLIENT_TERMS_FILE}" ] && [ -f "${CLIENT_TERMS_FILE}" ]; }
+ct_lines() {
+  ct_present || return 0
+  grep -vE '^[[:space:]]*(#|$)' "${CLIENT_TERMS_FILE}" 2>/dev/null | tr -d '\r' || true
+}
+ct_declared() {
+  ct_lines | awk -F'\t' '{ t=$1; gsub(/^[[:space:]]+|[[:space:]]+$/,"",t); if (t!="") print t }' | sort -u
+}
+ct_owned() {
+  ct_lines | awk -F'\t' 'NF>=2 { t=$1; o=$2; gsub(/^[[:space:]]+|[[:space:]]+$/,"",t); gsub(/^[[:space:]]+|[[:space:]]+$/,"",o)
+                                 if (t!="" && o!="") print o "\t" t }' | sort -u
+}
+# A declaração de NÃO VERIFICADO, uma linha por chamada (tsv: o lint a vira SOFT; humano: aviso alto).
+# `$1` = o que ficou sem verificar. O caminho NÃO é o arquivo (que não existe): é o registro ao lado do qual
+# a fonte morava, para o aviso ter âncora estável.
+ct_declare_unverified() {
+  # P9: fora da fonte, sem lista explícita, a lista do core NÃO É O OBJETO deste repo — não há o que
+  # "não verificar". Declarar NAO-VERIFICADO aqui seria cobrar do adotante a lista de clientes de OUTRO
+  # repo. O estado fica legível por `--ct-state` (e o lint o declara uma vez, na REGRA 36).
+  [ "${CT_STATE}" = "role-off" ] && return 0
+  if [ "${FORMAT}" = "tsv" ]; then
+    printf 'SOFT\tNAO-VERIFICADO\tdocs/evolution/federation/members.yaml\tfonte privada de termos AUSENTE (ONION_CLIENT_TERMS_FILE ou ~/.config/onion/client-terms.txt; no CI, o secret ONION_CLIENT_TERMS) — %s NÃO foi verificado contra os nomes privados; a guarda declara que não sabe, em vez de verde mudo (P8)\n' "$1"
+  else
+    echo "  ⚠️  NÃO VERIFICADO (P8): fonte privada de termos ausente — ${1} não foi verificado contra os nomes privados."
+    echo "      Defina ONION_CLIENT_TERMS_FILE ou crie ~/.config/onion/client-terms.txt (0600)."
+  fi
+}
+if [ "${EMIT_CT_STATE}" = "1" ]; then
+  printf '%s\n' "${CT_STATE}"
+  exit 0
+fi
+if [ "${EMIT_DECLARED}" = "1" ]; then
+  [ "${CT_STATE}" = "role-off" ] && exit 4
+  ct_present || exit 3
+  ct_declared
+  exit 0
 fi
 
 # ── run_audit — auditoria compartilhada (P2/P3/P4) ───────────────────────────
@@ -254,7 +355,16 @@ derive_terms() {
 # Dois conjuntos, por P2:
 #   TERMS_CI — nomes comerciais: sensíveis em qualquer caixa (pegam identificador).
 #   TERMS_CS — marcadores literais: só em caixa alta (evitam a palavra comum).
-TERMS_CI="$(derive_terms)"
+# P8: os nomes comerciais DE MEMBRO que moram na fonte privada (`<termo>\t<id>`) somam-se aos derivados,
+# com o mesmo filtro de P2 (token igual a id público não é nome) e o mesmo piso de comprimento.
+derive_owned() {
+  local _ids
+  _ids="$(awk '/^[[:space:]]*-?[[:space:]]*id:[[:space:]]/{v=$0; sub(/^[^:]*:[[:space:]]*/,"",v); sub(/[[:space:]]*#.*$/,"",v); gsub(/^[[:space:]]+|[[:space:]]+$/,"",v); if (v!="") print tolower(v)}' "${MEMBERS}" 2>/dev/null || true)"
+  ct_owned | awk -F'\t' -v ids="${_ids}" 'BEGIN{n=split(ids,I,"\n"); for(i=1;i<=n;i++) if(I[i]!="") pub[I[i]]=1}
+    { t=$2; if (length(t)<4) next; if (tolower(t) in pub) next; print t }'
+}
+TERMS_CI="$( { derive_terms; derive_owned; } | grep -v '^[[:space:]]*$' | sort -u || true)"
+CT_ABSENT=0; ct_present || CT_ABSENT=1
 TERMS_CS="CONFIDENCIAL"
 TERMS="$(printf '%s\n%s\n' "${TERMS_CI}" "${TERMS_CS}" | grep -v '^[[:space:]]*$' | sort -u)"
 
@@ -310,6 +420,9 @@ if [ "${FEDERATION}" = "1" ]; then
         if (t !~ /[A-Z]|\./ && t !~ /-/) continue
         print cur "\t" t }
     }' "${MEMBERS}" | sort -u)"
+  # P8: os nomes de membro da fonte privada, com o DONO (o que o mailbox-aware exige).
+  MEMBER_TERMS="$(printf '%s\n%s\n' "${MEMBER_TERMS}" "$(ct_owned)" | grep -v '^[[:space:]]*$' | sort -u || true)"
+  [ "${CT_ABSENT}" = "1" ] && ct_declare_unverified "o histórico de federação (REGRA 33)"
 
   FED_ROOT="${SURFACES[0]:-${FED_DIR}}"
   viol=0; scanned=0
@@ -357,7 +470,14 @@ fi
 
 # ── P5: lista vazia é NO-OP disfarçado de sucesso ────────────────────────────
 n_terms="$(printf '%s\n' "${TERMS}" | grep -c . || true)"
-if [ "${n_terms}" -lt 2 ]; then
+# P8: sem a fonte privada, a guarda DECLARA o que não verificou (uma linha por modo) e o P5 não vira HARD
+# por isso — a lista curta é consequência da fonte ausente, já declarada, e reprovar tudo por ela seria
+# trocar o verde mudo pelo vermelho que ninguém consegue curar no PR. Com a fonte presente, o P5 vale inteiro.
+if [ "${CT_ABSENT}" = "1" ]; then
+  if [ "${KG_IDS}" = "1" ]; then ct_declare_unverified "os ids de nó e caminhos de grafo (REGRA 30, P7)"
+  else ct_declare_unverified "as superfícies públicas (REGRA 30)"; fi
+fi
+if [ "${n_terms}" -lt 2 ] && [ "${CT_ABSENT}" = "0" ]; then
   if [ "${FORMAT}" = "tsv" ]; then
     printf 'HARD\tNO-OP\tdocs/evolution/federation/members.yaml\tderivação produziu %s termo(s) — sem termos a guarda passaria verde para sempre; é NO-OP, não aprovação (P5). Vocabulário: %s\n' "${n_terms}" "${MARKERS}"
     exit 1
@@ -366,6 +486,121 @@ if [ "${n_terms}" -lt 2 ]; then
   echo "  (P5) Sem termos a guarda passaria verde para sempre: é NO-OP, não aprovação."
   echo "  Confira o vocabulário de marcadores (${MARKERS}) contra members.yaml."
   exit 1
+fi
+
+# ── P7: IDS DE NÓ e NOMES DE GRAFO (`--kg-identifiers`, SAC-99) ──────────────
+#
+# O PONTO CEGO (medido 2026-10-10, onda O4 da migração de provenance; renomeado em 2026-10-11): o `id:` de
+# quatro nós e o caminho de um grafo carregavam o nome da PASTA PRIVADA de um hub cujo `id` público é slug
+# neutro. Nada acusava, por DOIS motivos que se somavam:
+#   (1) a varredura de conteúdo só olha as superfícies públicas enumeradas — e grafo de pesquisa não é
+#       uma delas, embora o id e o caminho dele SAIAM para as projeções geradas (o índice de leitura do KG,
+#       o backlog projetado), que copiam exatamente estas duas coisas: id e caminho;
+#   (2) o nome privado não estava nos termos DERIVADOS do members.yaml — morava só no `client-terms.txt`,
+#       a fonte declarada que a REGRA 36 já lê e esta guarda não lia. Slug neutro fecha a vitrine e, no
+#       mesmo movimento, desliga a busca (a lição já registrada no próprio client-terms.txt).
+# ESCOPO DELIBERADO — id e caminho, não label: label tem trilha própria (as ondas da migração trocam o nome
+# privado pelo id com juiz linha a linha), e o selo do maestro na O7 manteve verbatim o DOMÍNIO e o ARQUIVO
+# DE DEPLOY. Varrer label aqui acusaria o que o selo manteve — falso positivo, que treina a ignorar o veto.
+# TERMOS: os derivados (P0–P2) + TODOS os da fonte privada (P8, fora da árvore desde 2026-10-13; antes era o
+# `client-terms.txt` ao lado do members.yaml — ausente, a guarda declara NAO-VERIFICADO),
+# MENOS o termo cuja forma normalizada É um id de membro — id é público por P2 (`acme-adopter` no id de nó é
+# o id, não o nome comercial). NORMALIZAÇÃO: caixa baixa e `-` `.` espaço → `_`, porque o id de nó usa `_` e
+# o caminho usa `-` (`Acme Corp` tem de achar `ACME_CORP` e `acme-corp`).
+# A saída NÃO imprime o id casado: diz a LINHA (o log do lint não pode ser o vazamento novo). O CAMINHO do
+# grafo SUJO é impresso, sim, porque é o próprio artefato a renomear e o lint precisa apontá-lo; ele já está
+# no histórico do core, que não sai (correção da 1ª redação deste comentário, que afirmava o contrário).
+# TETO declarado: só o estilo de bloco (`- id:` / `id:` numa linha) — o radar, que é awk, também só lê
+# esse; id em estilo flow (`{id: X}`) ou com acento (id só aceita [A-Za-z0-9_]) não é id para o corpus.
+# Não olha o alvo de `trace:` nem o label: o índice de leitura copia o caminho do `trace:` e o backlog
+# copia o label, e o nome privado pode chegar por ali (resíduo nomeado no grafo do SAC-99).
+kg_ids_audit() {
+  local files=() f r terms pubids out
+  local roots=()
+  if [ "${N_USER_SURFACES}" -gt 0 ]; then roots=("${SURFACES[@]}"); else roots=("${REPO_DIR}/docs"); fi
+  terms="${TERMS_CI}
+$(ct_declared)"
+  pubids="$(awk '/^[[:space:]]*-[[:space:]]*id:[[:space:]]/{v=$0; sub(/^[^:]*:[[:space:]]*/,"",v); sub(/[[:space:]]*#.*$/,"",v); gsub(/^[[:space:]]+|[[:space:]]+$/,"",v); if (v!="") print v}' "${MEMBERS}" 2>/dev/null || true)"
+  for r in "${roots[@]}"; do
+    [ -e "${r}" ] || continue
+    while IFS= read -r f; do [ -n "${f}" ] && files+=("${f}"); done <<EOF
+$(find "${r}" -type f -name '*.kg.yaml' -not -path '*/fixtures/*' -not -path '*/kg-inbox/_rejected/*' -not -path '*/kg-inbox/_sealed/*' 2>/dev/null | sort)
+EOF
+  done
+  out="$(awk -v terms="${terms}" -v pubids="${pubids}" -v repo="${REPO_DIR}/" '
+    function norm(s) { s=tolower(s); gsub(/[-. \/]/,"_",s); return s }
+    function sq(s) { s=tolower(s); gsub(/[^a-z0-9]/,"",s); return s }
+    # termo CURTO (<=4 depois de espremido) so casa como TOKEN inteiro (entre _ ou borda): substring de
+    # sigla acha dentro de palavra alheia (termo Qux em E_QUXE_ORDER — o refutador de 2026-10-11 mediu a forma com siglas reais).
+    # termo LONGO casa por substring na forma normalizada OU na espremida (sem separador nenhum), que
+    # e a que acha o nome comercial partido em tokens (E_FOO_BAR_X para FooBar).
+    function hit(s, j,   ns) {
+      ns=norm(s)
+      if (short[j]) return index("_" ns "_", "_" term[j] "_") > 0
+      return index(ns, term[j]) > 0 || index(sq(s), tsq[j]) > 0
+    }
+    BEGIN {
+      np=split(pubids, P, "\n"); for (i=1;i<=np;i++) if (P[i]!="") { pub[norm(P[i])]=1; pubsq[sq(P[i])]=1 }
+      nt=split(terms, T, "\n"); k=0
+      for (i=1;i<=nt;i++) { t=T[i]; gsub(/^[[:space:]]+|[[:space:]]+$/,"",t)
+        if (length(t)<3) continue; if ((norm(t) in pub) || (sq(t) in pubsq)) continue
+        if (norm(t) in seen) continue
+        seen[norm(t)]=1; k++; term[k]=norm(t); tsq[k]=sq(t); short[k]=(length(tsq[k])<=4) }
+      if (k==0) { print "NOTERMS"; exit }
+    }
+    # bloco escalar (`narrative: |`): as linhas mais indentadas que a chave são TEXTO, não chave — um
+    # `id:` citado ali não é id (falso positivo medido pelo refutador de 2026-10-11).
+    FNR==1 { blk=-1 }
+    {
+      match($0, /^[ ]*/); ind=RLENGTH
+      if (blk >= 0) { if ($0 ~ /^[[:space:]]*$/ || ind > blk) next; blk=-1 }
+      if ($0 ~ /:[[:space:]]*[|>][-+0-9]*[[:space:]]*$/) blk=ind
+    }
+    FNR==1 {
+      rel=FILENAME; if (index(rel,repo)==1) rel=substr(rel,length(repo)+1)
+      for (j=1;j<=k;j++) if (hit(rel,j)) { print "NOME\t" rel "\t0"; break }
+    }
+    /^[[:space:]]*(-[[:space:]]+)?id:[[:space:]]*/ {
+      v=$0; sub(/^[^:]*:[[:space:]]*/,"",v); sub(/[[:space:]]+#.*$/,"",v); gsub(/["'"'"']/,"",v)
+      for (j=1;j<=k;j++) if (hit(v,j)) { print "ID\t" rel "\t" FNR; break }
+    }
+  ' "${files[@]}" /dev/null)"
+  if [ "${out}" = "NOTERMS" ]; then
+    [ "${CT_ABSENT}" = "1" ] && return 0   # P8: a ausência da fonte já foi declarada acima (NAO-VERIFICADO)
+    if [ "${FORMAT}" = "tsv" ]; then
+      printf 'HARD\tNO-OP\tdocs/evolution/federation/members.yaml\tP7 sem termo algum depois de excluir os ids públicos — a varredura de ids e nomes de grafo passaria verde para sempre (P5)\n'
+    else echo "✗ HARD projection-safety (P7): nenhum termo para varrer ids e nomes de grafo — NO-OP não é aprovação."; fi
+    return 1
+  fi
+  local viol=0 kind path line
+  while IFS="$(printf '\t')" read -r kind path line; do
+    [ -n "${kind}" ] || continue
+    viol=$((viol+1))
+    if [ "${kind}" = "NOME" ]; then
+      if [ "${FORMAT}" = "tsv" ]; then
+        printf 'HARD\tNOME-GRAFO\t%s\to CAMINHO do grafo carrega nome comercial de membro privado — o caminho sai para o índice de leitura do KG e o backlog projetado; renomeie usando o id do members.yaml (git mv + referências)\n' "${path}"
+      else echo "  ✗ HARD [NOME-GRAFO] ${path}: o caminho do grafo carrega nome comercial de membro privado — renomeie pelo id do members.yaml"; fi
+    else
+      if [ "${FORMAT}" = "tsv" ]; then
+        printf 'HARD\tID-NO\t%s\tid na linha %s carrega nome comercial de membro privado — o id sai para as projeções do KG; troque pelo id do members.yaml e reescreva as arestas (selo O7: labels e ids usam o id)\n' "${path}" "${line}"
+      else echo "  ✗ HARD [ID-NO] ${path}:${line}: id carrega nome comercial de membro privado — troque pelo id do members.yaml"; fi
+    fi
+  done <<EOF
+${out}
+EOF
+  if [ "${FORMAT}" != "tsv" ]; then
+    echo "=== Segurança de projeção — ids de nó e nomes de grafo (P7) ==="
+    echo "  Grafos varridos : ${#files[@]}"
+    if [ "${viol}" -gt 0 ]; then echo "✗ REPROVA — ${viol} id(s)/caminho(s) com nome comercial."; return 1; fi
+    echo "OK ✓ — nenhum id de nó nem caminho de grafo carrega nome comercial."
+  fi
+  return 0
+}
+if [ "${KG_IDS}" = "1" ]; then
+  kg_ids_audit
+  rc=$?
+  [ "${FORMAT}" = "tsv" ] && [ "${rc}" -ne 0 ] && exit 0   # tsv: a linha HARD já saiu; o lint decide pelo conteúdo
+  exit "${rc}"
 fi
 
 # ── P6: o TRECHO PROJETADO do `name:` tem de ser o próprio slug ──────────────

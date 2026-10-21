@@ -1,0 +1,30 @@
+# Baseline de citações de ops/<arquivo> em superfície que VIAJA — PASSIVO TOLERADO (REGRA 100).
+# Gerado por: bash .claude/validation/ops-citation-travel-check.sh --emit-baseline > .claude/validation/ops-citation-travel-baseline.txt
+# formato: <rel>|<ops/token>|<ocorrências>. SÓ PODE ENCOLHER: reescreva para o que o destinatário tem, ou marque (core-only), e remova a linha.
+# scope: .claude/agents .claude/commands .claude/skills .claude/utils .claude/validation .claude/hooks .claude/rules .claude/workflows docs/meta-specs docs/knowledge-base docs/sdaal vendor/kg-ssot plugins
+.claude/commands/meta/adopt.md|ops/audit-adopters-registry.sh|1
+.claude/commands/meta/kg-inbox.md|ops/mcp-onion-exec/server.py|2
+.claude/hooks/lib/invocation-lines.sh|ops/pr-merge-verified.sh|1
+.claude/hooks/pretooluse-env-guard.sh|ops/testing/|1
+.claude/utils/adopt/check-member-registered.sh|ops/audit-adopters-registry.sh|1
+.claude/utils/adopt/vendor-manifest.sh|ops/publish-door.sh|1
+.claude/utils/adopt/write-stamp.sh|ops/materialize-door.sh|1
+.claude/utils/marketplace/roles.yaml|ops/door-templates/mini|4
+.claude/validation/door-mini-check.sh|ops/door-templates/|1
+.claude/validation/door-role-parity-check.sh|ops/materialize-door.sh|3
+.claude/validation/door-staleness-check.sh|ops/publish-door.sh|1
+.claude/validation/evolve-staleness-check.sh|ops/materialize-door.sh|1
+.claude/validation/identifier-language-check.sh|ops/pr-merge-verified.sh|1
+.claude/validation/lint-artifacts.sh|ops/deploy-site.sh|3
+.claude/validation/lint-artifacts.sh|ops/materialize-door.sh|1
+.claude/validation/lint-artifacts.sh|ops/mutate-and-restore.sh|1
+.claude/validation/lint-artifacts.sh|ops/publish-door.sh|1
+.claude/validation/members-validate.sh|ops/registry-pins.sh|1
+.claude/validation/mutant-leftover-check.sh|ops/mutate-and-restore.sh|2
+.claude/validation/onion-regen-lib.sh|ops/pr-finalize.sh|1
+.claude/validation/pipe-verdict-check.sh|ops/publish-door.sh|1
+.claude/validation/plugin-bundle-check.sh|ops/publish-door.sh|1
+.claude/validation/testing-state.sh|ops/testing/collect-selftest.sh|9
+.claude/validation/vps-exposure-check.sh|ops/publish-door.sh|1
+docs/knowledge-base/tools/vps-tool-repo-skeleton.md|ops/bridge-auth/logto-provision.sh|1
+docs/meta-specs/architecture.md|ops/materialize-door.sh|1

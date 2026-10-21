@@ -47,7 +47,7 @@ companion_of: onion-guardrails.md
 | federation-map.md ausente / stale | `... mapa da federação desatualizado vs members.yaml ...` | lint-artifacts.sh | conf. |
 | federation-console.html ausente / stale | `... console desatualizado vs SSOT — regenere ...` | lint-artifacts.sh | conf. |
 | agent-card.json ausente / stale | `... agent card desatualizado vs SSOT — regenere ...` | lint-artifacts.sh | conf. |
-| plugin ausente / fora de sync / tree_sha divergente | `VIOLATION: plugins/${name}: ... regenere com 'assemble-plugin.sh'` | lint-artifacts.sh | conf. |
+| ~~plugin ausente / fora de sync / tree_sha divergente~~ (APOSENTADA na F4 das portas, 2026-10-10: o `plugins/` montado saiu do core; as guardas de plugin julgam o bundle na publicação) | `HARD<TAB>REGRA<TAB>classe<TAB>caminho<TAB>msg` | plugin-bundle-check.sh | conf. |
 | capability reivindicada ≠ cumprida | `... capability: reivindica '${claimed}' mas só cumpre '${met}' ...` | lint-artifacts.sh | conf. |
 | vertical em roles.yaml sem manifesto / fora do marketplace.json | `... papel referencia vertical '${v}' sem manifesto ...` | lint-artifacts.sh | conf. |
 | agent-card: membro core ausente | `a2a-agent-card: membro core (onion-evolve/source) ausente no members.yaml (exit 3).` | a2a-agent-card.sh | conf. |
@@ -65,8 +65,8 @@ companion_of: onion-guardrails.md
 |---|---|---|---|
 | envelope inexistente / não-JSON / campos ausentes | `envelope-absent` · `malformed-envelope` · `envelope-missing-fields` | a2a-verify.sh | conf. |
 | JWS malformado / payload não-JSON | `malformed-jws` · `malformed-jws-payload` | a2a-verify.sh | conf. |
-| `alg` ≠ RS256 | `unsupported-alg:${ALG:-none}` | a2a-verify.sh | conf. |
-| `kid` ausente / com path-traversal / desconhecido | `jws-missing-kid` · `bad-kid` · `unknown-kid:${KID}` | a2a-verify.sh | conf. |
+| `alg` ≠ RS256 (ou header com `crit`/`b64`) | `unsupported-alg` · `unsupported-jws-crit` (reason fixo, sem eco do valor) | a2a-verify.sh | conf. |
+| `kid` ausente / fora da forma (1–160 de `[A-Za-z0-9._-]`, sem `.` inicial) / desconhecido | `jws-missing-kid` · `bad-kid` · `unknown-kid:${KID}` | a2a-verify.sh | conf. |
 | `kid` não pertence ao `from` em members.yaml | `kid-not-owned-by-from:${KID}` | a2a-verify.sh | conf. (gated) |
 | assinatura RS256 inválida | `bad-signature` | a2a-verify.sh | conf. |
 | `iss`/`aud`/`to` divergem do declarado | `claim-iss-mismatch` · `claim-aud-mismatch` · `signal-to-mismatch` | a2a-verify.sh | conf. |
