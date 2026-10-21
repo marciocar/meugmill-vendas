@@ -44,7 +44,24 @@ bash ops/testing/collect-selftest.sh --report /tmp/r.tsv --source local
 
 ## 4. Custo e retorno da revisão de IA (REGRA 56)
 
-⊘ **NÃO MEDIDO** — `review-ledger.sh --env` não respondeu.
+| Medida | Valor | Produtor |
+|---|---:|---|
+| Resíduos de revisão | **↻ ao vivo** | `bash .claude/validation/review-ledger.sh --env` |
+| Achados totais | **↻ ao vivo** | `bash .claude/validation/review-ledger.sh --env` |
+| Achados REAIS | **↻ ao vivo** | `bash .claude/validation/review-ledger.sh --env` |
+| Precisão (reais/totais) | **↻ ao vivo** | `bash .claude/validation/review-ledger.sh --env` |
+| Tokens por achado REAL | **↻ ao vivo** | `bash .claude/validation/review-ledger.sh --env` |
+| Vereditos no vocabulário | **↻ ao vivo** | `bash .claude/validation/review-ledger.sh --env` |
+| — legado (texto livre) | **↻ ao vivo** | `bash .claude/validation/review-ledger.sh --env` |
+
+> `↻ ao vivo`: o número muda a cada PR, então **não mora no git** — versioná-lo punha este
+> painel em quase todo PR e fazia dois PRs
+> paralelos colidirem nele (passo A de `D_MERGE_PROCESS_ONION_2026_10`). Para ler:
+> `bash .claude/validation/testing-state.sh --live`.
+
+A média de tokens cobre só os resíduos com custo > 0 (a contagem sai em `--live`); os demais declaram `tokens: 0`
+(custo zero DECLARADO, que não é ausência) e ficam fora da média porque divisão por zero
+não é média — mas seus achados continuam contados no total.
 
 ## 5. O que este painel NÃO mede
 
@@ -60,4 +77,4 @@ Declarado para que a ausência não seja lida como zero:
 
 <sub>Painel gerado por `.claude/validation/testing-state.sh` a partir de
 `harness-inventory.sh`, `review-ledger.sh` e `docs/onion/metrics/selftest-runs.jsonl`.
-Produtores vivos nesta geração: 1/3.</sub>
+Produtores vivos nesta geração: 2/3.</sub>
