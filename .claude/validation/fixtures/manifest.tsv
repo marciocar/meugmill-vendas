@@ -37,9 +37,19 @@ members	members/members-bad-dup-id.yaml	-	fail
 members	members/members-bad-missing-pin.yaml	-	fail	
 members	members/members-bad-fake-source.yaml	-	fail	
 members	members/members-bad-stamp-role.yaml	-	fail	
+members	members/members-good-door-roles.yaml	-	pass	
+members	members/members-bad-mini-adopter.yaml	-	fail	
+members	members/members-bad-plugins-na.yaml	-	fail	
+members	members/members-good-superseded.yaml	-	pass	
+members	members/members-bad-superseded-unknown.yaml	-	fail	
+members	members/members-bad-source-door-no-pin.yaml	-	fail	
+members	members/members-bad-mini-na.yaml	-	fail	
+members	members/members-bad-two-source-doors.yaml	-	fail	
 merge	adopt-settings-merge/target-empty.json	-	-
 merge	adopt-settings-merge/target-with-own.json	-	-
+merge	adopt-settings-merge/target-old-adopter-no-onfailure.json	-	-
 merge	adopt-settings-merge/target-with-own-attribution.json	-	-
+merge	adopt-settings-merge/target-onion-hook-wrong-group.json	-	-
 lint	r17-frontmatter-colon/bad-unquoted-colon.md	.claude/agents/development	bad	não-aspado
 lint	r17-frontmatter-colon/good-quoted.md	.claude/agents/development	good	
 lint	r16-count-drift/bad-cmd-categorias.md	docs	bad	divergente da SSOT
@@ -117,6 +127,9 @@ lint	r16-count-drift/bad-conjuntiva.md	docs	bad	divergente da SSOT
 lint	r16-count-drift/good-conjuntiva.md	docs	good
 lint	r16-count-drift/bad-table-total.md	docs	bad	não bate com nenhuma contagem
 lint	r16-count-drift/good-table-total.md	docs	good
+lint	r16-count-drift/good-table-total-cost.md	docs	good
+lint	r16-count-drift/bad-table-total-pop-cell.md	docs	bad	não bate com nenhuma contagem
+lint	r16-count-drift/bad-table-total-thousand.md	docs	bad	não bate com nenhuma contagem
 lint	r89-aufhebung/bad-sem-aufhebung.kg.yaml	docs/evolution/research/radar-selftest-fixture	bad	REGRA 89	probe.kg.yaml
 lint	r53-rules-pathscoped/bad-empty-body.md	.claude/rules	bad	CORPO VAZIO
 lint	r53-rules-pathscoped/good-scalar-paths.md	.claude/rules	good	

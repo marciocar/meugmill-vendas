@@ -7,9 +7,10 @@
 # / "SOFT"). Assim o registro reflete o comportamento, não uma promessa que pode ter driftado.
 #
 # Imprime markdown em stdout; o arquivo .claude/validation/lint-rules.md é a PROJEÇÃO (a guarda
-# REGRA 39 regenera e compara). FALHA (exit 2) nas 6 catracas de clareza: número duplicado ·
+# REGRA 39 regenera e compara). FALHA (exit 2) nas 7 catracas de clareza: número duplicado ·
 # regra sem categoria · sem `# previne:` · sem tag [SEV] · severidade indefinida · regra ÓRFÃ
-# (header sem função própria — rouba a função da seguinte e publica severidade falsa).
+# (header sem função própria — rouba a função da seguinte e publica severidade falsa) · regra
+# EMITIDA pelo dispatcher (`violation … "REGRA N`) e ausente do registro (cabeçalho fora da forma).
 #
 # Uso:  bash .claude/validation/rules-registry.sh > .claude/validation/lint-rules.md
 # ===========================================================================
@@ -46,6 +47,8 @@ fnrx  = re.compile(r'^([a-z_][a-z0-9_]*)\(\)\s*\{')          # 'check_xxx() {'
 sevrx = re.compile(r'violation "(HARD|SOFT)"')
 tagrx = re.compile(r'\[([^\]]*)\]\s*$')                       # '… [HARD]'
 prevrx = re.compile(r'^#\s*previne:\s*(.+?)\s*$')            # '# previne: <modo-de-falha>'
+apprx  = re.compile(r'^#\s*aplica-se:\s*(.+?)\s*$')          # '# aplica-se: source[, hub]' (SAC-149)
+ROLES  = {'source', 'hub', 'adopted', 'standalone', 'plugins', 'mini', 'source-door'}
 
 rules, order, dups = {}, [], []
 i, n = 0, len(lines)
@@ -61,12 +64,16 @@ while i < n:
     # da guarda até o próximo docstring: acha a função, as severidades que ela emite,
     # e o campo '# previne:' (o modo-de-falha, no bloco de docstring antes da função).
     j = i + 1
-    fname, sev, previne = None, set(), None
+    fname, sev, previne, applies = None, set(), None, None
     while j < n and not rx.match(lines[j]):
         if previne is None:
             pm = prevrx.match(lines[j])
             if pm:
                 previne = pm.group(1)
+        if applies is None and fname is None:
+            am = apprx.match(lines[j])
+            if am:
+                applies = [r for r in re.split(r'[\s,]+', am.group(1)) if r]
         fm = fnrx.match(lines[j])
         if fm:
             fname = fm.group(1)
@@ -80,12 +87,39 @@ while i < n:
         j += 1
     if num in rules:
         dups.append(num)
-    rules[num] = dict(title=title, declared=declared, sev=sev, fn=fname, previne=previne)
+    rules[num] = dict(title=title, declared=declared, sev=sev, fn=fname, previne=previne, applies=applies)
     order.append(num)
     i += 1
 
 if dups:
     sys.stderr.write("ERRO rules-registry: numero(s) de REGRA duplicado(s): %s\n" % sorted(set(dups)))
+    sys.exit(2)
+
+# Catraca de CLAREZA nº7 — regra que o DISPATCHER emite e o REGISTRO não vê.
+#
+# DANO MEDIDO (2026-10-11): as REGRAS 98, 99, 100 e 101 nasceram com o cabeçalho
+# `# REGRA N (Título) — HARD`, que `rx` acima não casa. Elas rodavam no lint, emitiam
+# `violation … "REGRA N (…)"`, e ficaram FORA do lint-rules.md — e também do hook
+# rule-title-in-prose.sh e do _rule_map_build do lint, que leem o mesmo cabeçalho. Ninguém acusou
+# porque as catracas 1-6 só olham o que `rx` JÁ casou: cabeçalho que o parser não vê não tem
+# categoria a faltar, previne a faltar nem tag a faltar. A população conferida aqui vem de OUTRA
+# fonte (a mensagem que a guarda emite), e é por isso que ela vê o que as outras não podem ver.
+# TETO (medido pelo refutador, 2026-10-11): ela só vê a regra cujo `violation` cabe numa linha com o
+# prefixo "REGRA N" na mensagem: 26 das 93 hoje. Escapam a emissão multilinha (`violation "SEV" "p" \`,
+# 16 sítios), a mensagem sem prefixo (rotulada pela função) e o cabeçalho com sufixo (`# REGRA 65b — …`,
+# que já vive fora do registro: achado declarado, não curado aqui). A 98-101 caíam todas dentro do alcance.
+emitrx = re.compile(r'violation\s+"[^"]*"\s+"[^"]*"\s+"REGRA (\d+)\b')
+emitted = {}
+for ln, l in enumerate(lines, 1):
+    for em in emitrx.finditer(l):
+        emitted.setdefault(int(em.group(1)), ln)
+unregistered = sorted(x for x in emitted if x not in rules)
+if unregistered:
+    sys.stderr.write(
+        "ERRO rules-registry: REGRA(S) emitida(s) pelo dispatcher e AUSENTE(S) do registro: %s\n"
+        "  (1a emissao na linha: %s). O cabecalho dela nao casa a forma canonica\n"
+        "  `# REGRA N — Titulo [SEV]` — reescreva-o nessa forma em lint-artifacts.sh.\n"
+        % (unregistered, {x: emitted[x] for x in unregistered}))
     sys.exit(2)
 
 # Catraca de CLAREZA (irmã da 'sem categoria'): toda regra declara o MODO-DE-FALHA que
@@ -178,28 +212,48 @@ if orphans:
         "  em ORPHAN_ALLOWED (rules-registry.sh) com a razao escrita.\n" % orphans)
     sys.exit(2)
 
+# Catraca de CLAREZA nº8 — APLICABILIDADE POR PAPEL (SAC-149, 2026-10-15). `# aplica-se:` tira a regra dos
+# papéis em que ela não tem objeto (o lint a conta como "não se aplica", nunca SOFT). Duas recusas: papel fora
+# do vocabulário (typo cala a regra em silêncio em TODO papel), e lista sem `source` (a regra nunca rodaria no
+# core, onde a bancada a exercita — guarda que não roda onde é testada é guarda sem teste).
+bad_app = {x: r['applies'] for x, r in rules.items() if r.get('applies') is not None
+           and (not r['applies'] or 'source' not in r['applies'] or set(r['applies']) - ROLES)}
+if bad_app:
+    sys.stderr.write("ERRO rules-registry: '# aplica-se:' inválido em %s — papéis válidos: %s, e `source` é obrigatório\n"
+                     % (bad_app, sorted(ROLES)))
+    sys.exit(2)
+
+# ...e no máximo UMA declaração por regra, no docstring: uma 2ª, dentro da função, era invisível a este gerador e o
+# lint a lia (passada adversarial, 2026-10-15) — hoje o lint também só lê a do docstring, e esta recusa a ambiguidade.
+_starts = [i for i, l in enumerate(lines) if rx.match(l)] + [len(lines)]
+dup_app = sorted(int(rx.match(lines[a]).group(1)) for a, b in zip(_starts, _starts[1:])
+                 if sum(1 for l in lines[a:b] if apprx.match(l)) > 1)
+if dup_app:
+    sys.stderr.write("ERRO rules-registry: '# aplica-se:' repetido em %s — declare UMA vez, no docstring\n" % dup_app)
+    sys.exit(2)
+
 # --- classificação (SSOT da categoria; a cobertura é guardada abaixo) --------
 CATEGORIES = [
     ("Frontmatter & conformidade de artefato",
      "Campos obrigatórios, válidos e bem-formados no frontmatter de agentes e comandos.",
-     [1, 2, 3, 12, 17, 23, 51]),
+     [1, 2, 3, 12, 17, 23, 51, 102]),
     ("Higiene de artefato",
      "Tamanho saudável, nomes kebab-case, dialeto puro e links que resolvem.",
-     [5, 6, 13, 14, 15, 22, 48, 60, 71, 72, 73, 74, 75, 94]),
+     [5, 6, 13, 14, 15, 22, 48, 60, 71, 74, 94, 98, 109]),
     ("Fronteiras & contratos de arquitetura",
      "Proibições estruturais, documentação no lugar certo e os contratos de conformance e de adoção.",
-     [7, 18, 20, 40, 53, 77]),
+     [7, 18, 20, 40, 53]),
     ("SDAAL — abstração de provider",
      "O consumidor fala com a abstração, nunca com o provider direto.",
-     [10, 11]),
+     [10, 11, 103, 104, 105, 107]),
     ("SSOT anti-drift",
-     "Toda superfície DERIVADA fica em sincronia com a fonte única — contagens, mapas, plugins, topologia.",
-     [8, 9, 16, 19, 21, 27, 37, 39, 41, 50, 59, 62, 63, 70, 76, 80, 81, 83, 84, 85, 90, 92, 96]),
+     "Toda superfície DERIVADA fica em sincronia com a fonte única — contagens, mapas, catálogo, topologia.",
+     [8, 9, 16, 21, 27, 37, 39, 41, 50, 59, 62, 63, 70, 76, 80, 81, 83, 84, 85, 90, 92, 96, 108, 110]),
     ("KG & proveniência",
      "Conhecimento nasce no grafo e não morre em prosa; proveniência com catraca "
      "(por citação e por marcador autodeclarado); e frescor doutrinário — afirmação "
      "sensível-ao-tempo carimbada e dentro do TTL.",
-     [26, 29, 31, 32, 42, 43, 47, 49, 52, 55, 57, 58, 67, 68, 69, 78, 82, 87, 89, 93]),
+     [26, 29, 31, 32, 42, 43, 47, 49, 52, 55, 57, 58, 67, 68, 69, 78, 82, 87, 89, 93, 99]),
     ("Automação Graduada",
      "Classes de ação (HUMAN→MONITORED→DYNAMIC→AUTO) sobem de degrau com gate de promoção alcançável — nenhum rung-jump forjado.",
      [44, 65, 97]),
@@ -208,10 +262,9 @@ CATEGORIES = [
      [24, 25, 28, 38, 46, 66, 95]),
     ("Projeção & privacidade",
      "O que pode sair para superfícies públicas ou vendorizadas — nome de cliente e "
-     "deep-link privado nunca vazam (nem a HOME crua do source privado, num artefato de "
-     "plugin); e o compose commitado nunca publica porta em "
+     "deep-link privado nunca vazam; e o compose commitado nunca publica porta em "
      "0.0.0.0 nem sobe com segredo de fallback.",
-     [30, 33, 34, 35, 36, 45, 61, 64, 79]),
+     [30, 33, 34, 35, 36, 45, 61, 64, 100, 106]),
     ("Processo com resíduo",
      "O trabalho PROPOSTO carrega rastro material de ter sido revisado — o gate cria a cadência, "
      "o worker testa a verdade.",
@@ -225,8 +278,10 @@ CATEGORIES = [
      "que não PARSEIA não é um gate que falhou, é um gate que nunca rodou — e o repo o "
      "contava como existente. A REGRA 88 entrou em 2026-09-20 pela versão mais perversa da "
      "classe: o gate rodava, mas sem árvore — `bash <script do repo>` saía 127, o job reprovava "
-     "TODO PR e a mensagem culpava o código revisado. Gate que nunca olhou, acusando.",
-     [54, 86, 88]),
+     "TODO PR e a mensagem culpava o código revisado. Gate que nunca olhou, acusando. "
+     "A REGRA 101 entrou em 2026-10-11 pela versão do veto: o hook que nem roda (script "
+     "ausente, rc=127) deixava a ação passar — veto que não executou, contado como veto.",
+     [54, 86, 88, 101]),
 ]
 
 seen = {}
@@ -301,6 +356,20 @@ for title, desc, nums in CATEGORIES:
     out.append("|---:|-------|:----------:|---------------|")
     for x in present:
         out.append("| %d | %s | %s | %s |" % (x, esc(rules[x]['title']), labels[x], esc(rules[x]['previne'])))
+    out.append("")
+
+scoped = [x for x in sorted(rules) if rules[x].get('applies')]
+if scoped:
+    out.append("## Aplicabilidade por papel")
+    out.append("")
+    out.append("Regras cujo objeto só existe em alguns papéis, declaradas por `# aplica-se:` no docstring. Fora desses")
+    out.append("papéis o lint **não as roda** e as conta à parte (`Não se aplica`), fora de HARD e SOFT: ausência")
+    out.append("legítima de objeto não é aviso. Toda lista contém `source`, então no core todas rodam.")
+    out.append("")
+    out.append("| Nº | Regra | Aplica-se a |")
+    out.append("|---:|-------|-------------|")
+    for x in scoped:
+        out.append("| %d | %s | %s |" % (x, esc(rules[x]['title']), ', '.join(rules[x]['applies'])))
     out.append("")
 
 if len(sys.argv) > 2 and sys.argv[2] == '--counts':

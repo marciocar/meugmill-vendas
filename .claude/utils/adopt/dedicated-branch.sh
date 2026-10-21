@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# =============================================================================
+# dedicated-branch.sh — prepara a BRANCH DEDICADA onde o /meta:adopt --update e o --promote-hub
+# escrevem, e imprime o DIRETÓRIO onde trabalhar.
+#
+# Uso : dedicated-branch.sh <TARGET> <BRANCH> <BASE> [--worktree]
+#   --worktree = abre a worktree irmã mesmo sem farol vivo (SAC-144: o operador não tinha como
+#   forçá-la, e o checkout do alvo era trocado de branch sempre que nenhuma sessão estava lá)
+#   TARGET = repo do alvo · BRANCH = chore/onion-update-<pin> | chore/onion-promote-hub
+#   BASE   = de onde a branch nasce (a integração do alvo); ignorada se BRANCH já existe (retomada)
+# stdout: o diretório de trabalho — o próprio TARGET, ou uma WORKTREE dele quando há farol vivo.
+# rc  : 0 pronto · 2 precondição (não-repo, base inexistente, árvore suja, branch presa noutra worktree)
+#
+# ══ POR QUE EXISTE (F1 das portas, SAC-89, 2026-10-09) ════════════════════════════════════════════
+# Medido no --update de um hub adotante (2026-10): o adopt.md mandava `BR=$INTEGRATION_BRANCH`, o vendor-branch
+# fazia checkout E merge na integração, e o durable-commit fechava com `--no-verify`. Três escolhas que
+# somadas punham o framework novo na branch de integração do adotante SEM passar por PR nem pelo gate
+# dele — o oposto do que o Onion cobra de qualquer outra mudança. A branch dedicada devolve o update
+# ao caminho normal: commit numa branch própria → push → PR → merge commit.
+#
+# E o FAROL: se há outra sessão viva no alvo (`session-beacon.sh check` rc=1), um `checkout` aqui
+# troca a branch debaixo dela — o incidente W1×W2 que criou o farol (I3: um escritor por repo inclui
+# SESSÕES). Com farol vivo a branch nasce numa worktree IRMÃ do alvo e o checkout dele fica intocado.
+# Sem o script do farol não há como provar ausência, e a ausência de prova cai no lado seguro: worktree.
+# Exercitado por lint-selftest.sh (run_adopt_robust_selftests).
+# =============================================================================
+set -uo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+T="${1:-}"; BR="${2:-}"; BASE="${3:-}"; FORCE_WT=0
+case "${4:-}" in --worktree) FORCE_WT=1 ;; "") ;; *) echo "ERRO: 4º argumento desconhecido '${4}' (só --worktree)" >&2; exit 2 ;; esac
+[ -n "${T}" ] && [ -n "${BR}" ] && [ -n "${BASE}" ] || { echo "uso: dedicated-branch.sh <TARGET> <BRANCH> <BASE> [--worktree]" >&2; exit 2; }
+
+TOP="$(git -C "${T}" rev-parse --show-toplevel 2>/dev/null)" || { echo "ERRO: '${T}' não é repositório git." >&2; exit 2; }
+_has_br=0; git -C "${TOP}" rev-parse --verify --quiet "refs/heads/${BR}" >/dev/null && _has_br=1
+if [ "${_has_br}" = 0 ] && ! git -C "${TOP}" rev-parse --verify --quiet "${BASE}^{commit}" >/dev/null; then
+  echo "ERRO: base '${BASE}' não resolve para um commit em ${TOP}." >&2; exit 2
+fi
+
+# ── RETOMADA: a branch já está aberta numa worktree? Então é lá, com ou sem farol agora ─────────────
+# Passada adversarial do PR da F1 (D1): 1ª rodada com farol vivo cria a worktree irmã; a outra sessão
+# sai; a retomada (shell novo, WORK não persiste) ia pelo caminho "sem farol", tentava `checkout` da
+# branch no alvo e o git recusava (a branch está em uso pela worktree) — --update irretomável, rc=2.
+git -C "${TOP}" worktree prune 2>/dev/null || true   # worktree com diretório apagado não é retomada
+_existing="$(git -C "${TOP}" worktree list --porcelain | awk -v b="refs/heads/${BR}" '/^worktree /{w=substr($0,10)} $0=="branch " b {print w; exit}')"
+if [ -n "${_existing}" ]; then
+  [ "${_existing}" != "${TOP}" ] && echo "  retomada: '${BR}' já está aberta na worktree ${_existing} — trabalho lá." >&2
+  printf '%s\n' "${_existing}"
+  exit 0
+fi
+
+# ── farol: há OUTRA sessão viva no alvo? ─────────────────────────────────────────────────────────
+BEACON="${HERE}/../../validation/session-beacon.sh"
+LIVE=1
+if [ "${FORCE_WT}" = 1 ]; then
+  echo "  --worktree: worktree irmã por escolha do operador (sem consultar o farol)." >&2
+elif [ -f "${BEACON}" ]; then
+  bash "${BEACON}" check "${TOP}" >/dev/null 2>&1 && LIVE=0
+else
+  echo "  (sem session-beacon.sh: não há como provar que o alvo está livre — uso worktree)" >&2
+fi
+
+if [ "${LIVE}" = 1 ]; then
+  WT="$(dirname "${TOP}")/$(basename "${TOP}")-${BR//\//-}"
+  if grep -qxF "worktree ${WT}" <<< "$(git -C "${TOP}" worktree list --porcelain)"; then
+    _cur="$(git -C "${WT}" rev-parse --abbrev-ref HEAD 2>/dev/null)"
+    [ "${_cur}" = "${BR}" ] || { echo "ERRO: a worktree ${WT} existe mas está em '${_cur}', não em '${BR}'." >&2; exit 2; }
+  elif [ -e "${WT}" ]; then
+    echo "ERRO: ${WT} existe e não é worktree deste repo — não sobrescrevo." >&2; exit 2
+  elif [ "${_has_br}" = 1 ]; then
+    git -C "${TOP}" worktree add -q "${WT}" "${BR}" >&2 || { echo "ERRO: não consegui abrir a worktree de '${BR}' (presa noutra worktree?)." >&2; exit 2; }
+  else
+    git -C "${TOP}" worktree add -q -b "${BR}" "${WT}" "${BASE}" >&2 || { echo "ERRO: não consegui criar a worktree de '${BR}'." >&2; exit 2; }
+  fi
+  [ "${FORCE_WT}" = 1 ] || echo "  farol vivo em ${TOP}: trabalho na worktree ${WT} (branch ${BR}); o checkout do alvo fica intocado." >&2
+  printf '%s\n' "${WT}"
+  exit 0
+fi
+
+# ── sem farol: a branch nasce no próprio checkout, que tem de estar limpo ────────────────────────
+if ! git -C "${TOP}" diff --quiet 2>/dev/null || ! git -C "${TOP}" diff --cached --quiet 2>/dev/null; then
+  echo "ERRO: árvore de ${TOP} suja — commite ou guarde antes; trocar de branch carregaria trabalho alheio para a branch do update." >&2
+  exit 2
+fi
+_cur="$(git -C "${TOP}" rev-parse --abbrev-ref HEAD 2>/dev/null)"
+if [ "${_cur}" != "${BR}" ]; then
+  if [ "${_has_br}" = 1 ]; then git -C "${TOP}" checkout -q "${BR}" >&2
+  else git -C "${TOP}" checkout -q -b "${BR}" "${BASE}" >&2; fi \
+    || { echo "ERRO: checkout de '${BR}' falhou em ${TOP}." >&2; exit 2; }
+fi
+printf '%s\n' "${TOP}"

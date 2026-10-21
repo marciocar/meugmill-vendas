@@ -39,8 +39,9 @@ cobertura **dá licença**. O censo de guardas **não** vê isto — por isso a 
 Medido 3× num dia: em guarda de lista, o que falha é a **lista de formas**, não o algoritmo. Três
 consequências práticas:
 - **o motor do padrão decide a sintaxe**: `[[:space:]]` é POSIX do `grep` e o `re` do Python o trata
-  como *nested set* — a 1ª redação do `background-state-needs-evidence` ficou **cega ao `ps`** que ela
-  existe para exigir;
+  como *nested set* — a 1ª redação do `background-state-needs-evidence` (veto de prosa
+  aposentado em 2026-10-14 pela sonda `background-task-probe.sh`) ficou **cega ao `ps`** que ela
+  existia para exigir;
 - **o locale do hook não é o seu**: `Viola..es` casa em UTF-8 e **não** em locale `C`, que é o do
   hook. Rode a bancada com `LC_ALL=C`. **E meça com o BINÁRIO do script, nunca com a ferramenta da
   shell** — medido em 2026-10-02 ao forjar este próprio conjunto: um caso reprovou por `n[ãa]o` em
@@ -66,6 +67,14 @@ entrada** que a guarda lê.
 O censo mede as duas mortes: **registrada e sem `--selftest`** (dispara sem ser exercitada) e **com
 `--selftest` e não registrada** (exercitada e nunca dispara). O 1º dogfood do censo acusou a guarda
 que estava sendo forjada **naquele instante** na segunda categoria.
+
+> **O refutador que reprova aponta o que supera** (SAC-151, maestro 2026-10-15: "um juiz de sim ou
+> não sem tentar superação em uma pesquisa pode restringir possibilidades de crescimento e
+> inovação; é preciso ter medição e critérios claros"). O subagente que REFUTA a guarda devolve, para
+> cada reprovação, o critério pré-registrado com o comando que a checa e a superação
+> `{classe, achada, o_que, medida}`. Ou seja, o padrão, o substrato ou a guarda existente que cobriria a classe sem o defeito apontado. A sessão confere com
+> `bash .claude/validation/judge-verdict-check.sh <vereditos.json>` (rc 1 = reprovação recusada e
+> contada), e a superação achada vira nó.
 
 ## O que esta doutrina NÃO promete
 

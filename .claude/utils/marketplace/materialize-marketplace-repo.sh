@@ -67,12 +67,17 @@ fi
 
 # Monta cada plugin publicável fresco no TARGET (SRC=core lê a fonte; DEST=alvo/plugins/<nome>).
 count=0; PRODUZIDOS=""
+# O anterior de cada plugin é o que está NO ALVO (o publicado). Uma ONION_PLUGIN_PRIOR_DIR herdada do
+# shell apontaria todos para um diretório só (achado I3 da passada adversarial da F4).
+unset ONION_PLUGIN_PRIOR_DIR
 for m in "${VDIR}"/*.manifest.sh; do
   [ -f "${m}" ] || continue
   case "$(basename "${m}")" in __*) continue ;; esac   # ignora fixtures de teste
   pname="$( set +u; . "${m}" >/dev/null 2>&1; printf '%s' "${PLUGIN_NAME:-}" )"
   [ -n "${pname}" ] || { echo "⚠️  ${m}: sem PLUGIN_NAME — pulado." >&2; continue; }
-  rm -rf "${TARGET}/plugins/${pname}"
+  # SEM `rm -rf` do destino aqui (F4 das portas, 2026-10-10): o plugin que está no alvo é o
+  # PUBLICADO, e é dele que o assembler lê a versão anterior antes de limpar o destino ele mesmo.
+  # Apagar antes zeraria a versão de todo plugin a cada publicação (o updater ficaria no-op).
   if bash "${ASM}" "${m}" "${SRC}" "${TARGET}/plugins/${pname}" >/dev/null 2>&1; then
     echo "  ✓ ${pname}"
     PRODUZIDOS="${PRODUZIDOS} ${pname}"
@@ -85,19 +90,21 @@ done
 
 
 # 2ª GUARDA DE MOAT (cinto-e-suspensório): nenhum plugin materializado pode conter ARQUIVO de
-# meta-fábrica nem grafo privado. A REGRA 61 já barra na declaração; aqui barra no resultado.
-# Nomes ESPECÍFICOS da meta-fábrica (comandos achatados no plugin → só o basename resta; um glob
-# `create-*` false-positivaria em create-task-structure, comando de PRODUTO legítimo). + federação
-# downstream/ledger + QUALQUER grafo .kg.yaml.
+# adoção, federação nem grafo privado. A REGRA 61 já barra na declaração; aqui barra no resultado.
+# Nomes ESPECÍFICOS (comandos achatados no plugin → só o basename resta) + QUALQUER grafo .kg.yaml.
+# ⚠️ MUDOU EM 2026-10-10 (F2 das portas, D_MATRIZ_DE_PORTAS_2026_10): a meta-fábrica (create-*, evolve,
+# absorb-skill) deixou de ser moat — plugins = a superfície do standalone, que a leva. A lista passou a
+# ser a da REGRA 61 nova: adoção e federação (co-evolve, co-relay e, desde 2026-10-11, personality-sync,
+# que saiu de `pending` para o conjunto `federation` do roles.yaml).
 leak="$(find "${TARGET}/plugins" -type f \( \
-        -name 'create-abstraction.md' -o -name 'create-agent.md' -o -name 'create-agent-express.md' \
-        -o -name 'create-command.md' -o -name 'create-knowledge-base.md' -o -name 'create-skill.md' \
-        -o -name 'create-vertical.md' -o -name 'adopt.md' -o -name 'evolve.md' \
-        -o -name 'co-announce.md' -o -name 'co-deliver.md' -o -name 'federation-*.md' -o -name 'absorb-skill.md' \
+        -name 'adopt.md' -o -name 'federation-*.md' -o -name 'personality-sync.md' \
+        -o -name 'co-announce.md' -o -name 'co-deliver.md' -o -name 'co-evolve.md' -o -name 'co-relay.md' \
+        -o -name 'co-evolution-inbox-check.sh' \
         -o -name 'assemble-plugin.sh' -o -name 'generate-marketplace.sh' -o -name 'decouple-source.sh' \
+        -o -name 'materialize-marketplace-repo.sh' \
         -o -name '*.kg.yaml' \) 2>/dev/null || true)"
 if [ -n "${leak}" ]; then
-  echo "ABORTA (moat): plugin materializado contém fonte de meta-fábrica/grafo privado:" >&2
+  echo "ABORTA (moat): plugin materializado contém fonte de adoção/federação/grafo privado:" >&2
   printf '%s\n' "${leak}" | sed 's/^/    /' >&2
   exit 3
 fi

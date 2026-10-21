@@ -32,7 +32,8 @@
 #                     RULE-sem-trace · fonte-única (>1 READS saindo — ADR design-extends-kg)
 #   PROVENIÊNCIA    = decisão ancorada em origem (⚠ atenção, NÃO reprova — completude da camada
 #                     audit): decisão VIVA sem NENHUMA proveniência (nem aresta TRACES_TO nem
-#                     campo `trace:` inline `arquivo:linha`). Reconciliada (superseded/refuted)
+#                     campo `trace:` inline `arquivo:linha`, nem `provenance.source` — contrato
+#                     v4.1, SAC-96). Reconciliada (superseded/refuted)
 #                     é história — não cobrada (mesmo racional do FRESCOR).
 #   FRESCOR         = frescor da SSOT (⚠ atenção, NÃO reprova — nó stale mente, não corrompe):
 #                     STALE-MISSING (nó plane:PROD sem verified_at:) · STALE-OLD (verified_at
@@ -40,9 +41,17 @@
 #                     mas SEM verified_against: — carimbo sem alvo declarado; os demais tipos
 #                     ancoram por trace:/TRACES_TO e não são cobrados) · MISPLANED (plane:PROD
 #                     com verified_against: branch|commit — o nó afirma sobre o VIVO e declara
-#                     ter olhado a FONTE; contradição interna, vale p/ TODOS os tipos).
+#                     ter olhado a FONTE; contradição interna, vale p/ TODOS os tipos; `commit`
+#                     de sentido-EXECUÇÃO — commit-sonda, commit barrado/recusado — não acusa), e
+#                     plane:PROD com base em relato (`evidence_class: testimony` ou
+#                     `provenance.method: testemunho: …` — contrato v4.1, SAC-96).
 #                     Determinístico: compara duas datas / dois campos do arquivo, sem "agora"
 #                     (ADR onion-adr-kg-freshness-gate, proposta #2 (dogfood de campo)).
+#                     STALE-EXPIRED (2026-10-21) é a EXCEÇÃO declarada, e usa hoje: nó com
+#                     reverify_every (contrato kg-ssot v4.8) cujo verified_at + cadência já passou.
+#                     A data vem do `kg_validate.py --due` (kg-ssot.due/1), nunca deste radar;
+#                     NÃO MEDIDO quando o leitor falta ou não tem --due. Ver o bloco VENCIMENTO.
+#                     O --freshness-tsv NÃO o carrega (11 colunas exatas, consumidores por coluna).
 #   SCHEMA          = versão de schema (✗ REPROVA na divergência — radar não sabe ler o arquivo):
 #                     meta.schema_version ≠ a versão que o radar entende → recusa; ausente → ⚠
 #                     retrocompat (ADR onion-adr-kg-freshness-gate, proposta #1).
@@ -141,7 +150,113 @@ fi
 # tem systime/strftime". Medido na passada adversarial: este radar NÃO RODA sob mawk — morre em
 # `asorti never defined`, rc=2, saída zero. A razão da portabilidade era verdadeira sobre o awk e
 # FALSA sobre este script; ficou só a que o artefato sustenta.)
-awk -v mode="$MODE" -v radarSchema="$RADAR_SCHEMA" -v arq="$FILE" -v hoje="$(date -u +%Y-%m-%d)" "${STATUS_FACTOR}"'
+HOJE="$(date -u +%Y-%m-%d)"
+
+# ══ VENCIMENTO POR CADÊNCIA (STALE-EXPIRED) — CONSUMIDO do kg-ssot, NUNCA reimplementado ═══════
+# O contrato v4.8 (kg-ssot 4.15.0) trouxe `reverify_every` (duração ISO 8601 só com data) e
+# `reverify_on`, e o leitor de referência calcula o vencimento: `kg_validate.py --due <hoje>
+# --format json`, formato kg-ssot.due/1 (vendor/kg-ssot/spec/due.schema.json). A regra de soma
+# (meses pelo calendário, 31/jan + P1M = fim de fevereiro) mora LÁ: um segundo cálculo aqui seria o
+# terceiro leitor discordando do mesmo byte. Combinado com a sessão do kg-ssot: a forma só muda
+# com due/2, avisada antes, e due/2 aqui vira NÃO MEDIDO (nunca leitura chutada).
+# Decisão de origem: D_AUDIT_VOCAB_CONTRACT_VS_CORE_SPLIT_1021 (opção A, maestro, 2026-10-21) em
+# docs/evolution/research/audit-evidence-machinery-2026-10/.
+#
+# FORA DO VEREDITO: o vencimento é aviso do FRESCOR, nunca exit não-zero (nó vencido mente, não
+# corrompe — o mesmo racional da seção inteira).
+# ZERO RUÍDO: grafo que não declara `reverify_every`/`reverify_on` não paga o processo Python nem
+# ganha linha nova. O pré-filtro é grep de chave em bloco (a única forma que este radar lê); um
+# falso positivo (a chave citada no começo de linha de uma narrativa) só custa a chamada, porque
+# relatório vazio não imprime nada.
+# FAIL-CLOSED DECLARADO: leitor ausente, sem `--due` (vendor anterior à 4.15.0), rc != 0, JSON
+# ilegível, schema_version diferente de kg-ssot.due/1 ou arquivo que o leitor não parseia ⇒ a
+# linha diz NÃO MEDIDO e o porquê. Nunca "0 vencidos" por ausência de medição.
+# ONION_KG_DUE_VALIDATOR troca o leitor (bancada e cópia mutante do radar, que mora fora do repo).
+DUE_STATE="skip"; DUE_REPORT=""; DUE_FILE=""
+case "$MODE" in --all|--freshness)
+  if grep -qE '^[[:space:]]*(-[[:space:]]+)?reverify_(every|on)[[:space:]]*:' -- "$FILE"; then
+    _due_v="${ONION_KG_DUE_VALIDATOR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/vendor/kg-ssot/tools/kg_validate.py}"
+    if [ ! -f "${_due_v}" ]; then
+      DUE_STATE="unmeasured"; DUE_REPORT="leitor do contrato ausente (${_due_v})"
+    elif ! command -v python3 >/dev/null 2>&1; then
+      DUE_STATE="unmeasured"; DUE_REPORT="python3 ausente"
+    else
+      _due_tmp="$(mktemp -d)"; trap 'rm -rf "${_due_tmp}"' EXIT
+      _due_rc=0
+      python3 -I -B "${_due_v}" --due "${HOJE}" --format json -- "$FILE" >"${_due_tmp}/due.json" 2>"${_due_tmp}/due.err" || _due_rc=$?
+      if [ "${_due_rc}" -ne 0 ]; then
+        # `|| true` DENTRO do grupo: stderr mudo (leitor morto por SIGKILL/OOM) faz o grep -v sair 1, e
+        # sob set -e + pipefail isso matava o radar inteiro com rc 1 e saída vazia (refutador, 2026-10-21).
+        DUE_STATE="unmeasured"
+        _due_last="$( { grep -v '^[[:space:]]*$' "${_due_tmp}/due.err" || true; } | tail -n 1 | head -c 200 | tr '\n\t' '  ')"
+        _due_hint=""; case "${_due_last}" in *"unrecognized arguments"*--due*) _due_hint="; vendor anterior à 4.15.0, sem --due" ;; esac
+        DUE_REPORT="o leitor do contrato falhou no --due (rc ${_due_rc}${_due_hint}): ${_due_last:-stderr vazio}"
+      else
+        # A cadência FORA DA FORMA (`"30 dias"`, `30`) o --due descarta calado, e quem a julga é o SHOULD
+        # do mesmo leitor. Sem esta 2ª leitura o nó sumia e a contagem parecia completa (refutador,
+        # 2026-10-21). rc 0/1 é veredito (passa/reprova); outro rc é leitura que não aconteceu.
+        _ver_rc=0
+        python3 -I -B "${_due_v}" --format json -- "$FILE" >"${_due_tmp}/verdict.json" 2>/dev/null || _ver_rc=$?
+        _tr_rc=0
+        # Só TRADUZ os dois JSON para linhas TAB (o awk não lê JSON); não decide vencimento algum.
+        python3 -I -B -c '
+import json, re, sys
+due_path, ver_path, ver_rc, today, out_path = sys.argv[1:6]
+lines = []
+def err(msg):
+    with open(out_path, "w", encoding="utf-8") as fh:
+        fh.write("ERR\t%s\n" % msg)
+    sys.exit(0)
+clean = lambda v: str(v).replace("\t", " ").replace("\n", " ")
+try:
+    rep = json.load(open(due_path, encoding="utf-8"))
+except (OSError, ValueError) as exc:
+    err("JSON ilegível do --due: %s" % clean(exc))
+if not isinstance(rep, dict) or rep.get("schema_version") != "kg-ssot.due/1":
+    err("formato %r, este radar lê só kg-ssot.due/1" % (rep.get("schema_version") if isinstance(rep, dict) else type(rep).__name__))
+for key in ("due", "unstamped", "event", "broken"):
+    if not isinstance(rep.get(key), list):
+        err("relatório kg-ssot.due/1 sem a lista %r (fora do due.schema.json)" % key)
+if rep.get("as_of") != today:
+    err("relatório para %r, pedido para %s" % (rep.get("as_of"), today))
+for b in rep["broken"]:
+    err("o leitor do contrato não parseou o arquivo: %s" % clean(b.get("error")))
+if ver_rc not in ("0", "1"):
+    err("o veredito do contrato não rodou (rc %s): a cadência fora da forma não foi lida" % ver_rc)
+try:
+    ver = json.load(open(ver_path, encoding="utf-8"))
+    occ = [o for r in ver["results"] for o in r.get("occurrences", [])]
+except (OSError, ValueError, KeyError, TypeError) as exc:
+    err("veredito do contrato ilegível: %s" % clean(exc))
+for d in rep["due"]:
+    lines.append("\t".join(["DUE"] + [clean(d.get(k)) for k in ("id", "verified_at", "reverify_every", "due_on", "days_late")]))
+for d in rep["unstamped"]:
+    lines.append("UNSTAMPED\t%s\t%s" % (clean(d.get("id")), clean(d.get("reverify_every"))))
+for d in rep["event"]:
+    lines.append("EVENT\t%s" % clean(d.get("id")))
+for o in occ:
+    code = str(o.get("code", ""))
+    m = re.match(r"^nó (.+)$", str(o.get("place", "")))
+    if re.match(r"^form\.[a-z_]+\.node\.reverify_every$", code) and m:
+        lines.append("MALFORMED\t%s\t%s" % (clean(m.group(1)), code))
+with open(out_path, "w", encoding="utf-8") as fh:
+    fh.write("".join(l + "\n" for l in lines))
+' "${_due_tmp}/due.json" "${_due_tmp}/verdict.json" "${_ver_rc}" "${HOJE}" "${_due_tmp}/report.tsv" || _tr_rc=$?
+        if [ "${_tr_rc}" -ne 0 ] || [ ! -f "${_due_tmp}/report.tsv" ]; then
+          DUE_STATE="unmeasured"; DUE_REPORT="tradução do --due falhou (rc ${_tr_rc})"
+        elif grep -q $'^ERR\t' "${_due_tmp}/report.tsv"; then
+          DUE_STATE="unmeasured"; DUE_REPORT="$(grep -m1 $'^ERR\t' "${_due_tmp}/report.tsv" | cut -f2-)"
+        else DUE_STATE="ok"; DUE_FILE="${_due_tmp}/report.tsv"; fi
+      fi
+    fi
+  fi ;;
+esac
+# Por ARQUIVO e não por ENVIRON: string de ambiente tem teto de 128 KiB (MAX_ARG_STRLEN), e um grafo
+# com ~2.100 nós vencidos derrubava o awk com rc 126 (refutador, 2026-10-21). A razão do NÃO MEDIDO
+# é uma linha curta e segue por -v.
+DUE_REPORT="$(printf '%s' "${DUE_REPORT}" | tr '\\' '/' | head -c 400)"
+
+awk -v mode="$MODE" -v radarSchema="$RADAR_SCHEMA" -v arq="$FILE" -v hoje="${HOJE}" -v dueState="${DUE_STATE}" -v dueFile="${DUE_FILE}" -v dueWhy="${DUE_REPORT}" "${STATUS_FACTOR}"'
 /^---[ \t]*$/ { docSeps++ }
 # ── DENYLIST, NÃO ALLOWLIST — a lição de 2026-08-07 ─────────────────────────────────────────
 # Quando `drifted`/`unverifiable` entraram (2026-08-06), os predicados escritos como ALLOWLIST
@@ -208,6 +323,31 @@ function trabalhoPendente(s) { return (s != "confirmed" && s != "done" && s != "
 
 function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); gsub(/^["'\'']|["'\'']$/, "", s); return s }
 
+# MISPLANED, sentido da palavra: `commit` em verified_against só é LEITURA DE FONTE quando nomeia
+# o commit lido. Quando nomeia o commit que o gate BARROU (commit-sonda, commit recusado/bloqueado,
+# hook que bloqueia o commit), é EXECUÇÃO ao vivo, e PROD ali é legítimo.
+# Crédito: sinal de campo de um adotante (2026-10-11): o DETERMINISTIC_GATE dele
+# carimbava "commit-sonda que o gate barrou" e levou MISPLANED; contornou reescrevendo a frase.
+# Cura POR OCORRÊNCIA, nunca por nó: (1) `commit <sha>` acusa SEMPRE, venha o que vier antes ou
+# depois; (2) só as ocorrências de sentido-execução saem da string; (3) o que sobrar de
+# branch|commit continua acusando. Assim um carimbo com as DUAS leituras segue acusado.
+# `@<sha>` sozinho NÃO passou a acusar: `onion@<sha>` é stamp de pin, o caso ambíguo que o
+# MISPLANED deixa fora de propósito; alargar o gate não é o objeto desta cura.
+# Passada adversarial (2026-10-11) apertou três pontos: o sha vale com até 3 separadores quaisquer
+# (crase, parêntese, #), porque sha entre crases é a forma comum; `reprov`/`vet` SAÍRAM da lista,
+# porque são vocabulário de REVISOR, e revisor lendo o diff é leitura de fonte; e o radical tem
+# âncora à esquerda (`desbloqueado o commit` não é commit barrado). TETO DECLARADO: `recusado o
+# commit` dito por um revisor ainda cala, e um carimbo que cita commit barrado E leitura sem as
+# palavras branch/commit/sha (ex.: `HEAD lido`) também cala. É o limite de regra por vocabulário.
+function misplanedSourceRead(v,   w) {
+  w = tolower(v)
+  if (w ~ /(^|[^a-z])commit[^0-9a-z]{1,3}[0-9a-f]{7,40}([^0-9a-z]|$)/) return 1
+  gsub(/commit[-_ ]sonda/, " ", w)
+  gsub(/commit[-_ ]((foi|e|sai|saiu|ficou)[-_ ])?(barrad|recusad|bloquead)[oa]s?/, " ", w)
+  gsub(/(^|[^a-z])(barr|recus|bloque)[a-z]*[-_ ]((o|a|um|seu)[-_ ])?(([0-9]+[^-_ ]*|primeiro|proprio)[-_ ])?commit([^a-z]|$)/, " ", w)
+  return (w ~ /(^|[^a-z])(branch|commit)([^a-z]|$)/)
+}
+
 BEGIN { section = ""; nid = ""; ne = 0; metaClosed = 0; metaFieldIndent = -1 }
 
 # comentários e vazio fora de valores
@@ -218,6 +358,23 @@ BEGIN { section = ""; nid = ""; ne = 0; metaClosed = 0; metaFieldIndent = -1 }
 /^nodes:/ { section = "nodes"; metaClosed = 1; next }
 /^edges:/ { section = "edges"; nid = ""; metaClosed = 1; next }
 /^meta:/  { section = "meta"; next }
+# ARESTA PARA NÓ DE OUTRO GRAFO (contrato v4.3, 2026-10-10, SAC-98): `external_edges:` no topo, uma
+# aresta por item, exatamente uma ponta externa `<caminho>#<id>` (a outra é um nó daqui; `from` ausente
+# = o grafo inteiro). Este radar é de UM arquivo: não confere a ponta externa (é o gate do contrato que
+# a confere contra o corpus, integrity.dangling-external). Lê a ponta LOCAL, porque ela conta como
+# ligação (nó ligado só por aresta externa NÃO é órfão) e porque ponta local inexistente é integridade
+# deste arquivo. Sem esta seção o bloco caía na seção anterior: depois de `edges:`, um `- from:` externo
+# virava aresta intra-arquivo pendurada e o `edge_type:` do item sobrescrevia o da última aresta.
+/^external_edges:/ { section = "external"; nid = ""; metaClosed = 1; next }
+section == "external" && /^[[:space:]]+-[[:space:]]/ { nx++ }
+section == "external" && /^[[:space:]]+(-[[:space:]]+)?(from|to):/ {
+  v = $0; sub(/^[[:space:]]+(-[[:space:]]+)?/, "", v)
+  xk = v; sub(/:.*/, "", xk); sub(/^(from|to):/, "", v); v = trim(v)
+  if (v !~ /#/) { xlocal[nx] = v; xlocalKey[nx] = xk }
+  next
+}
+section == "external" && /^[[:space:]]+(-[[:space:]]+)?edge_type:/ { v = $0; sub(/^[[:space:]]+(-[[:space:]]+)?edge_type:/, "", v); xtype[nx] = trim(v); next }
+section == "external" { next }
 
 # Legibilidade da gramática (guarda anti-fail-open — sinal de campo 2026-07-17): conta as
 # linhas COM conteúdo dentro de nodes:. Se a seção tem conteúdo e mesmo assim o parser não extrai
@@ -229,10 +386,47 @@ section == "nodes" && /^[[:space:]]+- id:/ {
   if (nid in nodeSeen) dup[nid] = 1
   nodeSeen[nid] = 1
   order[++nn] = nid
+  # Indentação dos CAMPOS deste nó = a do traço + 2 (é onde o `id:` vive). Só chave nesta coluna
+  # conta como chave do nó: texto de bloco (`>-`) e mapas aninhados ficam mais à direita.
+  match($0, /-/); fieldIndent = RSTART + 1
+  inProv = 0; provIndent = -1
   next
 }
 section == "nodes" && nid != "" {
   line = $0; sub(/#.*$/, "", line)
+  # CHAVE REPETIDA, QUALQUER CHAVE (2026-10-08, sinal de campo de um adotante com leitor YAML 1.2):
+  # o YAML exige chave única num mapa. Um leitor tipado (PyYAML) fica com a ÚLTIMA em silêncio, e
+  # este radar lia as duas como texto — a proveniência sumia sem erro. A guarda abaixo de 2026-08-12
+  # só cobria 4 campos (verified_*, valid_from, source_tier) e só quando os valores DIFERIAM; o
+  # defeito medido foi `trace` repetido em 5 grafos do core. Agora vale para toda chave do nó,
+  # inclusive com valor igual (duas linhas iguais também são mapa inválido).
+  if (match($0, /^ +[A-Za-z_][A-Za-z0-9_]*:/) && RLENGTH > 0) {
+    _ind = match($0, /[^ ]/) - 1
+    if (_ind == fieldIndent) {
+      _k = substr($0, _ind + 1); sub(/:.*/, "", _k)
+      if ((nid "|" _k) in nodeKeySeen) { if (!((nid "|" _k) in dupKey)) dupKey[nid "|" _k] = "linhas " nodeKeySeen[nid "|" _k] " e " NR }
+      else nodeKeySeen[nid "|" _k] = NR
+    }
+  }
+  # ── PROVENANCE (bloco ANINHADO, contrato v4.1 — SAC-96, 2026-10-09) ─────────────────────────────
+  # O contrato lê dois campos de dentro do bloco que este radar ignorava: `provenance.method` da
+  # classe `testemunho:` em PROD alerta integrity.testimony-in-prod (aqui: MISPLANED), e a decision
+  # com `provenance` já tem origem (não alerta integrity.untraced-decision). Os dois avisos do radar
+  # liam só `evidence_class` e `trace:`/TRACES_TO, e divergiam do contrato em ~256 nós e 9 decisões.
+  # Leitura POSICIONAL, como a chave repetida acima: o bloco abre com `provenance:` SEM valor na
+  # coluna dos campos do nó, e só vale chave na coluna do 1º filho. Um `method:` em outro mapa
+  # aninhado, ou num texto de bloco, fica de fora. Lê de $0 (não de `line`): a fonte pode ter `#`.
+  if ($0 !~ /^[[:space:]]*$/) {
+    _pi = match($0, /[^ ]/) - 1
+    if (_pi <= fieldIndent) { inProv = (_pi == fieldIndent && line ~ /^ *provenance:[[:space:]]*$/); provIndent = -1 }
+    else if (inProv) {
+      if (provIndent < 0) provIndent = _pi
+      if (_pi == provIndent) {
+        if ($0 ~ /^ *source:/) { v = $0; sub(/^ *source:/, "", v); provSource[nid] = trim(v) }
+        if ($0 ~ /^ *method:/) { v = $0; sub(/^ *method:/, "", v); provMethod[nid] = trim(v) }
+      }
+    }
+  }
   # ── CAMPO SÓ EM POSIÇÃO DE CAMPO (âncora ^[[:space:]]*<campo>:) ──────────────────────────────
   # O parser é line-based: um match SOLTO (`line ~ /layer:/` + `sub(/.*layer:/…)`) lê CONTEÚDO como
   # CONFIGURAÇÃO — basta um label citar o token. Real, não hipotético:
@@ -256,6 +450,9 @@ section == "nodes" && nid != "" {
   # que codificou o relato, circular por construção. Sem o marcador, esses nós passavam nos três
   # vereditos com carimbo fresco, indistinguíveis de um nó medido. Default (ausente) = measured.
   if (line ~ /^[[:space:]]*evidence_class:/) { v = line; sub(/^[[:space:]]*evidence_class:/, "", v); eclass[nid] = trim(v) }
+  # provenance.method (2026-10-12, decisão do maestro sobre o selo do /meta:decide): só para reconhecer a decisão
+  # SELADA PELO MAESTRO, que é done em DEV por natureza (ver o aviso decision-done-em-DEV abaixo).
+  if (line ~ /^[[:space:]]+method:/) { v = line; sub(/^[[:space:]]+method:/, "", v); pmethod[nid] = trim(v) }
   if (line ~ /^[[:space:]]*verified_against:/) {
     v = line; sub(/^[[:space:]]*verified_against:/, "", v)
     if (nid in verifiedAgainst && verifiedAgainst[nid] != trim(v)) dupKey[nid "|verified_against"] = verifiedAgainst[nid] " -> " trim(v)
@@ -287,6 +484,8 @@ section == "nodes" && nid != "" {
     v = line; sub(/^[[:space:]]*valid_from:/, "", v)
     if (nid in validFrom && validFrom[nid] != trim(v)) dupKey[nid "|valid_from"] = validFrom[nid] " -> " trim(v)
     validFrom[nid] = trim(v)
+    # A FORMA crua, antes do trim (que tira as aspas): só dígitos SEM aspas é inteiro para YAML.
+    validFromBare[nid] = (v ~ /^[[:space:]]*[0-9]+[[:space:]]*$/)
   }
   else if (line ~ /^[[:space:]]*source_tier:/) {
     v = line; sub(/^[[:space:]]*source_tier:/, "", v)
@@ -320,7 +519,13 @@ section == "edges" && /^[[:space:]]+- from:/ {
 # `edge_type:` não casa `^[[:space:]]*to:`.)
 section == "edges" && /^[[:space:]]*to:/ { v = $0; sub(/^[[:space:]]*to:/, "", v); eto[ne] = trim(v); next }
 section == "edges" && /^[[:space:]]*edge_type:/ { v = $0; sub(/^[[:space:]]*edge_type:/, "", v); etype[ne] = trim(v); next }
-section == "edges" && /^[[:space:]]*on:/ { v = $0; sub(/^[[:space:]]*on:/, "", v); eon[ne] = trim(v); next }
+# GATILHO DE TRANSITIONS: `trigger:` (2026-10-07). A chave antiga era `on:`, e YAML 1.1 lê `on` como o
+# BOOLEANO true — um leitor tipado via o evento órfão onde este radar (texto) via a ligação: dois
+# leitores discordando do mesmo byte. O contrato formal do .kg.yaml, em curso, fixa perfil YAML 1.2
+# restrito com `on` PROIBIDO. `on:` segue LIDO (grafo fora do corpus não quebra) e é ACUSADO como
+# legado no --integrity; `eon` guarda o gatilho venha de qual chave vier.
+section == "edges" && /^[[:space:]]*trigger:/ { v = $0; sub(/^[[:space:]]*trigger:/, "", v); eon[ne] = trim(v); next }
+section == "edges" && /^[[:space:]]*on:/ { v = $0; sub(/^[[:space:]]*on:/, "", v); eon[ne] = trim(v); eonLegacy[ne] = 1; next }
 
 # meta: campos de governança de frescor/schema (proposta #1/#2 — ADR kg-freshness-gate)
 section == "meta" && /^[[:space:]]*schema_version:/ { v = $0; sub(/^[[:space:]]*schema_version:/, "", v); metaSchema = trim(v); next }
@@ -388,6 +593,7 @@ section == "meta" && metaClosed == 0 && /^[[:space:]]+target:/ {
 END {
   VN = "entity claim decision question evidence artifact state event rule invariant policy"
   VE = "SUPPORTS REFUTES SUPERSEDES CAUSES DEPENDS_ON TRACES_TO HAS_STATE TRANSITIONS EMITS CONSTRAINS READS WRITES"
+  VX = " SUPERSEDES CONSTRAINS SUPPORTS REFUTES TRACES_TO DEPENDS_ON "   # external_edges (contrato v4.3): lista fechada, casamento por palavra inteira
   VP = "DEV PROD"
   VL = "audit domain"
   problems = 0
@@ -445,14 +651,17 @@ END {
     if (etype[i] == "HAS_STATE")   ownedState[eto[i]]++
     if (etype[i] == "TRACES_TO")   traceOut[efrom[i]]++
     if (etype[i] == "READS")       readsOut[efrom[i]]++
-    if (eon[i] != "")              { onUsed[eon[i]] = 1; deg[eon[i]]++ }  # on: conecta o evento (não é órfão)
+    if (eon[i] != "")              { onUsed[eon[i]] = 1; deg[eon[i]]++ }  # trigger: (ou on: legado) conecta o evento (não é órfão)
     outDeg[efrom[i]]++
   }
+  # a ponta local de uma aresta externa conta como ligação (contrato v4.3): sem isto, um nó ligado só
+  # a outro grafo saía "órfão (grau 0)" num grafo que o contrato aprova
+  for (i = 1; i <= nx; i++) if (xlocal[i] != "") deg[xlocal[i]]++
 
   if (mode == "--triples") {
     for (i = 1; i <= ne; i++) {
       t = efrom[i] " " etype[i] " " eto[i]
-      if (eon[i] != "") t = t " on " eon[i]
+      if (eon[i] != "") t = t " trigger " eon[i]
       print t
     }
     exit 0
@@ -696,18 +905,24 @@ END {
     }
     if (found && swarn == 0) print "  ✅ nenhum alvo de SUPERSEDES ficou por reconciliar"
 
-    # ⚠ DECISÃO `done` EM DEV (2026-10-06, sinal de campo onion-slm, operador MU-18): a gramática diz que
+    # ⚠ DECISÃO `done` EM DEV (2026-10-06, sinal de campo de um adotante, operador MU-18): a gramática diz que
     # `decision` só vira `done` verificada em PROD, e o motor só rebaixava a atenção (DEV/done = 0,5), sem
     # aviso — 20 de 20 mutações passaram caladas. ⚠ AGREGADO, não um por nó: o corpus tem 95 casos em 36
     # grafos, e 95 linhas por leitura ensinariam a ignorar o aviso. Não reprova (`problems` intocado).
-    ndd = 0; ddids = ""
+    ndd = 0; ddids = ""; ndm = 0
     for (i = 1; i <= nn; i++) {
       id = order[i]
+      # EXCEÇÃO (2026-10-12, decisão do maestro): decisão selada pelo maestro (método "testemunho: decisão do
+      # maestro…", o que o kg-decide-seal.sh grava) é conhecimento de ADOTAR, não claim verificada em produção — e
+      # em PROD o contrato a acusaria de testimony-in-prod. Ela fica em DEV e não entra no aviso; PROD continua
+      # exigindo medição. Sinal de campo do adotante KG-SSOT, que achou a contradição em dogfood.
+      if (ntype[id] == "decision" && nstatus[id] == "done" && plane[id] == "DEV" && pmethod[id] ~ /^["\x27]?testemunho: decisão do maestro/) { ndm++; continue }
       if (ntype[id] == "decision" && nstatus[id] == "done" && plane[id] == "DEV") {
         ndd++
         if (ndd <= 5) ddids = ddids (ddids == "" ? "" : ", ") id
       }
     }
+    if (ndm > 0) printf "  · %d decisão(ões) selada(s) pelo maestro em DEV (testemunho do selo, aceita por desenho)\n", ndm
     if (ndd > 0)
       printf "  ⚠ decision-done-em-DEV: %d decisão(ões) `done` com plane: DEV (%s%s) — a gramática pede `done` verificada em PROD: promova o plane com verified_at, ou volte a open\n", ndd, ddids, (ndd > 5 ? ", …" : "")
     print ""
@@ -876,8 +1091,11 @@ END {
       # 2026-07-17). A guarda mira a decisão VIVA sem chão.
       if (nstatus[id] == "superseded" || nstatus[id] == "refuted") continue
       ndec++
-      if (traceOut[id] == 0 && traceInline[id] == "") {
-        print "  ⚠ decisão-sem-proveniência: " id " (sem aresta TRACES_TO nem campo trace: inline — origem não ancorada)"; pwarns++
+      # A `provenance` estruturada (source não vazio) também é origem — é o que o contrato v4.1 diz
+      # em integrity.untraced-decision ("sem trace, sem provenance e sem TRACES_TO"). Antes do
+      # SAC-96 (2026-10-09) o radar cobrava 9 decisões de 4 grafos que já declaravam a fonte.
+      if (traceOut[id] == 0 && traceInline[id] == "" && provSource[id] == "") {
+        print "  ⚠ decisão-sem-proveniência: " id " (sem aresta TRACES_TO, sem campo trace: inline e sem provenance.source — origem não ancorada)"; pwarns++
       }
     }
     if (ndec == 0) print "  (nenhuma decisão viva no grafo — nada a verificar)"
@@ -895,7 +1113,7 @@ END {
     } else {
       print "  ✅ schema_version " metaSchema " (bate com o radar)"
     }
-    # MULTI-DOCUMENTO (2026-10-06, sinal de campo onion-slm): este radar lê linha a linha e aceita
+    # MULTI-DOCUMENTO (2026-10-06, sinal de campo de um adotante): este radar lê linha a linha e aceita
     # `---` no meio do arquivo; o kg-drive-project.sh e o kg-realign-project.sh usam parser YAML de
     # documento ÚNICO e recusam (exit 2). Aviso, não reprova: o arquivo é legível AQUI.
     if (docSeps >= 2) {
@@ -970,6 +1188,14 @@ END {
       if (eclass[id] == "testimony" && plane[id] == "PROD") {
         print "  ⚠ MISPLANED: " id " (plane:PROD mas evidence_class: testimony — relato não é artefato vivo; reclassifique para plane:DEV)"; fwarns++
       }
+      # A MESMA contradição declarada pelo OUTRO campo (contrato v4.1, integrity.testimony-in-prod):
+      # `provenance.method` da classe `testemunho:` diz que a base do nó é relato. Até o SAC-96
+      # (2026-10-09) o radar só via o `evidence_class`, e ~125 nós PROD com método de testemunho
+      # passavam calados enquanto o contrato os acusava. `else`: um nó com os DOIS marcadores é UM
+      # aviso, não dois.
+      else if (plane[id] == "PROD" && provMethod[id] ~ /^testemunho:/) {
+        print "  ⚠ MISPLANED: " id " (plane:PROD mas provenance.method: testemunho — relato não é artefato vivo; reclassifique para plane:DEV)"; fwarns++
+      }
       # MISPLANED — CONTRADIÇÃO INTERNA ao próprio nó, e vale para TODOS os tipos.
       # `plane: PROD` afirma "cruzei com o ARTEFATO VIVO"; `verified_against: branch|commit`
       # declara "olhei a FONTE". Os dois campos falam da mesma coisa (a natureza da evidência)
@@ -985,11 +1211,39 @@ END {
       # declaração é verdadeira — um nó que escreve `deploy` medindo bench local passa. Isso é
       # limite honesto, não defeito: fecha a contradição legível, não a mentira deliberada.
       # `pin` NÃO é cobrado de propósito: é ambíguo (ler o stamp do checkout vivo é PROD legítimo).
-      if (plane[id] == "PROD" && verifiedAgainst[id] ~ /(^|[^a-zA-Z])(branch|commit)([^a-zA-Z]|$)/) {
+      # `misplanedSourceRead`: commit-sonda/commit barrado é EXECUÇÃO, não leitura (ver a função).
+      if (plane[id] == "PROD" && verifiedAgainst[id] ~ /(^|[^a-zA-Z])(branch|commit)([^a-zA-Z]|$)/ && misplanedSourceRead(verifiedAgainst[id])) {
         print "  ⚠ MISPLANED: " id " (plane:PROD mas verified_against: " verifiedAgainst[id] " — o nó afirma sobre o VIVO e declara ter olhado a FONTE; reclassifique para plane:DEV ou re-verifique contra o artefato vivo)"; fwarns++
       }
     }
-    if (ntracked == 0) print "  (nenhum nó com frescor rastreado — nada a verificar)"
+    # ── VENCIMENTO POR CADÊNCIA — STALE-EXPIRED (o bloco VENCIMENTO do shell, acima do awk) ─────
+    # O cálculo é do kg-ssot (--due). Aqui só se tira a história (superseded/refuted, o mesmo
+    # racional do laço acima, CONTADA) e se imprime. Fora do veredito: nada aqui toca em problems.
+    # Escopo diferente do laço acima DE PROPÓSITO: a cadência é opt-in do dono do nó, então vale
+    # para nó DEV sem verified_against também — quem declarou reverify_every pediu a cobrança.
+    if (dueState == "unmeasured") {
+      # O pré-filtro é TEXTO (grep de chave em começo de linha): uma narrativa que cite a chave também
+      # cai aqui. Por isso a linha diz o que se sabe, e não "o grafo declara cadência".
+      print "  ⚠ STALE-EXPIRED NÃO MEDIDO: o arquivo cita reverify_every/reverify_on e o vencimento não foi lido — " dueWhy " (isto NÃO é 0 vencidos)"; fwarns++
+    } else if (dueState == "ok") {
+      ndue = 0; nuns = 0; nev = 0; nhist = 0; nmal = 0
+      while ((getline dl < dueFile) > 0) {
+        if (dl == "") continue
+        split(dl, dc, "\t")
+        if ((dc[2] in nodeSeen) && (nstatus[dc[2]] == "superseded" || nstatus[dc[2]] == "refuted")) { nhist++; continue }
+        if (dc[1] == "DUE") {
+          print "  ⚠ STALE-EXPIRED: " dc[2] " (verificado em " dc[3] ", reverify_every " dc[4] ", venceu em " dc[5] (dc[6] + 0 > 0 ? ", " dc[6] " dia(s) de atraso" : ", hoje") " — re-verifique contra o alvo e carimbe; vencido avisa, não reprova)"; ndue++; fwarns++
+        } else if (dc[1] == "UNSTAMPED") {
+          print "  ⚠ CADENCE-UNSTAMPED: " dc[2] " (reverify_every " dc[3] " sem verified_at: legível — a cadência não tem de onde contar)"; nuns++; fwarns++
+        } else if (dc[1] == "MALFORMED") {
+          # Um aviso por nó, mesmo quando o contrato acusa forma E tipo.
+          if (!(dc[2] in malSeen)) { malSeen[dc[2]] = 1; print "  ⚠ CADENCE-MALFORMED: " dc[2] " (reverify_every recusado pelo contrato, " dc[3] " — o vencimento NÃO foi medido; use duração ISO 8601 só com data e não nula: P30D, P3M, P1Y)"; nmal++; fwarns++ }
+        } else if (dc[1] == "EVENT") nev++
+      }
+      close(dueFile)
+      if (ndue + nuns + nev + nhist + nmal > 0) print "  ℹ cadência por nó (kg-ssot --due em " hoje ", fora do veredito): " ndue " vencido(s) · " nuns " sem carimbo · " nmal " fora da forma (não medido) · " nev " só por evento (reverify_on não vence por data)" (nhist > 0 ? " · " nhist " em nó superseded/refuted, não cobrado(s)" : "")
+    }
+    if (ntracked == 0 && fwarns == 0) print "  (nenhum nó com frescor rastreado — nada a verificar)"
     else if (fwarns == 0) print "  ✅ " ntracked " nó(s) com frescor declarado" (metaBaseline != "" ? " (baseline " metaBaseline ")" : "")
     # `if` próprio, FORA da cadeia else-if: a supressão tem de aparecer mesmo quando fwarns==0.
     # Uma linha no lugar de N, e o filtro fica auditável em vez de mágico.
@@ -1050,8 +1304,17 @@ END {
       }
       if (index(VE, etype[i]) == 0 || etype[i] == "") { print "  ✗ aresta " i ": edge_type inválido: [" etype[i] "]"; problems++ }
       if (eon[i] != "" && !(eon[i] in nodeSeen)) {
-        if (isProposal) { dangling++ } else { print "  ✗ aresta " i ": on aponta evento inexistente: " eon[i]; problems++ }
+        if (isProposal) { dangling++ } else { print "  ✗ aresta " i ": trigger aponta evento inexistente: " eon[i]; problems++ }
       }
+      # `on:` LEGADO: lido, nunca reprovado (grafo antigo fora do corpus não quebra), sempre dito.
+      if (eonLegacy[i]) print "  ⚠ ON-LEGADO aresta " i " (" efrom[i] " -> " eto[i] "): o gatilho usa a chave on:, que YAML 1.1 lê como booleano — renomeie para trigger: " eon[i]
+    }
+    # aresta externa: só a ponta LOCAL se decide aqui (a externa é do gate, contra o corpus)
+    for (i = 1; i <= nx; i++) {
+      if (xlocal[i] != "" && !(xlocal[i] in nodeSeen)) {
+        if (isProposal) { dangling++ } else { print "  ✗ external_edges " i ": " xlocalKey[i] " aponta nó inexistente: " xlocal[i]; problems++ }
+      }
+      if (index(VX, " " xtype[i] " ") == 0 || xtype[i] == "") { print "  ✗ external_edges " i ": edge_type fora da lista do contrato v4.3: [" xtype[i] "]"; problems++ }
     }
     for (i = 1; i <= nn; i++) {
       id = order[i]
@@ -1067,6 +1330,21 @@ END {
       if (refutedBy[id] > 0 && pendingTarget(nstatus[id], ntype[id])) {
         print "  ✗ CONTRADIÇÃO: " id " recebe REFUTES mas segue status=" nstatus[id] " (reconciliar: refuted ou superseded)"; problems++
       }
+      # ALFABETO DO ID (2026-10-07, sinal de campo de um adotante que escreveu um leitor tipado do
+      # corpus): 12 ids `SYNTHESIS.md_*` num grafo do core — o nome do documento-fonte virou prefixo
+      # SEM tirar a extensão. Este radar os aceitava (o `id` é só texto para o awk), mas um ponto no
+      # id quebra quem endereça nó por caminho (`grafo#nó`, `a.b`) e não passa em nenhum schema
+      # tipado. Medido antes de reprovar: 0 ids fora de [A-Za-z0-9_] no corpus do core (pós-cura),
+      # nas fixtures e em 16 clones de adotantes — nasce HARD sem baseline. Aspas duplas são aceitas
+      # (o programa awk vive entre aspas SIMPLES do shell: a aspa simples não pode aparecer aqui).
+      _idc = id; gsub(/^"|"$/, "", _idc)
+      if (_idc !~ /^[A-Za-z0-9_]+$/) { print "  ✗ " id ": id fora do alfabeto [A-Za-z0-9_] — renomeie o nó e TODAS as arestas que o citam"; problems++ }
+      # `valid_from: 2026` SEM ASPAS é um INTEIRO para todo leitor YAML tipado, não uma data parcial:
+      # este radar lê o texto e não vê diferença, um leitor tipado vê. Dois leitores discordando do
+      # mesmo byte é a classe; o motor não decide o tipo, só avisa. AVISO e não reprova porque os
+      # adotantes carregam o passivo (42 ocorrências em 7 grafos de 3 clones, medido no mesmo dia) —
+      # a REGRA 52 o repassa como SOFT para que seja visto no lint.
+      if (validFromBare[id]) { print "  ⚠ VALID-FROM-INTEIRO " id ": valid_from: " validFrom[id] " é número para leitor tipado — escreva entre aspas (\"" validFrom[id] "\")" }
     }
     # O QUE FOI RELAXADO SAI NUMERADO. Sem esta linha o modo proposta seria exatamente o defeito
     # que ele cura, uma camada acima: um ✅ que não conta o que deixou de cobrar.

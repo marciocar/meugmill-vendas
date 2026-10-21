@@ -22,7 +22,13 @@ set -uo pipefail
 
 DEST="${1:-}"
 [ -n "${DEST}" ] || { echo "uso: offer-onion-ci.sh <dest-dir> [--apply]" >&2; exit 2; }
-[ -d "${DEST}/.git" ] || { echo "✗ '${DEST}' não é repositório git" >&2; exit 2; }
+# ⚠️ `[ -d "$DEST/.git" ]` RECUSAVA WORKTREE (F1 das portas, 2026-10-09): numa worktree o `.git` é
+# ARQUIVO (`gitdir: …`), não diretório — e a adoção legacy instala justamente numa worktree (Fase 2a).
+# Pergunta-se ao git, e exige-se que DEST seja a RAIZ: um subdiretório comum dentro de outro repo
+# também responde a `rev-parse`, e o workflow nasceria no lugar errado.
+_top="$(git -C "${DEST}" rev-parse --show-toplevel 2>/dev/null)" \
+  && [ "$(cd "${_top}" && pwd -P)" = "$(cd "${DEST}" && pwd -P)" ] \
+  || { echo "✗ '${DEST}' não é a raiz de um repositório git (nem de uma worktree)" >&2; exit 2; }
 APPLY=0
 [ "${2:-}" = "--apply" ] && APPLY=1
 
@@ -59,9 +65,26 @@ if ! ( cd "${DEST}" && bash "${LINT}" >/dev/null 2>&1 ); then
   exit 1
 fi
 
+# ── 3b. O CONTRATO DO CORPUS, MEDIDO — "lint VERDE" não é "corpus verde" ────────────────
+# Medido em 2026-10-20 na cópia do hub ANTES da migração dele (sinal de 2026-10-19): esta oferta dizia
+# "lint do alvo VERDE" com 1.024 nós em 24 grafos reprovando no MUST do contrato KG-SSOT vendorizado. O lint
+# não roda o gate do corpus, e o CI ofertado também não: a dívida não muda o rc desta oferta (o CI não
+# nasceria vermelho por ela), mas a frase não pode declarar verde o que não mediu.
+CONTRACT="contrato do corpus NÃO MEDIDO (remeasure-contract.sh ausente)"
+_RC_SH="$(dirname "${BASH_SOURCE[0]}")/remeasure-contract.sh"
+if [ -f "${_RC_SH}" ]; then
+  _rc_out="$(bash "${_RC_SH}" "${DEST}" 2>&1)"; _rc=$?
+  case "${_rc}" in
+    0) CONTRACT="contrato do corpus: passa no MUST" ;;
+    1) CONTRACT="contrato do corpus REPROVA no MUST ($(grep -oE '[0-9]+ nó\(s\) em [0-9]+ grafo\(s\)' <<< "${_rc_out}" | head -1)) — o lint verde NÃO cobre isso, e o CI ofertado roda só o lint" ;;
+    4) CONTRACT="contrato do corpus: não se aplica" ;;
+    *) CONTRACT="contrato do corpus NÃO MEDIDO (rc=${_rc}: $(head -1 <<< "${_rc_out}"))" ;;
+  esac
+fi
+
 # ── 4. CONSENTIMENTO ────────────────────────────────────────────────────────────────────
 if [ "${APPLY}" -eq 0 ]; then
-  echo "✓ APLICÁVEL: forge=GitHub · lint do alvo VERDE · sem workflow prévio." >&2
+  echo "✓ APLICÁVEL: forge=GitHub · lint do alvo VERDE · ${CONTRACT} · sem workflow prévio." >&2
   echo "  O que faria: criar '${TARGET#${DEST}/}' rodando o lint determinístico em cada PR." >&2
   echo "  Custo: minutos de CI da conta do adotante. Ganho: o gate deixa de ser pulável com --no-verify." >&2
   echo "  PERGUNTE ao dono do repositório e, se ele aceitar, rode com --apply." >&2
@@ -71,4 +94,5 @@ fi
 mkdir -p "${DEST}/.github/workflows"
 cp "${TPL}" "${TARGET}"
 echo "✓ CI instalado em '${TARGET#${DEST}/}' — o gate agora roda no PR, onde --no-verify não alcança." >&2
+echo "  ${CONTRACT}." >&2
 exit 0

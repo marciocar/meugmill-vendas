@@ -93,7 +93,7 @@ edges:
     to: C_MEU_CLAIM
     edge_type: SUPPORTS      # AUDIT: SUPPORTS | REFUTES | SUPERSEDES | CAUSES | DEPENDS_ON | TRACES_TO
                              # DOMAIN: HAS_STATE | TRANSITIONS | EMITS | CONSTRAINS | READS | WRITES
-    on: EV_GATILHO           # só TRANSITIONS: o evento que dispara (conta como conexão do evento)
+    trigger: EV_GATILHO      # só TRANSITIONS: o evento que dispara (conta como conexão do evento; `on:` é legado PROIBIDO)
 ```
 
 Peso do nó = `impact × confidence × fator de status` (open/confirmed = 1.0 · refuted = 0 ·
@@ -137,7 +137,7 @@ eventos, regras). O audit **`TRACES_TO`** o domain — mesma convenção de um a
 bash .claude/validation/kg-radar.sh docs/onion/graph/<slug>.kg.yaml            # todas as saídas (radar+reconcile+integrity+domain+freshness+schema)
 bash .claude/validation/kg-radar.sh <arquivo> --integrity                      # só o gate estrutural (exit 1 se problema)
 bash .claude/validation/kg-radar.sh <arquivo> --schema                         # só o gate de schema (exit 1 se schema_version divergir)
-bash .claude/validation/kg-radar.sh <arquivo> --freshness                      # só o frescor da SSOT (⚠ STALE-MISSING/STALE-OLD/UNANCHORED/MISPLANED, não reprova)
+bash .claude/validation/kg-radar.sh <arquivo> --freshness                      # só o frescor da SSOT (⚠ STALE-MISSING/STALE-OLD/UNANCHORED/MISPLANED/STALE-EXPIRED, não reprova)
 bash .claude/validation/kg-radar.sh <arquivo> --domain                         # só completude da camada domain
 bash .claude/validation/kg-radar.sh <arquivo> --triples                        # triplas p/ consumo por LLM
 bash .claude/validation/kg-console.sh <arquivo> > grafo.html                    # VER o grafo (projeção HTML self-contained)
@@ -148,14 +148,14 @@ bash .claude/validation/kg-console.sh <arquivo> > grafo.html                    
   EVENT-sem-efeito · STATE-sem-dona · RULE-sem-trace · fonte-única (>1 READS — átomo lendo de 2 fontes).
   *Foi esta checagem que fez o SLOT-limbo emergir do modelo no dogfood de campo.*
 - **INTEGRIDADE** = órfãos, arestas para nós inexistentes, contradições (REFUTES entrando em nó
-  ainda `confirmed`), enums inválidos (incl. `layer`, `on:` para evento inexistente).
+  ainda `confirmed`), enums inválidos (incl. `layer`, `trigger:` para evento inexistente).
   **Exit 1 = reconciliar antes de commitar.**
 - **FRESCOR** (⚠ **não reprova**) = a SSOT foi re-verificada contra o vivo? **STALE-MISSING** (nó rastreado —
   `plane:PROD` **ou** com `verified_against:` — sem `verified_at:`) · **STALE-OLD** (`verified_at` anterior à
   `meta.baseline`) · **UNANCHORED** (`node_type: claim` com `verified_at:` mas **sem** `verified_against:` —
   carimbo sem alvo declarado; os demais tipos ancoram por `trace:`/`TRACES_TO` e entram numa linha `ℹ` contada,
   nunca suprimidos em silêncio) · **MISPLANED** (`plane: PROD` com `verified_against: branch|commit` — o nó
-  afirma sobre o **vivo** e declara ter olhado a **fonte**; contradição interna, vale para **todos** os tipos). Cobre nós DEV que rastreiam artefato móvel (branch/commit), não só PROD. Um nó stale
+  afirma sobre o **vivo** e declara ter olhado a **fonte**; contradição interna, vale para **todos** os tipos; `commit` de sentido-**execução** — commit-sonda, commit barrado/recusado pelo gate — não acusa, e `commit <sha>` acusa sempre) · **STALE-EXPIRED** (nó com `reverify_every:`, campo do contrato kg-ssot v4.8, cujo `verified_at` + a cadência já passou; a data vem do `kg_validate.py --due`, nunca do radar, e sem `--due` a linha diz NÃO MEDIDO). Cobre nós DEV que rastreiam artefato móvel (branch/commit), não só PROD. Um nó stale
   **mente**, não corrompe — o veredito é "re-verifique". *Nasceu da lição-mestra do dogfood de campo.*
 - **SCHEMA** (✗ **reprova**, exit 1) = `meta.schema_version` bate com o que o radar entende? Divergência
   = recusa (o radar não sabe ler o arquivo); ausência = ⚠ retrocompat. *Teria pego o fork de ferramenta
@@ -200,7 +200,7 @@ entidades, estados, transições (com evento gatilho), regras/invariantes — **
 regras+estados+eventos) que ela toca.
 
 **Jornadas/fluxos → máquina de estados** (por identidade, não analogia): passos da jornada = `state`
-do progresso do ator (ou do processo, se fluxo de sistema); avanço = `TRANSITIONS` com `on:` no
+do progresso do ator (ou do processo, se fluxo de sistema); avanço = `TRANSITIONS` com `trigger:` no
 evento (ação do usuário ou do sistema); cada passo `TRACES_TO` a tela/endpoint que toca. O radar
 paga na hora: **estado-absorvente = ponto de drop-off/limbo do funil** — o mesmo motor que achou o
 SLOT-limbo acha onde a jornada morre. Sem tipos novos até um dogfood pedir (gated-until-trigger).

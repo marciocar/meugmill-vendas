@@ -15,8 +15,8 @@
 #       Ramifica onion/vendor do HEAD da integração (framework LIMPO recém-instalado). Idempotente.
 #   vendor-branch.sh update <TARGET> <SOURCE_ROOT> <PIN> <INTEGRATION_BRANCH>
 #       Aplica o framework NOVO do core no onion/vendor (worktree) + durable-commit, depois mergeia na
-#       integração. Bootstrapa o vendor se ausente (legado). Exit: 0 merge limpo · 10 CONFLITO (humano
-#       resolve) · 11 BASE CRUZADA · 12 arquivo do core não chegou à vendor (nada mergeado) · 2 precondição.
+#       integração. Bootstrapa o vendor se ausente (legado). Exit: 0 merge limpo (ou conflito SÓ em
+#       projeção gerada, resolvido por regeneração e declarado) · 10 CONFLITO (humano resolve) · 11 BASE CRUZADA · 12 arquivo do core não chegou à vendor (nada mergeado) · 2 precondição.
 #
 # Reusa: durable-commit.sh (commit no vendor) · o manifest L1+L2 (mesma superfície do adopt).
 # Determinístico, sem jq. Exercitado por lint-selftest.sh (run_vendor_branch_selftests).
@@ -47,16 +47,34 @@ _manifest() {  # $1=SOURCE_ROOT → imprime pathspecs existentes, um por linha
   # sem o dir o comando NASCE MORTO no adotante (sinal de campo de um adotante, 2026-09-04).
   # A lista vive UMA vez, em vendor-manifest.sh (SSOT). Quatro cópias eram três a mais, e duas já
   # tinham driftado (medido 2026-09-13).
-  bash "${HERE}/vendor-manifest.sh" --role "${ONION_ROLE:-adopted}" --repo "$1"
+  # o DESTINO (2026-10-11): quem usa o vendor-branch é a ADOÇÃO, e o adotado standalone mantém o canal
+  # upstream que a porta standalone perde. O `--update` do adopt.md exporta ONION_KIND=door se o carimbo
+  # do alvo tiver `kind: door`.
+  bash "${HERE}/vendor-manifest.sh" --role "${ONION_ROLE:-adopted}" --kind "${ONION_KIND:-adoption}" --repo "$1"
 }
 
-# `--print-manifest <SOURCE_ROOT>` — expõe a decisão de transporte que este helper toma, para que
+# O PAPEL E O DESTINO SÃO DO ALVO, e o env é só um atalho (passada adversarial de 2026-10-11): o
+# `--update` do adopt.md exporta ONION_ROLE/ONION_KIND num bloco e chama o `update` noutro, e a shell de
+# um agente não persiste entre chamadas. Env perdido = papel `adopted` (não corta nada) e destino
+# `adoption` (o canal upstream iria para uma porta). Quando o env veio vazio, lê-se o carimbo do alvo,
+# o mesmo predicado do adopt.md (`role:` e `kind: door`). Env presente vence: é a escolha de quem chama.
+_from_target_stamp() {  # $1=TARGET → preenche ONION_ROLE/ONION_KIND vazios a partir do carimbo dele
+  local _st="$1/.claude/.onion-version"
+  [ -f "${_st}" ] || return 0
+  [ -n "${ONION_ROLE:-}" ] || ONION_ROLE="$(awk '/^role:/{print $2; exit}' "${_st}")"
+  if [ -z "${ONION_KIND:-}" ]; then
+    if [ "$(awk '/^kind:/{print $2; exit}' "${_st}")" = door ]; then ONION_KIND=door; else ONION_KIND=adoption; fi
+  fi
+}
+
+# `--print-manifest <SOURCE_ROOT> [<TARGET>]` — expõe a decisão de transporte que este helper toma, para que
 # ela possa ser MEDIDA em vez de inferida. Nasceu porque a bancada "provava" a propagação do papel
 # com três `grep` de string literal, e a passada adversarial (2026-09-15) mostrou que ela aprovava um
 # caminho quebrado: 106 arquivos da meta-fábrica caindo num alvo `role: standalone`, tudo verde.
 # Guarda `behavior-over-declaration` que testa declaração não é guarda.
 if [ "${1:-}" = "--print-manifest" ]; then
-  [ -n "${2:-}" ] || { echo "uso: vendor-branch.sh --print-manifest <SOURCE_ROOT>" >&2; exit 2; }
+  [ -n "${2:-}" ] || { echo "uso: vendor-branch.sh --print-manifest <SOURCE_ROOT> [<TARGET>]" >&2; exit 2; }
+  [ -n "${3:-}" ] && { _from_target_stamp "$3"; export ONION_TARGET="${ONION_TARGET:-$3}"; }   # o mesmo caminho do `update`, para a bancada medir
   _manifest "$2"
   exit 0
 fi
@@ -94,9 +112,70 @@ _vendor_is_framework_pure() {  # <TARGET> <SOURCE_ROOT> <INTEGRATION_BRANCH> →
   done <<< "$mf"
   # .claude/.onion-version é carimbo do framework, não produto.
   keep="$(printf '%s\n' "$keep" | grep -vE '^\.claude/\.onion-version$|^$' || true)"
+  # As PROJEÇÕES GERADAS (docs/onion/inventory.md, graph.md, testing-*.md, kg-read-index.tsv) também são
+  # framework: o próprio commit da onion/vendor as regenera, e fora do manifesto elas viravam "produto
+  # alheio" → BASE CRUZADA falsa (rc=11), medida no --update de um hub em 2026-10-14. A lista vem do
+  # GERADOR (--list-outputs), nunca copiada aqui. Gerador ausente ou mudo = nada a tirar: falha
+  # fechada, a recusa segue como antes.
+  local gen_out
+  gen_out="$(bash "${HERE}/regen-ssot-projections.sh" --list-outputs 2>/dev/null)" || gen_out=""
+  [ -n "$gen_out" ] && keep="$(printf '%s\n' "$keep" | grep -vxF -f <(printf '%s\n' "$gen_out") || true)"
   [ -z "$keep" ] && return 0
   printf '%s\n' "$keep" | head -8
   return 1
+}
+
+# ── CONFLITO SÓ EM PROJEÇÃO GERADA SE RESOLVE POR REGENERAÇÃO (SAC-139, 2026-10-14) ──────────────
+# Medido nos dois `--update` reais do dia (um hub com integração onion/develop, outro com main): o merge
+# deu rc=10 SÓ em `docs/onion/{inventory,testing-inventory,testing-state}.md` e `kg-read-index.tsv`,
+# porque as DUAS pontas as regeneram. Nenhuma das duas versões é a certa (a certa é a que o gerador
+# escreve sobre a árvore mergeada), e a resolução manual era sempre a mesma: `checkout --theirs`,
+# regenerar, `git add`, commitar. Aqui ela vira mecanismo, com três travas:
+#   1. TODO arquivo em conflito tem de estar na lista do GERADOR (`--list-outputs`), por linha inteira
+#      (`grep -vxF`). Um único arquivo fora dela (customização de framework) → nada é tocado, rc=10.
+#   2. Gerador ausente/mudo ou que falha → rc=10, e os marcadores VOLTAM (`checkout -m`): falha fechada.
+#   3. A resolução é DECLARADA no stdout (quantos e quais), nunca calada.
+_autoresolve_projections() {  # <TARGET> <CONFLITOS, um por linha> <args -m do merge...> → 0 resolvido · 1 não
+  local T="$1" conf="$2" gen_out outside n f; shift 2
+  gen_out="$(bash "${HERE}/regen-ssot-projections.sh" --list-outputs 2>/dev/null)" || gen_out=""
+  [ -n "${gen_out}" ] || return 1
+  outside="$(grep -vxF -f <(printf '%s\n' "${gen_out}") <<< "${conf}" || true)"
+  [ -z "${outside}" ] || return 1
+  n="$(grep -c . <<< "${conf}")"
+  local -a files=(); while IFS= read -r f; do [ -n "$f" ] && files+=("$f"); done <<< "${conf}"
+  # (modify/delete: o lado deles não existe e o `--theirs` recusa — os marcadores voltam, rc=10)
+  if ! git --literal-pathspecs -C "$T" checkout --theirs -- "${files[@]}" 2>/dev/null; then
+    git --literal-pathspecs -C "$T" checkout -m -- "${files[@]}" 2>/dev/null || true; return 1
+  fi
+  if ! bash "${HERE}/regen-ssot-projections.sh" "$T" >/dev/null 2>&1; then
+    git --literal-pathspecs -C "$T" checkout -m -- "${files[@]}" 2>/dev/null || true   # os marcadores voltam
+    echo "⚠️  Onion: ${n} conflito(s) só de projeção gerada, mas o gerador FALHOU no alvo — não resolvo às cegas." >&2
+    return 1
+  fi
+  # Stageia os arquivos em conflito (agora regenerados) e as projeções que o gerador reescreveu ao lado.
+  # (É a trava 1 que protege a customização: daqui em diante, o que estava em conflito é dado por resolvido.)
+  git --literal-pathspecs -C "$T" add -A -- "${files[@]}" 2>/dev/null || true
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    if [ -e "$T/$f" ] || git --literal-pathspecs -C "$T" ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
+      git --literal-pathspecs -C "$T" add -A -- "$f" 2>/dev/null || true
+    fi
+  done <<< "${gen_out}"
+  if [ -n "$(git -C "$T" diff --name-only --diff-filter=U 2>/dev/null)" ]; then
+    echo "⚠️  Onion: regenerei as projeções, mas ainda há conflito no índice — não concluo o merge." >&2
+    return 1
+  fi
+  local -a msg=("$@"); [ "${#msg[@]}" -ge 2 ] || msg=(-m "chore(onion): atualizar o Onion")
+  # A nota entra ANTES da assinatura (o último -m), para o trailer do adotante seguir no fim.
+  local -a full=("${msg[@]:0:2}" -m "Conflito só em projeção gerada (${n}), resolvido por regeneração: $(tr '\n' ' ' <<< "${conf}")" "${msg[@]:2}")
+  if ! git -C "$T" commit -q "${full[@]}" >/dev/null 2>&1; then
+    echo "⚠️  Onion: projeções regeneradas e stageadas, mas o commit do merge foi RECUSADO em $T — conclua com 'git commit'." >&2
+    return 1
+  fi
+  echo "Onion: resolvi ${n} conflito(s) de projeção gerada por regeneração (checkout --theirs + regen-ssot-projections.sh):"
+  printf '%s\n' "${conf}" | sed 's/^/    /'
+  echo "Onion: framework atualizado via merge de $VENDOR (pin ${PIN:-?})."
+  return 0
 }
 
 _seed() {  # <TARGET> <INTEGRATION_BRANCH>
@@ -169,6 +248,16 @@ _update() {  # <TARGET> <SOURCE_ROOT> <PIN> <INTEGRATION_BRANCH>
     echo "      Passe o commit real: git -C \"$SRC\" rev-parse --short=12 HEAD" >&2
     return 2
   fi
+  # O PIN É O COMMIT TRANSPORTADO (SAC-144, 2026-10-15): o transporte abaixo sai do HEAD da fonte, e
+  # o pin é o que se carimba. Pin ≠ HEAD = o adotante recebe um commit e registra outro — a escolha
+  # da fonte vive no resolve-update-source.sh, que entrega um SOURCE_ROOT cujo HEAD É o pin.
+  # Só compara o que resolve: lixo de pin é da guarda acima (o mutante dela tem de continuar mordendo).
+  _pin_full="$(git -C "$SRC" rev-parse --verify -q "${PIN}^{commit}" 2>/dev/null)"
+  if [ -n "${_pin_full}" ] && [ "${_pin_full}" != "$(git -C "$SRC" rev-parse HEAD)" ]; then
+    echo "ERRO: pin '${PIN}' não é o HEAD da fonte ($SRC) — o transporte sairia de outro commit." >&2
+    echo "      Resolva a fonte pelo resolve-update-source.sh (ele entrega a raiz cujo HEAD é o pin)." >&2
+    return 2
+  fi
 
   # Bootstrap de legado (sem vendor): ramifica do commit LIMPO (framework == core@pin-ADOTADO), não do HEAD
   # (que pode ter customização commitada → clobber no 1º merge — spec §8). Fresh-adoption já tem vendor.
@@ -195,6 +284,8 @@ _update() {  # <TARGET> <SOURCE_ROOT> <PIN> <INTEGRATION_BRANCH>
   # Aplica o framework NOVO no onion/vendor, num worktree (não sai da integração).
   local wt; wt="$(mktemp -d)/onion-vendor-wt"
   git -C "$T" worktree add -q "$wt" "$VENDOR" 2>/dev/null || { echo "ERRO: worktree do $VENDOR falhou." >&2; return 2; }
+  _from_target_stamp "$T"
+  export ONION_TARGET="${ONION_TARGET:-$T}"   # o contrato do .kg.yaml que o alvo já tem não é sobrescrito (vendor-manifest.sh)
   local mf; mf="$(_manifest "$SRC")"
   [ -n "$mf" ] || { echo "ERRO: manifest vazio (core sem framework?)." >&2; git -C "$T" worktree remove --force "$wt" 2>/dev/null; return 2; }
   # O sha é resolvido UMA vez: transporte e lista de exigidos saem do MESMO commit (Elenxo: com dois
@@ -246,8 +337,62 @@ _update() {  # <TARGET> <SOURCE_ROOT> <PIN> <INTEGRATION_BRANCH>
   rm -f "$idx"
   [ -s "$req" ] || { echo "ERRO: a lista do que o core transporta saiu VAZIA (sha ${sha:0:12}) — recuso seguir sem ela." >&2
                      git -C "$T" worktree remove --force "$wt" 2>/dev/null; rm -f "$req"; return 12; }
+  # ── O QUE O CORE PAROU DE TRANSPORTAR SAI DA VENDOR (rename do workflow do evolve, 2026-10-13) ────
+  # O `tar -x` acima SOBREPÕE: escreve o que o core manda e nunca apaga o que ele deixou de mandar.
+  # (Os nomes vão SEM extensão de propósito: este arquivo viaja e ANCORA peças por citação com extensão
+  #  — `vendor-manifest.sh`, "_is_anchor" — e citar o workflow aqui o manteria vivo onde o evolve é cortado.)
+  # MEDIDO numa fixture (core renomeia o workflow `evolve` → `meta-evolve-fanout`, update rc=0
+  # "merge limpo"): o adotante ficava com OS DOIS — o antigo, órfão, seguia na lista de workflows dele
+  # com o nome que o core aposentou. Todo rename e toda remoção do core vazavam assim, em silêncio.
+  # O CRITÉRIO É O DELTA DO PRÓPRIO CORE, nunca "o que a vendor tem e o core não": a vendor nasce da
+  # integração e carrega arquivo do ADOTANTE sob `.claude/` (comandos próprios, por exemplo). Sai só o
+  # que o core TRANSPORTAVA no pin anterior (o `source_commit` do carimbo da integração, ainda não
+  # re-carimbado) e NÃO transporta mais, com o mesmo manifesto dos dois lados. Adotante que editou o
+  # arquivo removido recebe conflito modify/delete (exit 10): never-clobber continua estrutural.
+  # RENAME (o caso que motivou): a vendor ganha delete+add do mesmo conteúdo, e a detecção de rename do
+  # merge leva a edição do adotante para o nome novo, sem conflito (medido, caso (c) da bancada).
+  # Pin anterior ausente ou que não é commit da fonte → NADA sai, e isso é DITO (status quo, declarado).
+  # O LADO ANTIGO SE MEDE SEM AS EXCLUSÕES DE APOSENTADORIA (2026-10-17): com o manifesto inteiro, o
+  # `:(exclude)` que APOSENTA um arquivo também filtrava o pin anterior, e ele nunca entrava no delta —
+  # medido num clone descartável de adotante: a skill onion-publish, tirada da adoção, ficava nele depois
+  # do --update rc=0. SÓ as de aposentadoria saem do lado antigo (`vendor-manifest.sh --retired-excludes`):
+  # A 1ª cura tirava TODAS. Isso não apaga arquivo próprio do adotante (o lado antigo é a árvore do CORE
+  # no pin anterior, e a bancada refutou essa objeção), mas estenderia a remoção aos CORTES DE PAPEL: um
+  # adotante que trocou de papel perderia o que o corte novo tira, decisão que ninguém tomou. Estreito.
+  # LIMITE DECLARADO: o manifesto só lista raiz que EXISTE no HEAD da fonte; se o core apagar uma raiz
+  # INTEIRA (ex.: `.claude/workflows/` vazio), os arquivos dela não entram no delta e ficam.
+  # >>> D_CURE-core-removed (run_vendor_core_removed_selftests remove ESTE bloco p/ provar load-bearing) >>>
+  local _prev _pidx _pold _gone
+  _prev="$(awk '/^source_commit:/{print $2; exit}' "$T/.claude/.onion-version" 2>/dev/null)"
+  if [ -n "${_prev}" ] && git -C "$SRC" cat-file -e "${_prev}^{commit}" 2>/dev/null; then
+    _pidx="$(mktemp)"; _pold="$(mktemp)"; rm -f "$_pidx"
+    # shellcheck disable=SC2046
+    GIT_INDEX_FILE="$_pidx" git -C "$SRC" read-tree "$_prev" 2>/dev/null \
+      && GIT_INDEX_FILE="$_pidx" git -C "$SRC" ls-files -z -- $(printf '%s\n' $mf | grep -vxF -f <(bash "$HERE/vendor-manifest.sh" --retired-excludes) || true) 2>/dev/null \
+         | grep -zvE '^\.claude/validation/[^/]*-baseline\.txt$' | LC_ALL=C sort -zu > "$_pold"
+    rm -f "$_pidx"
+    _gone="$(LC_ALL=C comm -z -23 "$_pold" "$req" | tr '\0' '\n')"
+    rm -f "$_pold"
+    while IFS= read -r _f; do
+      [ -n "${_f}" ] || continue
+      git -C "$wt" cat-file -e "HEAD:${_f}" 2>/dev/null || continue   # a vendor nunca o teve: nada a tirar
+      # (a 1ª redação passava `--literal-pathspecs` ao `rm`, que o recusa: falhou calada e o arquivo
+      #  ficou — por isso a falha agora é DITA, nunca engolida)
+      if git --literal-pathspecs -C "$wt" rm -q -- "${_f}" >/dev/null 2>&1; then
+        echo "Onion: '${_f}' saiu do core (pin ${_prev:0:12} → ${sha:0:12}) — removido da $VENDOR."
+      else
+        echo "⚠️  Onion: '${_f}' saiu do core mas NÃO consegui tirá-lo da $VENDOR — fica no adotante." >&2
+      fi
+    done <<< "${_gone}"
+  else
+    echo "⚠️  Onion: pin anterior '${_prev:-<sem source_commit>}' não é commit da fonte — arquivo que o core REMOVEU não sai da $VENDOR nesta rodada." >&2
+  fi
+  # <<< D_CURE-core-removed <<<
   local _dc=0
-  ONION_REQUIRED_LIST="$req" ONION_REQUIRED_NUL=1 bash "$HERE/durable-commit.sh" "$wt" update "$PIN" "$VENDOR" >/dev/null 2>"$req.err" || _dc=$?
+  # ONION_DURABLE_VERIFY=0 FIXO: o commit da onion/vendor é framework puro numa worktree temporária; um
+  # VERIFY=1 exportado pelo operador para o commit final do --update vazaria até aqui, o hook recusaria
+  # e o erro viraria rc=12 "não levou o framework inteiro" — mentira (Elenxo do PR da F1, O2).
+  ONION_DURABLE_VERIFY=0 ONION_REQUIRED_LIST="$req" ONION_REQUIRED_NUL=1 bash "$HERE/durable-commit.sh" "$wt" update "$PIN" "$VENDOR" >/dev/null 2>"$req.err" || _dc=$?
   git -C "$T" worktree remove --force "$wt" 2>/dev/null
   if [ "$_dc" -ne 0 ]; then
     echo "ERRO: o commit durável do $VENDOR NÃO levou o framework inteiro (durable-commit rc=$_dc) — NADA foi mergeado." >&2
@@ -298,10 +443,14 @@ except Exception: print("")' "$T/.claude/settings.json")"
     return 0
   fi
   # Merge deixou conflito (ou nada a fazer). Distinga:
-  if git -C "$T" diff --name-only --diff-filter=U 2>/dev/null | grep -q .; then
+  local _conf; _conf="$(git -c core.quotePath=false -C "$T" diff --name-only --diff-filter=U 2>/dev/null)"
+  if [ -n "${_conf}" ]; then
+    # >>> D_CURE-projection-autoresolve (run_vendor_branch_selftests (g3-MUT) remove ESTE bloco) >>>
+    _autoresolve_projections "$T" "${_conf}" "${_mmsg[@]}" && return 0
+    # <<< D_CURE-projection-autoresolve <<<
     echo "Onion: CONFLITO no merge de $VENDOR — customização local vs framework novo (never-clobber estrutural)." >&2
     echo "  Resolva em $T: 'git mergetool' ou edite os marcadores; depois 'git commit'. Arquivos:" >&2
-    git -C "$T" diff --name-only --diff-filter=U 2>/dev/null | sed 's/^/    /' >&2
+    printf '%s\n' "${_conf}" | sed 's/^/    /' >&2
     return 10
   fi
   # Sem conflito e merge não-zero → provavelmente nada a mergear (já atualizado).
