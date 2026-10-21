@@ -1,5 +1,6 @@
 # === onion — vendor + SSOT gerado (provisionado por /meta:adopt; não remover) ===
 .claude/
+vendor/
 docs/meta-specs/
 docs/sdaal/
 docs/knowledge-base/
